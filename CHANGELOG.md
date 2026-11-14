@@ -12,6 +12,11 @@ What changed in each release of Melodex. Versions follow [semantic versioning](h
   Songs you don't have can be asked for; in the playlist they hold their places, greyed out, until they arrive, and a
   **Get** button asks for them later. Songs nothing was found for wait in Review, under **Couldn't match**, where
   matching one puts it in the playlist where it was in the list (#21).
+- **Export** on the Tools page: your playlists as M3U8 playlists, with paths in the music folder or under the folder
+  another machine sees it as, or as a CSV of each song's artist, title, album, length, ISRC and MusicBrainz ID, which
+  the list import reads back. Several come as a zip. Songs you don't have are left out, or kept by name only. The
+  library exports as a CSV too, a row for each song you have or each album, with the columns you choose. A playlist's
+  page has an export button (#24).
 
 ### Fixed
 

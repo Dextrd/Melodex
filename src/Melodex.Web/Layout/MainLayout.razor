@@ -19,10 +19,7 @@
         {
             <NavLink href="review" title="Review">@PageIcon("review")<span class="nav-label">Review</span></NavLink>
         }
-        @if (Auth.May(UserPermissions.Request))
-        {
-            <NavLink href="tools" Match="NavLinkMatch.Prefix" title="Tools">@PageIcon("tools")<span class="nav-label">Tools</span></NavLink>
-        }
+        <NavLink href="tools" Match="NavLinkMatch.Prefix" title="Tools">@PageIcon("tools")<span class="nav-label">Tools</span></NavLink>
         @SectionLink(NavSection.Search, "Search")
     </nav>
     <span class="spacer"></span>
