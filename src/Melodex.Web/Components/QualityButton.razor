@@ -45,12 +45,12 @@
             <input type="radio" name="quality-kind" checked="@(_kind == QualityOverrideKind.NeverUpgrade)" @onchange="() => _kind = QualityOverrideKind.NeverUpgrade" />
             <span><strong>Never upgrade</strong><span class="muted small">Keep it as it is, whatever its quality.</span></span>
         </label>
-        <div class="setting-line">
-            <button @onclick="LookAsync" disabled="@_looking">Look for upgrades now</button>
-            <span class="muted small">@(_looked ?? "By the setting as it's saved: each song below its cutoff gets a request in Activity.")</span>
-        </div>
         @if (_error is not null) { <div class="error small">@_error</div> }
         <div class="toolbar dialog-buttons">
+            <button class="with-glyph look-now" disabled="@_looking" title="By the setting as it's saved: each song below its cutoff gets a request in Activity"
+                    @onclick="LookAsync"><Icon Name="upgrade" />Look for @(Kind == "tracks" ? "an upgrade" : "upgrades") now</button>
+            @if (_looked is not null) { <span class="muted small">@_looked</span> }
+            <span class="spacer"></span>
             <button @onclick="() => _open = false">Cancel</button>
             <button class="primary" disabled="@_saving" @onclick="SaveAsync">Save</button>
         </div>

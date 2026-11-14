@@ -72,7 +72,7 @@
                             <div class="tile-name">@artist.Name</div>
                             @if (artist.Disambiguation is not null) { <div class="muted small tile-sub">@artist.Disambiguation</div> }
                         </a>
-                        <IconButton Icon="cancel" Class="remove tile-remove" Title="@($"Forget {artist.Name}")" OnClick="() => ForgetArtistAsync(artist)" />
+                        <IconButton Icon="cancel" Class="remove tile-corner" Title="@($"Forget {artist.Name}")" OnClick="() => ForgetArtistAsync(artist)" />
                     </div>
                 }
             </div>
@@ -144,13 +144,18 @@ else
         <div class="tiles">
             @foreach (var artist in Artists)
             {
-                <a class="tile arrives" href="@(artist.Local ? "local/artists" : "artists")/@artist.Id" title="@(artist.Disambiguation is null ? artist.Name : $"{artist.Name} ({artist.Disambiguation})")"
-                   @onclick="() => RememberArtistAsync(new RecentArtist(artist.Id, artist.Name, artist.Disambiguation, artist.ImageUrl, artist.Local))">
-                    <Cover Url="@artist.ImageUrl" Artist="true" />
-                    <div class="tile-name">@artist.Name</div>
-                    @if (artist.Disambiguation is not null) { <div class="muted small tile-sub">@artist.Disambiguation</div> }
-                    @if (artist.InLibrary) { <div><span class="badge owned">In library</span></div> }
-                </a>
+                <div class="tile-wrap arrives">
+                    <a class="tile" href="@(artist.Local ? "local/artists" : "artists")/@artist.Id" title="@(artist.Disambiguation is null ? artist.Name : $"{artist.Name} ({artist.Disambiguation})")"
+                       @onclick="() => RememberArtistAsync(new RecentArtist(artist.Id, artist.Name, artist.Disambiguation, artist.ImageUrl, artist.Local))">
+                        <Cover Url="@artist.ImageUrl" Artist="true" />
+                        <div class="tile-name">@artist.Name</div>
+                        @if (artist.Disambiguation is not null) { <div class="muted small tile-sub">@artist.Disambiguation</div> }
+                        @if (artist.InLibrary) { <div><span class="badge owned">In library</span></div> }
+                    </a>
+                    <ItemMenu What="artist" Class="tile-menu" Name="@artist.Name" ArtistHref="@($"{(artist.Local ? "local/artists" : "artists")}/{artist.Id}")"
+                              Get="@(artist.Local ? null : (RequestKind.Artist, artist.Id))" GetLabel="Get everything missing"
+                              Upgrade="@(artist.InLibrary && !artist.Local ? new FormatScope(FormatScopeKind.Artist, artist.Id) : null)" />
+                </div>
             }
         </div>
     }
@@ -179,16 +184,20 @@ else
                                     RenderFragment play = @<text>
                                         <IconButton Icon="@(missing ? "listen" : "play")" Requires="@UserPermissions.Listen" Title="@(missing ? "Listen: fetch it to play now, without adding it to your library" : album.Status == AlbumStatus.Partial ? "Play, fetching the tracks you don't have to listen to" : "Play")"
                                                     OnClick="() => Player.PlayAlbumAsync(album.Id)" />
-                                        <QueueButton Class="@(album.Status is AlbumStatus.Missing or AlbumStatus.Partial ? "hide-narrow" : null)" Title="Add to the queue: next, or at the end" OnQueue="next => Player.QueueAlbumAsync(album.Id, next)" />
+                                        <ItemMenu What="album" AlbumId="album.Id" AlbumStatus="album.Status" Name="@album.Title"
+                                                  Upgrade="@(!album.Local && album.Status is AlbumStatus.Complete or AlbumStatus.Partial ? new FormatScope(FormatScopeKind.Album, album.Id) : null)"
+                                                  ArtistHref="@(album.Local ? null : $"artists/{album.ArtistId}")"
+                                                  Get="@(!album.Local && album.Status is AlbumStatus.Missing or AlbumStatus.Partial ? (RequestKind.Album, album.Id) : null)"
+                                                  GetLabel="@(missing ? "Get it into your library" : "Get the tracks you're missing")" />
                                     </text>;
                                 }
                                 @if (album.Local)
                                 {
-                                    @* Your own music plays from its page. *@
+                                    <ItemMenu What="album" AlbumId="album.Id" AlbumStatus="album.Status" Name="@album.Title" />
                                 }
                                 else if (album.Status is AlbumStatus.Missing or AlbumStatus.Partial)
                                 {
-                                    <FetchButton Kind="RequestKind.Album" Id="album.Id" Hint="@(missing ? "Get this album" : "Get the tracks you're missing")">@play</FetchButton>
+                                    <FetchButton Kind="RequestKind.Album" Id="album.Id" Button="false">@play</FetchButton>
                                 }
                                 else
                                 {
@@ -208,13 +217,15 @@ else
             @if (track.Owned)
             {
                 <IconButton Icon="play" Requires="@UserPermissions.Listen" Title="Play" OnClick="() => Player.PlayAsync([PlayerEntry.Owned(track)])" />
-                <QueueButton Title="Add to the queue: next, or at the end" OnQueue="next => Player.AddAsync([PlayerEntry.Owned(track)], next)" />
+                <ItemMenu Entry="PlayerEntry.Owned(track)" Keep="[new PlaylistItem(track.Id)]" Name="@track.Title" UpgradeTrackId="track.Id"
+                          AlbumHref="@(track.AlbumId is { } albumId ? $"albums/{albumId}" : null)" ArtistHref="@(track.ArtistId is { } artistId ? $"artists/{artistId}" : null)" />
             }
             else
             {
-                <FetchButton Kind="RequestKind.Track" Id="track.Id" Hint="Get it into your library">
+                <FetchButton Kind="RequestKind.Track" Id="track.Id" Button="false">
                     <IconButton Icon="listen" Requires="@UserPermissions.Listen" Title="Listen: fetch it to play now, without adding it to your library" OnClick="() => Player.ListenAsync(track.Id)" />
-                    <IconButton Icon="queue" Requires="@UserPermissions.Listen" Class="hide-narrow" Title="Add to the queue, fetching it to listen to" Confirm="true" OnClick="() => Player.ListenAsync(track.Id, next: true)" />
+                    <ItemMenu ListenTrackId="track.Id" Name="@track.Title" Get="(RequestKind.Track, track.Id)"
+                              AlbumHref="@(track.AlbumId is { } albumId ? $"albums/{albumId}" : null)" ArtistHref="@(track.ArtistId is { } artistId ? $"artists/{artistId}" : null)" />
                 </FetchButton>
             }
         </text>)

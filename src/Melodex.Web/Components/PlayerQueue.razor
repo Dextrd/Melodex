@@ -29,6 +29,11 @@
                 <span class="muted small ellipsis">@entry.ArtistCredit</span>
             </button>
             <span class="small muted nowrap">@EntryState(entry)</span>
+            <ItemMenu Name="@entry.Title" OnPlay="() => Player.JumpAsync(index)" PlayLabel="Play from here"
+                      Keep="entry.Keep" UpgradeTrackId="@(entry.Keep is not null && entry.FileId is null ? entry.TrackId : null)"
+                      AlbumHref="@entry.AlbumHref" ArtistHref="@entry.ArtistHref"
+                      OnMove="by => Player.MoveBy(index, by)" MoveFirst="index == 0" MoveLast="index == Player.Queue.Count - 1"
+                      OnTakeOut="() => Player.RemoveAsync(index)" TakeOutLabel="Take it out of the queue" />
             <button class="link small" title="Remove from the queue" @onclick="() => Player.RemoveAsync(index)">✕</button>
         </li>
     </Virtualize>

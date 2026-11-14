@@ -44,7 +44,7 @@ else
                 var playHint = missing ? $"{playLabel}: in order, fetching the tracks you don't have to listen to, without adding them to your library" : "Play the album";
                 RenderFragment play = @<text>
                     <IconButton Icon="play" Requires="@UserPermissions.Listen" Primary="true" Large="true" Label="@playLabel" Title="@playHint" OnClick="() => Player.PlayAlbumAsync(_album!)" />
-                    <QueueButton Large="true" Left="true" Title="@(missing ? "Add to the queue, next or at the end, fetching the tracks you don't have to listen to" : "Add to the queue: next, or at the end")"
+                    <QueueButton Large="true" Left="true" Title="@(missing ? "Add to the queue, to play next or last, fetching the tracks you don't have to listen to" : "Add to the queue: play next, or play last")"
                                 OnQueue="next => Player.QueueAlbumAsync(_album!, next)" />
                     @if (tracks.Any(Owned))
                     {
@@ -186,15 +186,12 @@ else
                                 @if (track.Status is TrackStatus.Owned or TrackStatus.OwnedElsewhere)
                                 {
                                     <IconButton Icon="play" Requires="@UserPermissions.Listen" Title="@(_album.Tracks.Any(t => t.Status == TrackStatus.Missing) ? "Play the album from here, fetching the tracks you don't have to listen to" : "Play the album from here")"
-                                                OnClick="() => Player.PlayAlbumAsync(_album, track.TrackId)" />
-                                    <QueueButton Title="Add to the queue: next, or at the end"
-                                                OnQueue="next => Player.AddAsync([PlayerEntry.Owned(track, album, _album.ShownEditionId)], next)" />
-                                    <IconButton Icon="playlist" Requires="@UserPermissions.Listen" Class="hide-narrow" Title="Add to a playlist"
-                                                OnClick="() => _adding = (track.Title, [new PlaylistItem(track.TrackId)])" />
+                                                OnClick="() => Player.PlayAlbumAsync(_album, track.TrackId)" />@* no space: it lines up with a listen button's *@<ItemMenu Entry="PlayerEntry.Owned(track, album, _album.ShownEditionId)" Keep="[new PlaylistItem(track.TrackId)]" Name="@track.Title"
+                                              UpgradeTrackId="track.TrackId" />
                                 }
                                 else if (track.Status is TrackStatus.Missing or TrackStatus.Elsewhere && Tracker.Find(RequestKind.Album, album.Id) is not { Active: true })
                                 {
-                                    <FetchButton Kind="RequestKind.Track" Id="track.TrackId" EditionId="_album.ShownEditionId" Hint="Get it into your library">
+                                    <FetchButton Kind="RequestKind.Track" Id="track.TrackId" EditionId="_album.ShownEditionId" Button="false">
                                         @if (track.Status == TrackStatus.Missing)
                                         {
                                             <IconButton Icon="listen" Requires="@UserPermissions.Listen" Title="Listen: play the album from here, fetching the tracks you don't have, without adding them to your library"
@@ -205,13 +202,8 @@ else
                                             <IconButton Icon="listen" Requires="@UserPermissions.Listen" Title="Listen: fetch it to play now, without adding it to your library"
                                                         OnClick="() => Player.ListenAsync(track.TrackId, _album.ShownEditionId)" />
                                         }
-                                        <IconButton Icon="queue" Requires="@UserPermissions.Listen" Class="hide-narrow" Title="Add to the queue, fetching it to listen to" Confirm="true"
-                                                    OnClick="() => Player.ListenAsync(track.TrackId, _album.ShownEditionId, next: true)" />
-                                        @if (track.Status == TrackStatus.Missing)
-                                        {
-                                            <IconButton Icon="ignore" Requires="@UserPermissions.Request" Class="hide-narrow" Title="Ignore: stop counting this song as missing, on every album it's on"
-                                                        OnClick="() => ToggleTrackIgnoredAsync(track)" />
-                                        }
+                                        <ItemMenu ListenTrackId="track.TrackId" EditionId="_album.ShownEditionId" Name="@track.Title" Get="(RequestKind.Track, track.TrackId)"
+                                                  OnIgnore="@(track.Status == TrackStatus.Missing ? EventCallback.Factory.Create(this, () => ToggleTrackIgnoredAsync(track)) : default)" />
                                     </FetchButton>
                                 }
                                 @if (track.Status == TrackStatus.Ignored || track.Ignored)

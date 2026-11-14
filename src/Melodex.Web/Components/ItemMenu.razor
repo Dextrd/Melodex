@@ -1,0 +1,248 @@
+@inject Player Player
+@inject AuthState Auth
+@inject MelodexClient Api
+@inject RequestTracker Tracker
+@inject NavigationManager Nav
+
+@*
+    Everything for one song, album or artist, behind a "more" button: play it, next or last; add it to a playlist; get
+    it into the library; look for a better copy; move it in its list or take it out; go to its album or artist; or remove it from the library. Right-clicking its row or tile, or pressing
+    and holding it on a phone, opens it too (see songmenu.js). Each item shows only where it applies, from what's given.
+*@
+<span class="song-menu @Class">
+    <IconButton Icon="more" On="_open" Title="@($"More for this {What}")" OnClick="Toggle" />
+    @if (_open)
+    {
+        <div class="menu-backdrop" @onclick="Close"></div>
+        <div class="menu right" role="menu" @onkeydown="Key">
+            @if (Auth.May(UserPermissions.Listen))
+            {
+                @if (OnPlay.HasDelegate)
+                {
+                    <button type="button" role="menuitem" @onclick="() => Do(() => OnPlay.InvokeAsync())"><Icon Name="play" />@PlayLabel</button>
+                }
+                else if (Entry is not null)
+                {
+                    <button type="button" role="menuitem" @onclick="() => Do(() => Player.PlayAsync([Entry]))"><Icon Name="play" />Play</button>
+                    <button type="button" role="menuitem" @onclick="() => Do(() => Player.AddAsync([Entry], true))"><Icon Name="play-next" />Play next</button>
+                    <button type="button" role="menuitem" @onclick="() => Do(() => Player.AddAsync([Entry], false))"><Icon Name="play-last" />Play last</button>
+                }
+                else if (ListenTrackId is { } listen)
+                {
+                    <button type="button" role="menuitem" title="Fetch it to play now, without adding it to your library" @onclick="() => Do(() => Player.ListenAsync(listen, EditionId))"><Icon Name="listen" />Listen now</button>
+                    <button type="button" role="menuitem" @onclick="() => Do(() => Player.QueueListenAsync(listen, true, EditionId))"><Icon Name="play-next" />Play next</button>
+                    <button type="button" role="menuitem" @onclick="() => Do(() => Player.QueueListenAsync(listen, false, EditionId))"><Icon Name="play-last" />Play last</button>
+                }
+                else if (AlbumId is { } album)
+                {
+                    <button type="button" role="menuitem" @onclick="() => Do(() => Player.PlayAlbumAsync(album))"><Icon Name="@(AlbumStatus == Melodex.Client.AlbumStatus.Missing ? "listen" : "play")" />@(AlbumStatus == Melodex.Client.AlbumStatus.Missing ? "Listen now" : "Play")</button>
+                    <button type="button" role="menuitem" @onclick="() => Do(() => Player.QueueAlbumAsync(album, true))"><Icon Name="play-next" />Play next</button>
+                    <button type="button" role="menuitem" @onclick="() => Do(() => Player.QueueAlbumAsync(album, false))"><Icon Name="play-last" />Play last</button>
+                }
+                @if (Keep is { Count: > 0 })
+                {
+                    <button type="button" role="menuitem" @onclick="() => { _open = false; _adding = true; }"><Icon Name="playlist" />Add to a playlist…</button>
+                }
+            }
+            @if (Auth.May(UserPermissions.Request))
+            {
+                @if (Get is { } get && Tracker.Find(get.Kind, get.Id) is null)
+                {
+                    <button type="button" role="menuitem" disabled="@(_busy || ScanStatus.Reading)" @onclick="GetAsync"><Icon Name="get" />@GetLabel</button>
+                }
+                @if (OnIgnore.HasDelegate)
+                {
+                    <button type="button" role="menuitem" @onclick="() => Do(() => OnIgnore.InvokeAsync())"><Icon Name="ignore" />Ignore: don't count it as missing</button>
+                }
+                @if (UpgradeScope is { } scope)
+                {
+                    @if (_upgrade is null)
+                    {
+                        <button type="button" role="menuitem" disabled="@_busy" @onclick="() => UpgradeAsync(scope)">
+                            @if (_busy) { <span class="spinner"></span> } else { <Icon Name="upgrade" /> }Look for @(scope.Kind == FormatScopeKind.Track ? "an upgrade" : "upgrades")
+                        </button>
+                    }
+                }
+            }
+            @if (_note is { } note)
+            {
+                <div class="menu-note muted small">@note</div>
+            }
+            @if (_upgrade is { } said)
+            {
+                <div class="menu-note muted small">@said</div>
+            }
+            @if (OnMove.HasDelegate)
+            {
+                <hr />
+                <button type="button" role="menuitem" disabled="@MoveFirst" @onclick="() => Do(() => OnMove.InvokeAsync(int.MinValue))"><Icon Name="top" />Move to the top</button>
+                <button type="button" role="menuitem" disabled="@MoveFirst" @onclick="() => Do(() => OnMove.InvokeAsync(-1))"><Icon Name="up" />Move up</button>
+                <button type="button" role="menuitem" disabled="@MoveLast" @onclick="() => Do(() => OnMove.InvokeAsync(1))"><Icon Name="down" />Move down</button>
+                <button type="button" role="menuitem" disabled="@MoveLast" @onclick="() => Do(() => OnMove.InvokeAsync(int.MaxValue))"><Icon Name="bottom" />Move to the bottom</button>
+            }
+            @if (AlbumHref is not null || ArtistHref is not null)
+            {
+                <hr />
+                @if (AlbumHref is not null) { <button type="button" role="menuitem" @onclick="() => Go(AlbumHref)"><Icon Name="album" />Go to album</button> }
+                @if (ArtistHref is not null) { <button type="button" role="menuitem" @onclick="() => Go(ArtistHref)"><Icon Name="artist" />Go to artist</button> }
+            }
+            @if (OnTakeOut.HasDelegate)
+            {
+                <hr />
+                <button type="button" role="menuitem" class="menu-danger" @onclick="() => Do(() => OnTakeOut.InvokeAsync())"><Icon Name="cancel" />@TakeOutLabel</button>
+            }
+            @if (OnRemove.HasDelegate && Auth.May(UserPermissions.Remove))
+            {
+                <hr />
+                <button type="button" role="menuitem" class="menu-danger" @onclick="() => Do(() => OnRemove.InvokeAsync())"><Icon Name="remove" />Remove from your library…</button>
+            }
+        </div>
+    }
+</span>
+
+@if (_adding && Keep is not null)
+{
+    <AddToPlaylistDialog Name="@Name" Songs="Keep" OnClose="() => _adding = false" />
+}
+
+@code {
+    /// <summary>Plays it where it is, such as a song in the queue, in place of playing or queueing it afresh.</summary>
+    [Parameter] public EventCallback OnPlay { get; set; }
+
+    [Parameter] public string PlayLabel { get; set; } = "Play";
+
+    /// <summary>A song you have, as the player has it, to play or queue.</summary>
+    [Parameter] public PlayerEntry? Entry { get; set; }
+
+    /// <summary>A song you don't have, to fetch to listen to (from <see cref="EditionId"/>, if given).</summary>
+    [Parameter] public Guid? ListenTrackId { get; set; }
+
+    [Parameter] public Guid? EditionId { get; set; }
+
+    /// <summary>An album to play or queue, fetching the songs you don't have to listen to.</summary>
+    [Parameter] public Guid? AlbumId { get; set; }
+
+    /// <summary>How much of the album you have, for what playing it says.</summary>
+    [Parameter] public AlbumStatus? AlbumStatus { get; set; }
+
+    /// <summary>What a playlist keeps of it; null for what can't go in one, such as songs only listened to.</summary>
+    [Parameter] public IReadOnlyList<PlaylistItem>? Keep { get; set; }
+
+    /// <summary>Its name, for the playlist dialog.</summary>
+    [Parameter] public string Name { get; set; } = "";
+
+    /// <summary>What to fetch into the library, while it isn't asked for already.</summary>
+    [Parameter] public (RequestKind Kind, Guid Id)? Get { get; set; }
+
+    /// <summary>What the get item says.</summary>
+    [Parameter] public string GetLabel { get; set; } = "Get it into your library";
+
+    /// <summary>Stops counting it as missing, where it can be.</summary>
+    [Parameter] public EventCallback OnIgnore { get; set; }
+
+    /// <summary>A song's catalogue ID while a file of it is in the library, so a better copy can be looked for.</summary>
+    [Parameter] public Guid? UpgradeTrackId { get; set; }
+
+    /// <summary>An album or artist in the library to look for better copies of.</summary>
+    [Parameter] public FormatScope? Upgrade { get; set; }
+
+    [Parameter] public string? AlbumHref { get; set; }
+
+    [Parameter] public string? ArtistHref { get; set; }
+
+    /// <summary>
+    /// Moves it in the list it's in, such as a playlist: -1 or 1 for a step, <see cref="int.MinValue"/> for the top,
+    /// <see cref="int.MaxValue"/> for the bottom.
+    /// </summary>
+    [Parameter] public EventCallback<int> OnMove { get; set; }
+
+    /// <summary>Whether it's first or last in that list, so it can't go further that way.</summary>
+    [Parameter] public bool MoveFirst { get; set; }
+
+    [Parameter] public bool MoveLast { get; set; }
+
+    /// <summary>Takes it out of the list it's in, such as a playlist; it stays in the library.</summary>
+    [Parameter] public EventCallback OnTakeOut { get; set; }
+
+    [Parameter] public string TakeOutLabel { get; set; } = "Take it out";
+
+    /// <summary>Takes it out of the library, after asking; for those who may.</summary>
+    [Parameter] public EventCallback OnRemove { get; set; }
+
+    /// <summary>song, album or artist, for the button's title.</summary>
+    [Parameter] public string What { get; set; } = "song";
+
+    [Parameter] public string? Class { get; set; }
+
+    private bool _open, _adding, _busy;
+    private string? _upgrade, _note;
+
+    private FormatScope? UpgradeScope => Upgrade ?? (UpgradeTrackId is { } id ? new FormatScope(FormatScopeKind.Track, id) : null);
+
+    private void Toggle()
+    {
+        _open = !_open;
+        _upgrade = _note = null;
+    }
+
+    private void Close() => _open = false;
+
+    private void Key(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape")
+            _open = false;
+    }
+
+    private async Task Do(Func<Task> action)
+    {
+        _open = false;
+        await action();
+    }
+
+    private void Go(string href)
+    {
+        _open = false;
+        Nav.NavigateTo(href);
+    }
+
+    private async Task GetAsync()
+    {
+        _busy = true;
+        try
+        {
+            await Tracker.CreateAsync(new CreateRequest(Get!.Value.Kind, Get.Value.Id, EditionId));
+            _note = "Asked for: it's in Activity.";
+        }
+        catch (MelodexApiException e)
+        {
+            _note = e.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task UpgradeAsync(FormatScope scope)
+    {
+        _busy = true;
+        try
+        {
+            var found = await Api.SearchUpgradesAsync(scope);
+            _upgrade = found switch
+            {
+                { Upgradable: 0 } => scope.Kind == FormatScopeKind.Track ? "It's at its cutoff already, so there's nothing better to look for." : "Every song is at its cutoff already.",
+                { Queued: 0 } => "Better copies are being looked for already.",
+                _ => scope.Kind == FormatScopeKind.Track ? "Looking for a better copy: it's in Activity." : $"Looking for better copies of {found.Queued}: they're in Activity.",
+            };
+        }
+        catch (Exception e) when (e is HttpRequestException or MelodexApiException)
+        {
+            _upgrade = e.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}
