@@ -48,7 +48,7 @@ else
                             OnClick="() => Player.PlayAsync(playable)" />
                 <IconButton Icon="shuffle" Requires="@UserPermissions.Listen" Large="true" Title="Shuffle: play in a random order" Disabled="playable.Count == 0"
                             OnClick="() => Player.PlayAsync(playable.OrderBy(_ => Random.Shared.Next()).ToList())" />
-                <QueueButton Large="true" Left="true" Title="Add to the queue: next, or at the end" Disabled="playable.Count == 0"
+                <QueueButton Large="true" Left="true" Title="Add to the queue: play next, or play last" Disabled="playable.Count == 0"
                             OnQueue="next => Player.AddAsync(playable, next)" />
                 <IconButton Icon="rename" Large="true" Label="Edit" Title="Rename it, move it to another folder, change its comment, or choose where songs you add go" OnClick="StartRename" />
                 <IconButton Icon="image" Large="true" Label="Picture" Title="Give it a picture of its own, or take it away" OnClick="() => _choosingCover = true" />
@@ -124,11 +124,13 @@ else
                                     @if (canPlay)
                                     {
                                         <IconButton Icon="play" Requires="@UserPermissions.Listen" Title="Play the playlist from here" OnClick="() => PlayFromAsync(song)" />
-                                        <QueueButton Class="hide-narrow" Title="Add to the queue: next, or at the end"
-                                                    OnQueue="next => Player.AddAsync(PlaylistNames.Playable([song]), next)" />
                                     }
-                                    <MoveMenu First="index == 0" Last="index == _playlist.Songs.Count - 1" Disabled="_busy" OnMove="by => MoveAsync(index, by)" />
-                                    <IconButton Icon="cancel" Title="Take it out of the playlist" Disabled="_busy" OnClick="() => RemoveAsync(index)" />
+                                    <ItemMenu Entry="@(canPlay ? PlaylistNames.Playable([song]).FirstOrDefault() : null)" Name="@song.Title"
+                                              Keep="@(song.State == PlaylistSongState.Library && song.TrackId is { } kept ? [new PlaylistItem(kept)] : null)"
+                                              UpgradeTrackId="@(song.State == PlaylistSongState.Library ? song.TrackId : null)" AlbumHref="@albumHref"
+                                              ArtistHref="@(song.ArtistId is { } artistId ? $"{(song.State == PlaylistSongState.Local ? "local/artists" : "artists")}/{artistId}" : null)"
+                                              OnMove="by => MoveAsync(index, by)" MoveFirst="@(index == 0 || _busy)" MoveLast="@(index == _playlist.Songs.Count - 1 || _busy)"
+                                              OnTakeOut="() => RemoveAsync(index)" TakeOutLabel="Take it out of the playlist" />
                                 </div>
                             </td>
                         </tr>

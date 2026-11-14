@@ -59,6 +59,11 @@ public sealed class PlayerEntry
     };
 
     /// <summary>Where its album's page is.</summary>
+    /// <summary>What a playlist keeps of it: the song, or a file of your own; nothing for one only listened to.</summary>
+    public IReadOnlyList<PlaylistItem>? Keep => ListenId is not null ? null : FileId is { } file ? [new PlaylistItem(FileId: file)] : [new PlaylistItem(TrackId)];
+
+    public string? ArtistHref => ArtistId is { } artist ? $"artists/{artist}" : null;
+
     public string? AlbumHref => AlbumId is { } album ? $"{(FileId is null ? "albums" : "local/albums")}/{album}" : null;
 
     public static PlayerEntry Listening(ListenNowInfo item) => new()
@@ -311,6 +316,22 @@ public sealed class Player : IAsyncDisposable
         }
     }
 
+    /// <summary>Fetches a track you don't have to listen to, and puts it next in the queue or last.</summary>
+    public async Task QueueListenAsync(Guid trackId, bool next, Guid? editionId = null)
+    {
+        Error = null;
+        try
+        {
+            var items = await _api.StartListeningAsync(new StartListen(RequestKind.Track, trackId, editionId));
+            await AddAsync(items.Select(PlayerEntry.Listening).ToList(), next);
+        }
+        catch (MelodexApiException e)
+        {
+            Error = e.Message;
+            Changed?.Invoke();
+        }
+    }
+
     /// <summary>
     /// Replaces the queue and starts playing it. When shuffling, the song started from comes first and the rest follow
     /// in a random order; started from the beginning, all of it is in a random order.
@@ -474,6 +495,13 @@ public sealed class Player : IAsyncDisposable
         }
         Changed?.Invoke();
     }
+
+    /// <summary>
+    /// Moves a song a step up or down the queue (-1 or 1), or to the top or bottom (<see cref="int.MinValue"/> or
+    /// <see cref="int.MaxValue"/>), as a song's menu asks.
+    /// </summary>
+    public void MoveBy(int index, int by) =>
+        Move(index, Math.Clamp(by is int.MinValue or int.MaxValue ? by : index + by, 0, _queue.Count - 1));
 
     /// <summary>Moves a song in the queue, carrying on with the same one.</summary>
     public void Move(int from, int to)

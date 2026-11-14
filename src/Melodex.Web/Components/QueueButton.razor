@@ -13,8 +13,8 @@
         {
             <div class="menu-backdrop" @onclick="() => _open = false"></div>
             <div class="menu @(Left ? "" : "right")" role="menu">
-                <button type="button" role="menuitem" @onclick="() => ChooseAsync(true)">Play next</button>
-                <button type="button" role="menuitem" @onclick="() => ChooseAsync(false)">Add to the end of the queue</button>
+                <button type="button" role="menuitem" @onclick="() => ChooseAsync(true)"><Icon Name="play-next" />Play next</button>
+                <button type="button" role="menuitem" @onclick="() => ChooseAsync(false)"><Icon Name="play-last" />Play last</button>
             </div>
         }
     </span>
@@ -24,7 +24,7 @@
     /// <summary>Adds to the queue: next, or at the end.</summary>
     [Parameter, EditorRequired] public Func<bool, Task> OnQueue { get; set; } = _ => Task.CompletedTask;
 
-    [Parameter] public string Title { get; set; } = "Add to the queue: next, or at the end";
+    [Parameter] public string Title { get; set; } = "Add to the queue: play next, or play last";
 
     [Parameter] public string? Class { get; set; }
 

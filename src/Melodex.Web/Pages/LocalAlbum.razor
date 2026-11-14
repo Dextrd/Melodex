@@ -35,7 +35,7 @@ else
             </div>
             <div class="row album-actions" style="margin-top: .5rem;">
                 <IconButton Icon="play" Requires="@UserPermissions.Listen" Primary="true" Large="true" Label="Play" Title="Play the album" OnClick="() => PlayFromAsync(0)" />
-                <QueueButton Large="true" Left="true" Title="Add to the queue: next, or at the end" OnQueue="next => Player.AddAsync(Entries(), next)" />
+                <QueueButton Large="true" Left="true" Title="Add to the queue: play next, or play last" OnQueue="next => Player.AddAsync(Entries(), next)" />
                 <IconButton Icon="playlist" Requires="@UserPermissions.Listen" Large="true" Title="Add to a playlist"
                             OnClick="() => _adding = (album.Title, album.Tracks.Select(t => new PlaylistItem(FileId: t.FileId)).ToList())" />
             </div>
@@ -67,9 +67,7 @@ else
                         <td class="num hide-narrow muted">@Format.Duration(track.DurationSeconds)</td>
                         <td class="num actions">
                             <IconButton Icon="play" Requires="@UserPermissions.Listen" Title="Play from here" OnClick="() => PlayFromAsync(index)" />
-                            <QueueButton Title="Add to the queue: next, or at the end" OnQueue="next => Player.AddAsync([PlayerEntry.Owned(track, album)], next)" />
-                            <IconButton Icon="playlist" Requires="@UserPermissions.Listen" Class="hide-narrow" Title="Add to a playlist"
-                                        OnClick="() => _adding = (track.Title, [new PlaylistItem(FileId: track.FileId)])" />
+                            <ItemMenu Entry="PlayerEntry.Owned(track, album)" Keep="[new PlaylistItem(FileId: track.FileId)]" Name="@track.Title" />
                             <a class="small" href="@($"search?q={Uri.EscapeDataString($"{track.Artist} {track.Title}")}&file={track.FileId}")"
                                title="Look for it in the catalogue after all, and match it">Match</a>
                         </td>

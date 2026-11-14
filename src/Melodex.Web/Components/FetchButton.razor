@@ -17,7 +17,7 @@
 else
 {
     @ChildContent
-    @if (!Auth.May(UserPermissions.Request))
+    @if (!Auth.May(UserPermissions.Request) || !Button)
     {
     }
     else if (Primary)
@@ -44,6 +44,9 @@ else
 
     /// <summary>As big as a page head's other buttons, with its label.</summary>
     [Parameter] public bool Large { get; set; }
+
+    /// <summary>False where asking for it is in a menu among the other actions: only how it's going shows here.</summary>
+    [Parameter] public bool Button { get; set; } = true;
 
     /// <summary>The other actions, shown until it's asked for.</summary>
     [Parameter] public RenderFragment? ChildContent { get; set; }

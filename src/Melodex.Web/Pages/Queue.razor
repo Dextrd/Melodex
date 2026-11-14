@@ -78,7 +78,11 @@ else
                                 <IconButton Icon="@(now && Player.Playing ? "pause" : "play")" Primary="now"
                                             Title="@(now ? (Player.Playing ? "Pause" : "Play") : "Play from here")"
                                             OnClick="() => now ? Player.ToggleAsync() : Player.JumpAsync(index)" />
-                                <MoveMenu First="index == 0" Last="index == Player.Queue.Count - 1" OnMove="by => Move(index, by)" />
+                                <ItemMenu Name="@entry.Title" OnPlay="() => now ? Player.ToggleAsync() : Player.JumpAsync(index)" PlayLabel="@(now ? (Player.Playing ? "Pause" : "Play") : "Play from here")"
+                                          Keep="entry.Keep" UpgradeTrackId="@(entry.Keep is not null && entry.FileId is null ? entry.TrackId : null)"
+                                          AlbumHref="@entry.AlbumHref" ArtistHref="@entry.ArtistHref"
+                                          OnMove="by => Player.MoveBy(index, by)" MoveFirst="index == 0" MoveLast="index == Player.Queue.Count - 1"
+                                          OnTakeOut="() => Player.RemoveAsync(index)" TakeOutLabel="Take it out of the queue" />
                                 <IconButton Icon="cancel" Title="Take it out of the queue" OnClick="() => Player.RemoveAsync(index)" />
                             </div>
                         </td>
@@ -116,9 +120,6 @@ else
     private void Redraw() => InvokeAsync(StateHasChanged);
 
     public void Dispose() => Player.Changed -= Redraw;
-
-    private void Move(int index, int by) =>
-        Player.Move(index, Math.Clamp(by is int.MinValue or int.MaxValue ? by : index + by, 0, Player.Queue.Count - 1));
 
     // Only songs in the library can go in a playlist: not those fetched just to listen to.
     private List<PlaylistItem> Keepable() => Player.Queue

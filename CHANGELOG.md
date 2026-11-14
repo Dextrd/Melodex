@@ -4,6 +4,20 @@ What changed in each release of Melodex. Versions follow [semantic versioning](h
 
 ## [Unreleased]
 
+### Added
+
+- Songs, albums and artists have a menu, from the **⋯** at the end of a row or the corner of a tile, by right-clicking
+  it, or by pressing and holding it on a phone. A song you have can be played, played next or played last, added to a
+  playlist, or upgraded; one you don't have can be listened to, played next or played last. An album can be played,
+  played next or played last, and its songs upgraded; an artist's can be upgraded, and everything missing asked for.
+  Each goes to its album or artist too. **Remove from your library…** is in the Library's menus now, rather than a
+  button on every tile and row, and getting or ignoring an album on artist and search pages is in its menu too, leaving
+  play (or listen) and the menu beside each, as do a playlist's songs, whose menu moves them or takes them out. A menu
+  opened by right-clicking, or by pressing and holding, opens right where you did; one with no room below it opens
+  upward, and a tile's is as wide as it needs, and doing either elsewhere with one open opens that one instead. Songs in
+  the queue, on its page and in the player's pop-up, have the same menu, to play from there, move them or take them out.
+  A playlist's pin is in its square's right corner (#120).
+
 ### Changed
 
 - The queue counts what's left to play, on its button and page, rather than every song in it. Songs already played stay

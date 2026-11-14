@@ -722,6 +722,11 @@ button.icon.play .spinner { margin: 0; vertical-align: middle; }
 .queue-list .queue-title { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; text-align: left; color: var(--text); }
 .queue-list .queue-title > span { max-width: 100%; }
 .queue-list .queue-cover { width: 2.25rem; flex: none; border-radius: 4px; }
+/* A song's menu and its remove button, small and grey beside it, in the theme's colour when pointed at. */
+.queue-list .song-menu > .icon-button { min-width: 1.4rem; height: 1.4rem; border: none; background: none; color: var(--muted); }
+.queue-list li > button.link.small { min-width: 1.4rem; color: var(--muted); }
+.queue-list .song-menu > .icon-button:hover:not(:disabled), .queue-list .song-menu > .icon-button.on,
+.queue-list li > button.link.small:hover { color: var(--accent); }
 /* Narrower, the right takes only the room its buttons need, and the volume folds into a button. */
 @media (max-width: 1100px) {
     .player-bar { grid-template-columns: minmax(0, 1fr) minmax(13.5rem, 1.6fr) auto; }
@@ -934,8 +939,8 @@ button.link.listen-album-title { display: block; max-width: 100%; color: var(--t
 /* Its gap spaces a label, so the spinner needs none of the margin it has beside a button's text: alone, it's centred (#83). */
 .icon-button .spinner { width: .9rem; height: .9rem; margin: 0; vertical-align: middle; }
 /* Buttons that open a menu are spaced like any other. */
-td.actions > :is(.icon-button, .queue-menu, .move-menu) + :is(.icon-button, .queue-menu, .move-menu),
-td.actions > :is(.icon-button, .queue-menu, .move-menu) + .badge, td.actions > .badge + :is(.icon-button, .queue-menu, .move-menu) { margin-left: .3rem; }
+td.actions > :is(.icon-button, .queue-menu, .song-menu) + :is(.icon-button, .queue-menu, .song-menu),
+td.actions > :is(.icon-button, .queue-menu, .song-menu) + .badge, td.actions > .badge + :is(.icon-button, .queue-menu, .song-menu) { margin-left: .3rem; }
 .album-actions { gap: .4rem; }
 .track-list col.icons-2-col { width: 5.5rem; }
 .track-list col.icons-3-col { width: 9.5rem; }
@@ -1020,6 +1025,10 @@ fieldset.row { border: 0; margin: 0; padding: 0; min-width: 0; }
 .dialog-choice input { margin-top: .2rem; }
 .dialog-choice > span { display: flex; flex-direction: column; gap: .2rem; }
 .dialog-buttons { justify-content: flex-end; margin-top: 1rem; margin-bottom: 0; }
+.dialog-buttons .spacer { flex: 1; }
+/* A text button with an icon before its words, as in menus. */
+button.with-glyph { display: inline-flex; align-items: center; gap: .45rem; }
+button.with-glyph .glyph { width: 1rem; height: 1rem; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 /* A link that reads as text until pointed at, such as a song's title in an album's track list. */
 a.plain { color: inherit; }
 a.plain:hover { color: var(--accent); }
@@ -1048,11 +1057,18 @@ button.danger { background: var(--missing); border-color: var(--missing); color:
 button.danger:hover:not(:disabled) { filter: brightness(1.1); }
 button .spinner { width: .85rem; height: .85rem; vertical-align: -2px; margin-right: .3rem; }
 
-/* A remove button in the corner of a library tile, shown on hover or focus. */
+/* A tile, with its menu, or a button in its corner shown on hover or focus. */
 .tile-wrap { position: relative; display: grid; min-width: 0; }
-.tile-remove { position: absolute; top: .4rem; right: .4rem; opacity: 0; transition: opacity .15s; }
-.tile-wrap:hover .tile-remove, .tile-wrap:focus-within .tile-remove { opacity: 1; }
-@media (hover: none) { .tile-remove { opacity: 1; } }
+.tile-corner { position: absolute; top: .4rem; right: .4rem; opacity: 0; transition: opacity .15s; }
+.tile-wrap:hover .tile-corner, .tile-wrap:focus-within .tile-corner { opacity: 1; }
+@media (hover: none) { .tile-corner { opacity: 1; } }
+/* The button in the tile's corner, and its menu below it, as wide as it needs; songmenu.js keeps it on screen whichever
+   column the tile is in. More specific than .song-menu's own place in a row, which comes later. */
+.tile-wrap > .song-menu.tile-menu { position: static; opacity: 0; transition: opacity .15s; }
+.tile-wrap > .tile-menu > .icon-button { position: absolute; top: .4rem; right: .4rem; }
+.tile-wrap > .tile-menu > .menu { top: 2.6rem; left: auto; right: .4rem; width: max-content; }
+.tile-wrap:hover > .tile-menu, .tile-wrap:focus-within > .tile-menu, .tile-wrap > .tile-menu:has(.menu) { opacity: 1; }
+@media (hover: none) { .tile-menu { display: none; } .tile-wrap:has(.tile-menu) { -webkit-touch-callout: none; } }
 .icon-button.remove:hover:not(:disabled) { color: var(--missing); border-color: var(--missing); }
 
 /* The library's sort: what by, and which way. */
@@ -1067,6 +1083,8 @@ h1:focus { outline: none; }
 .toolbar.one-line select { min-width: 0; max-width: 11rem; }
 svg.flip { transform: scaleY(-1); }
 .icon-button.on { border-color: var(--accent); color: var(--accent); }
+/* A menu opened by right-clicking its row: its button wasn't pressed, so it doesn't look it. */
+.song-menu:has(> .menu.at-pointer) > .icon-button.on:not(:hover) { border-color: var(--border); color: var(--text); }
 
 /* Sorting: a button that opens the ways to sort, and one that reverses the order. */
 .sort-menu { position: relative; display: inline-flex; gap: .3rem; flex: none; }
@@ -1079,8 +1097,14 @@ svg.flip { transform: scaleY(-1); }
 }
 .menu button { border: none; background: none; text-align: left; padding: .45rem .7rem; border-radius: 6px; white-space: nowrap; }
 .menu button:hover { background: var(--bg); }
+.menu button:has(> .glyph), .menu a:has(> .glyph) { display: flex; align-items: center; gap: .6rem; }
+.menu .glyph { width: 1rem; height: 1rem; flex: none; color: var(--muted); fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.menu .glyph .fill { fill: currentColor; stroke: none; }
 .menu button.selected { color: var(--accent); font-weight: 600; }
 .menu.right { left: auto; right: 0; }
+/* Opened upward, with no room below (songmenu.js). */
+.menu.up { top: auto; bottom: calc(100% + .3rem); }
+.tile-wrap > .tile-menu > .menu.up { top: auto; bottom: .4rem; }
 .menu hr { border: none; border-top: 1px solid var(--border); margin: .25rem 0; }
 
 /* The account button at the top right, and its menu. */
@@ -1450,7 +1474,10 @@ input[type=search]:disabled { opacity: .6; }
 
 /* Rows and results that arrive after the page has shown, as MusicBrainz answers, fade in rather than jump. */
 @keyframes arrive { from { opacity: 0; transform: translateY(4px); } }
-.arrives { animation: arrive .35s ease-out both; }
+/* Only before it starts: a row still holding the animation's end would be a layer of its own, over a menu opened above it. */
+.arrives { animation: arrive .35s ease-out backwards; }
+/* A row with a menu open is drawn over the rows after it. */
+:is(tr, li, .request, .scan-file):has(> * > .menu, .menu-backdrop) { position: relative; z-index: 32; }
 @media (prefers-reduced-motion: reduce) { .arrives { animation: none; } }
 
 /* The Library page's tabs: Browse and Playlists. */
@@ -1474,7 +1501,6 @@ input[type=search]:disabled { opacity: .6; }
 .page-tabs .tab-count { margin-left: .35rem; padding: 0 .4rem; border-radius: 999px; font-size: .75rem; background: var(--border); color: var(--text); }
 
 /* Pins: on a square, shown on hover like other tile buttons, and always once pinned; in a list, faint until wanted. */
-.tile-pin { left: .4rem; right: auto; }
 .tile-pin.pinned, .row-pin.pinned { opacity: 1; color: var(--accent); }
 .row-pin { opacity: .45; }
 .playlist-row:hover .row-pin, .row-pin:focus-visible { opacity: 1; }
@@ -1529,13 +1555,19 @@ input[type=search]:disabled { opacity: .6; }
 .folder-crumbs { display: flex; flex-wrap: wrap; gap: .4rem; align-items: baseline; margin: 1rem 0 .75rem; }
 
 /* Moving a song in a playlist: the "more" button and its menu. */
-.move-menu, .queue-menu { position: relative; display: inline-flex; vertical-align: middle; }
+.queue-menu, .song-menu { position: relative; display: inline-flex; vertical-align: middle; }
+.song-menu .menu { text-align: left; }
+.song-menu .menu .menu-note { padding: .45rem .7rem; max-width: 16rem; white-space: normal; }
+/* A song's row opens its menu when held on a touch screen, rather than the system's own. */
+@media (hover: none) { tr:has(.song-menu), li:has(.song-menu) { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; } }
 /* After their own display, or those meant to go on a phone stay. */
-@media (max-width: 640px) { .move-menu.hide-narrow, .queue-menu.hide-narrow { display: none; } }
+@media (max-width: 640px) { .queue-menu.hide-narrow { display: none; } }
 /* A row's buttons, evenly apart whether or not they open a menu. */
 .row-actions { display: flex; gap: .3rem; align-items: center; justify-content: flex-end; }
-.move-menu .menu { text-align: left; }
 .menu button:disabled { opacity: .45; cursor: default; background: none; }
+/* What can't be undone without asking: red as it's pointed at. */
+.menu button.menu-danger:hover:not(:disabled) { color: var(--missing); background: var(--missing-bg); }
+.menu button.menu-danger:hover:not(:disabled) .glyph { color: inherit; }
 
 /* Shuffle and repeat: quieter than the transport until they're on, then in the accent, with a dot beneath. */
 button.icon.mode { color: var(--muted); position: relative; }

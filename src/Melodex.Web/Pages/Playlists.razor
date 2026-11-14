@@ -324,7 +324,7 @@ else
             <div class="tile-name">@folder.Name</div>
             <div class="muted small tile-sub">Folder · @Format.Count(folder.Count, "playlist", "playlists")</div>
         </a>
-        <IconButton Icon="image" Class="small tile-remove" Title="@($"Give {folder.Name} a picture")" OnClick="() => _picturing = folder.Path" />
+        <IconButton Icon="image" Class="small tile-corner" Title="@($"Give {folder.Name} a picture")" OnClick="() => _picturing = folder.Path" />
     </div>;
 
     private RenderFragment Tile(PlaylistSummary playlist, bool withFolders) => @<div class="tile-wrap" @key="playlist.Id">
@@ -335,7 +335,7 @@ else
                 @(withFolders && string.Join(" › ", PlaylistNames.Folders(playlist.Name, Delimiter)) is { Length: > 0 } folders ? $"{folders} · " : "")@PlaylistNames.Length(playlist.Count, playlist.DurationSeconds)
             </div>
         </a>
-        <IconButton Icon="pin" Class="@($"small tile-remove tile-pin {(playlist.Pinned ? "pinned" : "")}")" On="playlist.Pinned"
+        <IconButton Icon="pin" Class="@($"small tile-corner tile-pin {(playlist.Pinned ? "pinned" : "")}")" On="playlist.Pinned"
                     Title="@(playlist.Pinned ? "Unpin it" : "Pin it, to show it first")" OnClick="() => PinAsync(playlist)" />
     </div>;
 
