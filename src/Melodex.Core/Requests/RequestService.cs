@@ -334,10 +334,10 @@ public sealed class RequestService(MelodexDbContext db, RequestSignal signal, Re
     }
 
     // Listen-now songs that were ready to play and are gone: deleted by someone, or expired, as are those from before
-    // deleting was told apart.
+    // deleting was told apart. A song is ready a moment before its request says so, so it's the songs that tell.
     private async Task<Dictionary<Guid, ListenNowEnd>> EndedAsync(IReadOnlyCollection<Request> requests, CancellationToken ct)
     {
-        var ids = requests.Where(r => r.Mode == RequestMode.ListenNow && r.Status == RequestStatus.Playable).Select(r => r.Id).ToList();
+        var ids = requests.Where(r => r.Mode == RequestMode.ListenNow).Select(r => r.Id).ToList();
         if (ids.Count == 0)
             return [];
         var gone = await db.ListenNowItems.Where(i => ids.Contains(i.RequestId) && i.State == Data.ListenNowState.Expired)
