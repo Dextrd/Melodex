@@ -4,6 +4,13 @@ What changed in each release of Melodex. Versions follow [semantic versioning](h
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-11-14
+
+The web app, reworked where you use it most. Songs, albums and artists have one menu everywhere, by right-click or a
+long press too. Activity and Downloads are one page, and Listen now is a Library tab. Every task shows what it's doing
+and keeps its list afterwards. The queue keeps what's played, and settings save themselves. The core image changes;
+the database updates itself on start.
+
 ### Added
 
 - Songs, albums and artists have a menu, from the **⋯** at the end of a row or the corner of a tile, by right-clicking
