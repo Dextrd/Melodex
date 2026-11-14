@@ -51,6 +51,12 @@ public enum PlaylistSongState
 
     /// <summary>No longer in your library.</summary>
     Gone,
+
+    /// <summary>Not in your library yet: put in by an import, it keeps its place until the song arrives.</summary>
+    Awaiting,
+
+    /// <summary>Not in your library yet, and asked for: it fills in when it's fetched.</summary>
+    Coming,
 }
 
 /// <summary>A song in a playlist.</summary>

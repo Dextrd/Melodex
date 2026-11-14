@@ -91,6 +91,8 @@ public partial class MelodexDbContext(DbContextOptions<MelodexDbContext> options
     public DbSet<Playlist> Playlists => Set<Playlist>();
     public DbSet<PlaylistEntry> PlaylistEntries => Set<PlaylistEntry>();
     public DbSet<PlaylistFolder> PlaylistFolders => Set<PlaylistFolder>();
+    public DbSet<ListImport> Imports => Set<ListImport>();
+    public DbSet<ImportLine> ImportLines => Set<ImportLine>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -218,6 +220,19 @@ public partial class MelodexDbContext(DbContextOptions<MelodexDbContext> options
             e.HasIndex(pe => new { pe.PlaylistId, pe.Position });
             e.HasIndex(pe => pe.TrackId);
             e.HasIndex(pe => pe.FileId);
+        });
+
+        modelBuilder.Entity<ListImport>(e =>
+        {
+            e.HasOne<User>().WithMany().HasForeignKey(i => i.UserId).OnDelete(DeleteBehavior.Cascade);
+            e.HasIndex(i => i.UserId);
+        });
+
+        modelBuilder.Entity<ImportLine>(e =>
+        {
+            e.HasOne(l => l.Import).WithMany(i => i.Lines).HasForeignKey(l => l.ImportId).OnDelete(DeleteBehavior.Cascade);
+            e.HasIndex(l => new { l.ImportId, l.Position });
+            e.HasIndex(l => l.InReview);
         });
 
         modelBuilder.Entity<ApiKey>(e =>

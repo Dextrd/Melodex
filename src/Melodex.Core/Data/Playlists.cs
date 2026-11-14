@@ -94,6 +94,12 @@ public class PlaylistEntry
 
     /// <summary>Its ID on the media server, once found there.</summary>
     public string? ServerTrackId { get; set; }
+
+    /// <summary>
+    /// Put in before the library had it, as an import does with songs not owned yet: it holds its place until the song
+    /// arrives, rather than being one that's gone.
+    /// </summary>
+    public bool AwaitingFile { get; set; }
 }
 
 /// <summary>A folder of a user's playlists with a picture of its own. Folders are only parts of playlists' names, so one has a row only for its picture.</summary>

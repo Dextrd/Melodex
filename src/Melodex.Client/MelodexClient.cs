@@ -694,6 +694,66 @@ public sealed class MelodexClient(HttpClient http)
     public async Task<IReadOnlyList<WebhookDeliveryInfo>> ListWebhookDeliveriesAsync(Guid id, int limit = 50, CancellationToken ct = default) =>
         await http.GetFromJsonAsync<List<WebhookDeliveryInfo>>($"{Api}/webhooks/{id}/deliveries?limit={limit}", MelodexJson.Options, ct) ?? [];
 
+    // ---- Imports ----
+
+    /// <summary>Reads a list without importing it: what kind it is, and for a CSV, what each column looks to hold.</summary>
+    public async Task<ImportPeek> PeekImportAsync(PeekImport list, CancellationToken ct = default)
+    {
+        using var response = await http.PostAsJsonAsync($"{Api}/imports/peek", list, MelodexJson.Options, ct);
+        await EnsureAsync(response, ct);
+        return (await response.Content.ReadFromJsonAsync<ImportPeek>(MelodexJson.Options, ct))!;
+    }
+
+    /// <summary>Imports a list; its songs are matched in the background.</summary>
+    public async Task<ImportSummary> CreateImportAsync(CreateImport import, CancellationToken ct = default)
+    {
+        using var response = await http.PostAsJsonAsync($"{Api}/imports", import, MelodexJson.Options, ct);
+        await EnsureAsync(response, ct);
+        return (await response.Content.ReadFromJsonAsync<ImportSummary>(MelodexJson.Options, ct))!;
+    }
+
+    public async Task<IReadOnlyList<ImportSummary>> ListImportsAsync(CancellationToken ct = default) =>
+        await http.GetFromJsonAsync<List<ImportSummary>>($"{Api}/imports", MelodexJson.Options, ct) ?? [];
+
+    public Task<ImportDetail?> GetImportAsync(Guid id, CancellationToken ct = default) => GetOrNullAsync<ImportDetail>($"{Api}/imports/{id}", ct);
+
+    /// <summary>Chooses which song one of an import's is, or leaves it out or puts it back.</summary>
+    public async Task<ImportLineInfo> ChangeImportLineAsync(Guid id, Guid lineId, ChangeImportLine change, CancellationToken ct = default)
+    {
+        using var response = await http.PutAsJsonAsync($"{Api}/imports/{id}/lines/{lineId}", change, MelodexJson.Options, ct);
+        await EnsureAsync(response, ct);
+        return (await response.Content.ReadFromJsonAsync<ImportLineInfo>(MelodexJson.Options, ct))!;
+    }
+
+    public async Task<ImportApplied> ApplyImportAsync(Guid id, ApplyImport apply, CancellationToken ct = default)
+    {
+        using var response = await http.PostAsJsonAsync($"{Api}/imports/{id}/apply", apply, MelodexJson.Options, ct);
+        await EnsureAsync(response, ct);
+        return (await response.Content.ReadFromJsonAsync<ImportApplied>(MelodexJson.Options, ct))!;
+    }
+
+    public async Task DeleteImportAsync(Guid id, CancellationToken ct = default)
+    {
+        using var response = await http.DeleteAsync($"{Api}/imports/{id}", ct);
+        await EnsureAsync(response, ct);
+    }
+
+    /// <summary>Imported songs nothing was found for, waiting in Review.</summary>
+    public async Task<IReadOnlyList<UnmatchedImportSong>> GetUnmatchedImportSongsAsync(CancellationToken ct = default) =>
+        await http.GetFromJsonAsync<List<UnmatchedImportSong>>($"{Api}/imports/unmatched", MelodexJson.Options, ct) ?? [];
+
+    public async Task MatchUnmatchedImportSongAsync(Guid lineId, MatchImportSong match, CancellationToken ct = default)
+    {
+        using var response = await http.PostAsJsonAsync($"{Api}/imports/unmatched/{lineId}/match", match, MelodexJson.Options, ct);
+        await EnsureAsync(response, ct);
+    }
+
+    public async Task DismissUnmatchedImportSongAsync(Guid lineId, CancellationToken ct = default)
+    {
+        using var response = await http.DeleteAsync($"{Api}/imports/unmatched/{lineId}", ct);
+        await EnsureAsync(response, ct);
+    }
+
     // ---- Playlists ----
 
     public async Task<IReadOnlyList<PlaylistSummary>> ListPlaylistsAsync(CancellationToken ct = default) =>
