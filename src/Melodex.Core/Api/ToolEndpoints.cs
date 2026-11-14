@@ -80,6 +80,30 @@ public static class ToolEndpoints
             .WithSummary("Delete an import, stopping its matching. A playlist it made stays, as do its requests.")
             .Produces(StatusCodes.Status204NoContent).Produces(StatusCodes.Status404NotFound);
 
+        var exports = api.MapGroup("/exports").WithTags("Exports");
+
+        exports.MapGet("/playlists", async (Guid[] id, PlaylistExportFormat? format, bool? keepMissing, string? prefix, HttpContext http, ExportService service, CancellationToken ct) =>
+                Owner(http) is { } user
+                    ? await Refusable(async () => await service.PlaylistsAsync(user, id, format ?? PlaylistExportFormat.M3u8, keepMissing ?? false, prefix, ct) is { } file
+                        ? Results.File(file.Bytes, file.ContentType, file.Name)
+                        : Results.NotFound())
+                    : NoOwner())
+            .RequireScope(Scopes.Listen)
+            .WithName("ExportPlaylists")
+            .WithSummary("Export your playlists: one as an M3U8 or CSV file, several as a zip of them. Songs you don't have are left out unless keepMissing; an M3U8's paths are relative to the music folder, or under prefix.")
+            .Produces<byte[]>(contentType: "application/octet-stream").Produces(StatusCodes.Status404NotFound).ProducesValidationProblem();
+
+        exports.MapGet("/library", async (LibraryExportRows? rows, LibraryExportColumn[] column, ExportService service, CancellationToken ct) =>
+                await Refusable(async () =>
+                {
+                    var file = await service.LibraryAsync(rows ?? LibraryExportRows.Songs, column, ct);
+                    return Results.File(file.Bytes, file.ContentType, file.Name);
+                }))
+            .RequireScope(Scopes.Read)
+            .WithName("ExportLibrary")
+            .WithSummary("Export the library as a CSV: a row for each song you have, or each album you have some of, with the columns asked for (all of them if none are).")
+            .Produces<byte[]>(contentType: "text/csv").ProducesValidationProblem();
+
         return api;
     }
 

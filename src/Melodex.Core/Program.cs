@@ -80,6 +80,7 @@ builder.Services.AddScoped<CoverChooser>();
 builder.Services.AddScoped<LyricsFinder>();
 builder.Services.AddScoped<PlaylistService>();
 builder.Services.AddScoped<ImportService>();
+builder.Services.AddScoped<ExportService>();
 builder.Services.AddScoped<ImportMatcher>();
 builder.Services.AddSingleton<PlaylistCovers>();
 builder.Services.AddScoped<PlaylistSync>();

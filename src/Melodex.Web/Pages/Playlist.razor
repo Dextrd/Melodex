@@ -59,6 +59,7 @@ else
                 }
                 <IconButton Icon="rename" Large="true" Label="Edit" Title="Rename it, move it to another folder, change its comment, or choose where songs you add go" OnClick="StartRename" />
                 <IconButton Icon="image" Large="true" Label="Picture" Title="Give it a picture of its own, or take it away" OnClick="() => _choosingCover = true" />
+                <IconButton Icon="export" Large="true" Title="Export it, as an M3U8 playlist or a CSV" OnClick="@(() => Nav.NavigateTo($"tools/export?playlist={Id}"))" />
                 <IconButton Icon="pin" Large="true" On="summary.Pinned" Title="@(summary.Pinned ? "Unpin it" : "Pin it, to show it first among your playlists")" OnClick="PinAsync" />
                 <IconButton Icon="remove" Large="true" Title="Delete the playlist" OnClick="() => _deleting = true" />
             </div>

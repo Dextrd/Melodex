@@ -95,6 +95,13 @@ public static partial class ListParser
             {
                 if (ExtInf().Match(line) is { Success: true } info)
                 {
+                    // One with no path before the next: a song by name only, as an export of songs not had writes it.
+                    if (named is { Length: > 0 })
+                    {
+                        if (Named(named, artist, album, length) is { } nameOnly)
+                            yield return nameOnly;
+                        artist = album = null;
+                    }
                     length = double.TryParse(info.Groups[1].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out var seconds) && seconds > 0 ? seconds : null;
                     named = info.Groups[2].Value.Trim();
                 }
@@ -119,6 +126,14 @@ public static partial class ListParser
             length = null;
             named = artist = album = null;
         }
+        if (named is { Length: > 0 } && Named(named, artist, album, length) is { } last)
+            yield return last;
+    }
+
+    private static ImportSong? Named(string named, string? artist, string? album, double? length)
+    {
+        var (a, t) = SplitArtist(named);
+        return t.Length == 0 ? null : new ImportSong(t, artist ?? a, album, length);
     }
 
     [GeneratedRegex(@"^\s*(?:\d{1,3}[-.]?)?\d{1,3}\s*(?:[-.)_]\s*|\s+)")]

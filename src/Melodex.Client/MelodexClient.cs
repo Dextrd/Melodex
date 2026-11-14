@@ -754,6 +754,41 @@ public sealed class MelodexClient(HttpClient http)
         await EnsureAsync(response, ct);
     }
 
+    // ---- Exports ----
+
+    /// <summary>
+    /// Where playlists are exported: one as an M3U8 or CSV file, several as a zip of them. Songs you don't have are left out,
+    /// or kept by name only; an M3U8's paths are relative to the music folder, or under <paramref name="prefix"/>.
+    /// </summary>
+    public static string PlaylistExportUrl(IReadOnlyList<Guid> ids, PlaylistExportFormat format = PlaylistExportFormat.M3u8, bool keepMissing = false, string? prefix = null)
+    {
+        var query = ids.Select(id => $"id={id}").Append($"format={format}").Append($"keepMissing={(keepMissing ? "true" : "false")}");
+        if (!string.IsNullOrWhiteSpace(prefix))
+            query = query.Append($"prefix={Uri.EscapeDataString(prefix.Trim())}");
+        return $"{Api}/exports/playlists?{string.Join('&', query)}";
+    }
+
+    /// <summary>Where the library is exported, as a CSV with a row for each song you have or each album, and the columns given.</summary>
+    public static string LibraryExportUrl(LibraryExportRows rows, IReadOnlyList<LibraryExportColumn>? columns = null) =>
+        $"{Api}/exports/library?rows={rows}{string.Concat((columns ?? []).Select(c => $"&column={c}"))}";
+
+    /// <summary>Exports playlists: the file, or a zip of them, as <see cref="PlaylistExportUrl"/> says.</summary>
+    public async Task<byte[]> ExportPlaylistsAsync(IReadOnlyList<Guid> ids, PlaylistExportFormat format = PlaylistExportFormat.M3u8, bool keepMissing = false,
+        string? prefix = null, CancellationToken ct = default)
+    {
+        using var response = await http.GetAsync(PlaylistExportUrl(ids, format, keepMissing, prefix), ct);
+        await EnsureAsync(response, ct);
+        return await response.Content.ReadAsByteArrayAsync(ct);
+    }
+
+    /// <summary>Exports the library as a CSV.</summary>
+    public async Task<byte[]> ExportLibraryAsync(LibraryExportRows rows, IReadOnlyList<LibraryExportColumn>? columns = null, CancellationToken ct = default)
+    {
+        using var response = await http.GetAsync(LibraryExportUrl(rows, columns), ct);
+        await EnsureAsync(response, ct);
+        return await response.Content.ReadAsByteArrayAsync(ct);
+    }
+
     // ---- Playlists ----
 
     public async Task<IReadOnlyList<PlaylistSummary>> ListPlaylistsAsync(CancellationToken ct = default) =>
