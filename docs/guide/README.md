@@ -10,11 +10,12 @@ These pages are also in the web app, under **Settings → Help**.
 3. [Requests and listening](requests-and-listening.md): fetching music, the Activity page, and Listen now
 4. [Playlists](playlists.md): making them, folders, and syncing them with Navidrome
 5. [Your library](library.md): Review, files that don't match, your own music, formatting and removing
-6. [Users and permissions](users-and-permissions.md): accounts, what each permission allows, and API keys
-7. [Appearance](appearance.md): themes, light and dark, and high contrast
-8. [Plugins](plugins.md): Navidrome, retrieval plugins, catalogue and artwork sources
-9. [Configuration](configuration.md): environment variables, ports and paths
-10. [Upgrading](upgrading.md): new versions, and moving from Navidex
-11. [Troubleshooting](troubleshooting.md): when something doesn't work
+6. [Tools](tools.md): importing playlists and lists of songs
+7. [Users and permissions](users-and-permissions.md): accounts, what each permission allows, and API keys
+8. [Appearance](appearance.md): themes, light and dark, and high contrast
+9. [Plugins](plugins.md): Navidrome, retrieval plugins, catalogue and artwork sources
+10. [Configuration](configuration.md): environment variables, ports and paths
+11. [Upgrading](upgrading.md): new versions, and moving from Navidex
+12. [Troubleshooting](troubleshooting.md): when something doesn't work
 
 For apps that use Melodex's API, see the [client guide](../client-guide.md).

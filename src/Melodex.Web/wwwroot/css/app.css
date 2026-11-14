@@ -1679,3 +1679,34 @@ table.slots thead th { height: 32px; box-sizing: border-box; }
 }
 .autosave .spinner { width: .9rem; height: .9rem; }
 .autosave.failed { color: var(--missing); border-color: var(--missing); border-radius: var(--radius); }
+
+/* Tools: a card for each, and imports from a list. */
+.tool-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr)); gap: .75rem; margin: 1rem 0; }
+a.card.tool-card { display: flex; gap: .85rem; align-items: flex-start; padding: 1rem; color: var(--text); text-decoration: none; transition: border-color .15s; }
+a.card.tool-card:hover { border-color: var(--accent); text-decoration: none; }
+.tool-card > .glyph { flex: none; width: 1.6rem; height: 1.6rem; color: var(--accent); fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.tool-card > span { display: flex; flex-direction: column; gap: .3rem; }
+.imports-table col.import-state-col, .import-lines col.import-state-col { width: 9rem; }
+.import-lines col.import-given-col { width: 30%; }
+.import-text { font-family: inherit; }
+.field .import-text { max-width: 48rem; }
+.import-columns { overflow-x: auto; margin: .5rem 0 1rem; }
+.import-columns table { table-layout: auto; }
+.import-columns th { vertical-align: bottom; min-width: 8rem; max-width: 16rem; }
+.import-columns th select { width: 100%; margin-top: .25rem; }
+.import-columns td { max-width: 16rem; }
+.chips { display: flex; flex-wrap: wrap; gap: .4rem; }
+.chip { font: inherit; font-size: .85rem; padding: .25rem .7rem; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); color: var(--muted); cursor: pointer; }
+.chip:hover { color: var(--text); }
+.chip.on { background: var(--accent); border-color: var(--accent); color: var(--accent-text, #fff); }
+.notice .progress { height: 4px; border-radius: 2px; margin-top: .5rem; background: color-mix(in srgb, var(--text) 12%, transparent); overflow: hidden; }
+.notice .progress > span { display: block; height: 100%; background: var(--accent); transition: width .4s; }
+.import-apply { display: flex; flex-direction: column; gap: .5rem; max-width: 40rem; }
+.import-apply .dialog-choice input[type=text], .import-apply .dialog-choice select { margin-top: .3rem; max-width: 24rem; }
+.import-apply label.check { display: flex; align-items: flex-start; gap: .45rem; cursor: pointer; }
+.import-apply label.check input { margin-top: .25rem; }
+.import-apply .indent { margin: -.3rem 0 0 1.6rem; }
+label.check { cursor: pointer; }
+/* A greyed row in a table of slots greys what's in its cells, not the cells, so the slots behind don't show through. */
+table.slots > tbody > tr.dim > td { opacity: 1; color: color-mix(in srgb, var(--text) 60%, transparent); }
+table.slots > tbody > tr.dim > td > * { opacity: .6; }

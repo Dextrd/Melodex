@@ -17,6 +17,10 @@ its songs in your library.
 
 A song that leaves your library stays in the playlist, greyed out, so it's there again if the song comes back.
 
+A playlist can also be made from a list of songs: an M3U playlist, a CSV, or lines you paste. See
+[importing from a list](tools.md#importing-from-a-list). Songs from it that you don't have hold their places, greyed
+out, until they arrive.
+
 ## Finding them
 
 Show your playlists as a **List**, in their folders, or as **Squares**, each with its picture. In Squares, folders

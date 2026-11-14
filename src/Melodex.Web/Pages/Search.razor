@@ -22,6 +22,14 @@
         <div class="row" style="margin-top: .4rem;"><a class="small" href="review">Back to Review</a></div>
     </div>
 }
+else if (_song is not null)
+{
+    <div class="notice">
+        Choosing the song for <strong>@_song.Title</strong>
+        <span class="muted">· @(_song.Artist ?? "unknown artist")@(_song.Album is { } album ? $" · {album}" : "")@(_song.DurationSeconds is { } length ? $" · {Format.Duration(length)}" : "")</span>
+        <div class="row" style="margin-top: .4rem;"><a class="small" href="@_songBack">@(UnmatchedId is null ? "Back to the import" : "Back to Review")</a></div>
+    </div>
+}
 
 <div class="library-bar search-bar">
     <div class="toolbar one-line">
@@ -132,11 +140,11 @@ else
     {
         <div class="empty card">No results@(_owned != "" || _kind != "" ? " with these filters" : "").</div>
     }
-    @if (_file is not null && Tracks.Count > 0)
+    @if ((_file is not null || _song is not null) && Tracks.Count > 0)
     {
         <h2>Tracks</h2>
         @if (_error is not null) { <div class="notice error">@_error</div> }
-        @TrackList(track => @<button class="primary small" disabled="@_matching" @onclick="() => MatchAsync(track)">This one</button>)
+        @TrackList(track => @<button class="primary small" disabled="@_matching" @onclick="() => (_song is null ? MatchAsync(track) : ChooseAsync(track))">This one</button>)
     }
 @if (Artists.Count > 0)
     {
@@ -210,7 +218,7 @@ else
             </table>
         </div>
     }
-    @if (_file is null && Tracks.Count > 0)
+    @if (_file is null && _song is null && Tracks.Count > 0)
     {
         <h2>Tracks</h2>
         @TrackList(track => @<text>
@@ -238,6 +246,14 @@ else
 
     /// <summary>A file from the Review page to choose the song for.</summary>
     [SupplyParameterFromQuery(Name = "file")] public Guid? FileId { get; set; }
+
+    /// <summary>An import's song to choose the song for, before the import is applied: the import and the line.</summary>
+    [SupplyParameterFromQuery(Name = "import")] public Guid? ImportId { get; set; }
+
+    [SupplyParameterFromQuery(Name = "line")] public Guid? LineId { get; set; }
+
+    /// <summary>An imported song nothing was found for, from Review, to choose the song for.</summary>
+    [SupplyParameterFromQuery(Name = "unmatched")] public Guid? UnmatchedId { get; set; }
 
     private static readonly IReadOnlyList<(string Value, string Label, string? Hint)> Kinds =
         [("", "All", null), ("artists", "Artists", "Only artists, which is quicker"), ("albums", "Albums", "Only albums, which is quicker"), ("tracks", "Tracks", "Only tracks, which is quicker")];
@@ -287,6 +303,8 @@ else
     private bool _localBusy;
     private List<string> _recent = [];
     private ReviewItem? _file;
+    private ImportSong? _song;
+    private string _songBack = "tools";
     private string? _error;
     private string? _searchError;
     private bool _matching;
@@ -349,6 +367,7 @@ else
             _restored = true;
             if (kept.FileId is { } fileId && Auth.May(UserPermissions.Review))
                 _file = await FindFileAsync(fileId);
+            await FindSongAsync();
             if ((Query ?? "").Trim() != kept.Query)
                 Navigation.NavigateTo(SearchLink(kept.Query), replace: true);
             if (kept.Busy)
@@ -380,6 +399,7 @@ else
         _shown = null;
         _query = Query ?? "";
         _file = FileId is { } fileId && Auth.May(UserPermissions.Review) ? await FindFileAsync(fileId) : null;
+        await FindSongAsync();
         _searchError = null;
         // What's shown (matches found while typing, say) stays until the search has something to replace it with.
         if (_query.Trim().Length > 0)
@@ -645,7 +665,12 @@ else
         await Prefs.SetAsync(RecentKey, _recent);
     }
 
-    private string SearchLink(string text) => $"search?q={Uri.EscapeDataString(text)}{(_file is null ? "" : $"&file={_file.FileId}")}";
+    private string SearchLink(string text) => $"search?q={Uri.EscapeDataString(text)}{(_file is null ? "" : $"&file={_file.FileId}")}{Choosing}";
+
+    // The imported song being chosen for, kept in the address as the search changes.
+    private string Choosing => UnmatchedId is { } unmatched ? $"&unmatched={unmatched}"
+        : ImportId is { } import && LineId is { } line ? $"&import={import}&line={line}"
+        : "";
 
     private Task SubmitAsync()
     {
@@ -711,6 +736,43 @@ else
             </table>
         </div>
     };
+
+    // The imported song being chosen for, if any, and where to go back to.
+    private async Task FindSongAsync()
+    {
+        _song = null;
+        if (!Auth.May(UserPermissions.Request))
+            return;
+        if (ImportId is { } importId && LineId is { } lineId && await Api.GetImportAsync(importId) is { } import)
+        {
+            _song = import.Lines.FirstOrDefault(l => l.Id == lineId)?.Song;
+            _songBack = $"tools/import/{importId}";
+        }
+        else if (UnmatchedId is { } unmatched)
+        {
+            _song = (await Api.GetUnmatchedImportSongsAsync()).FirstOrDefault(u => u.LineId == unmatched)?.Song;
+            _songBack = "review/couldnt-match";
+        }
+    }
+
+    private async Task ChooseAsync(SearchTrack track)
+    {
+        _matching = true;
+        _error = null;
+        try
+        {
+            if (UnmatchedId is { } unmatched)
+                await Api.MatchUnmatchedImportSongAsync(unmatched, new MatchImportSong(track.Id));
+            else
+                await Api.ChangeImportLineAsync(ImportId!.Value, LineId!.Value, new ChangeImportLine(TrackId: track.Id));
+            Navigation.NavigateTo(_songBack);
+        }
+        catch (MelodexApiException e)
+        {
+            _error = e.Message;
+        }
+        _matching = false;
+    }
 
     private async Task MatchAsync(SearchTrack track)
     {
