@@ -4,7 +4,7 @@
 @inject NavigationManager Nav
 
 @* Settings, the log, plugins, users, API access and appearance, as sections listed down the left (across the top on narrow screens), each shown to those who may use it. *@
-<h1>Settings</h1>
+<h1 class="settings-title">Settings</h1>
 <div class="settings-page">
     <nav class="settings-nav" aria-label="Settings sections">
         @if (Auth.May(UserPermissions.Settings))
