@@ -152,6 +152,12 @@ else
             days
         </div>
         <div class="muted small">Every entry is written to a file per day under <code>data/logs</code> as it happens, so a restart loses nothing. Older files are deleted.</div>
+        <div class="setting-line">
+            Keep tasks' lists for
+            <NumberField Min="1" Max="3650" Label="Days" Value="_log.TaskDays" ValueChanged="n => SetLog(_log with { TaskDays = n })" />
+            days
+        </div>
+        <div class="muted small">What each scan, format, lyrics search and catalogue update did, row by row, as Activity shows it. A task's list is written under <code>data/tasks</code> when it finishes.</div>
     </div>
 
     <AutoSave @ref="_saver" Save="SaveAsync" />

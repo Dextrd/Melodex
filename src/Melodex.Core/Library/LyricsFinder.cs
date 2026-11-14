@@ -57,8 +57,9 @@ public sealed class LyricsFinder(
     /// Finds and writes lyrics for the files. With <paramref name="again"/>, lyrics they have already are looked for
     /// afresh and replaced.
     /// </summary>
+    /// <param name="rows">Where a task shows what happened to each file, if it does.</param>
     /// <exception cref="HttpRequestException">The beets worker couldn't be reached.</exception>
-    public async Task<Outcome> FindAsync(IReadOnlyCollection<Guid> fileIds, bool again, CancellationToken ct)
+    public async Task<Outcome> FindAsync(IReadOnlyCollection<Guid> fileIds, bool again, CancellationToken ct, TaskRows? rows = null)
     {
         var sources = await plugins.GetAsync(ct);
         var storage = (await settings.GetLibraryAsync(ct)).LyricsStorage;
@@ -70,17 +71,23 @@ public sealed class LyricsFinder(
         string? problem = null;
 
         // One question per song, however many files it has.
-        var answers = new Dictionary<Guid, (FoundLyrics? Lyrics, bool Failed)>();
+        var answers = new Dictionary<Guid, (FoundLyrics? Lyrics, bool Failed, string? Source)>();
         var writes = new List<(LibraryFile File, FormatFile Request, LyricsKind Kind)>();
         var found = 0;
+        void Show(LibraryFile file, TaskRowState state, string detail) =>
+            rows?.Put(file.Path, state, file.Track!.Title,
+                file.Track.ArtistCredit + (file.Edition is { } edition ? $" · {edition.Album.Title}" : ""), detail,
+                file.Edition is { } e ? $"albums/{e.AlbumId}" : null, file.Edition is { } on ? LibraryView.CoverUrl(on.AlbumId, on.Id) : null);
         foreach (var file in files)
         {
             if (!again && LyricsFiles.KindOf(Path.Combine(root, file.Path)) is not LyricsKind.None and var kind)
             {
                 file.Lyrics = kind;
                 already++;
+                Show(file, TaskRowState.Skipped, "Had lyrics already");
                 continue;
             }
+            Show(file, TaskRowState.Working, "Looking");
             if (!answers.TryGetValue(file.TrackId!.Value, out var answer))
                 answers[file.TrackId.Value] = answer = await AskAsync(sources, file, ct);
             switch (answer)
@@ -88,24 +95,36 @@ public sealed class LyricsFinder(
                 case { Failed: true, Lyrics: null }:
                     failed++;
                     problem ??= "a lyrics source isn't answering";
+                    Show(file, TaskRowState.Failed, "A lyrics source isn't answering; tried again next time");
                     break;
                 case { Lyrics: null }:
                     file.LyricsCheckedAt = now;
                     none++;
+                    Show(file, TaskRowState.Skipped, "None at the sources");
                     break;
                 case { Lyrics.Instrumental: true }:
                     file.Lyrics = LyricsKind.Instrumental;
                     file.LyricsCheckedAt = now;
                     found++;
+                    Show(file, TaskRowState.Done, $"Instrumental, says {answer.Source}");
                     break;
                 case { Lyrics: { } lyrics }:
                     var text = lyrics.Synced ?? lyrics.Plain!;
                     writes.Add((file, Write(file, text, storage), LyricsFiles.KindOfText(text)));
+                    Show(file, TaskRowState.Working, $"Writing {(lyrics.Synced is not null ? "synced lyrics" : "lyrics")} from {answer.Source}");
                     break;
             }
         }
 
         var (written, unwritten, why) = await WriteAsync(writes, root, ct);
+        foreach (var (file, _, kind) in writes)
+        {
+            var source = answers[file.TrackId!.Value].Source;
+            if (file.Lyrics == kind)
+                Show(file, TaskRowState.Done, $"{(kind == LyricsKind.Synced ? "Synced lyrics" : "Lyrics")} from {source}");
+            else
+                Show(file, TaskRowState.Failed, $"Found at {source}, but couldn't be written; tried again next time");
+        }
         // Saved even if it's cancelled now: the files have been written.
         await db.SaveChangesAsync(CancellationToken.None);
         return new Outcome(found + written, already, none, failed + unwritten, problem ?? why);
@@ -210,7 +229,7 @@ public sealed class LyricsFinder(
     }
 
     // The first lyrics a source has, in the user's order. A failure is only reported if no source had any.
-    private async Task<(FoundLyrics? Lyrics, bool Failed)> AskAsync(IReadOnlyList<(PluginInstance Instance, ILyricsPlugin Plugin)> sources,
+    private async Task<(FoundLyrics? Lyrics, bool Failed, string? Source)> AskAsync(IReadOnlyList<(PluginInstance Instance, ILyricsPlugin Plugin)> sources,
         LibraryFile file, CancellationToken ct)
     {
         var track = file.Track!;
@@ -228,7 +247,7 @@ public sealed class LyricsFinder(
                 var lyrics = await plugin.FindAsync(query, ct);
                 _failures[instance.Id] = 0;
                 if (lyrics is not null)
-                    return (lyrics, false);
+                    return (lyrics, false, instance.Name);
             }
             catch (Exception e) when (e is not OperationCanceledException || !ct.IsCancellationRequested)
             {
@@ -240,7 +259,7 @@ public sealed class LyricsFinder(
                     logger.LogWarning("{Plugin} couldn't look for the lyrics of {Title}: {Message}", instance.Name, track.Title, e.Message);
             }
         }
-        return (null, failed);
+        return (null, failed, null);
     }
 }
 
@@ -248,7 +267,7 @@ public sealed class LyricsFinder(
 /// Finds lyrics for every song in the library without them, after a scan. It goes a few songs at a time, so pausing
 /// or cancelling keeps what's been found, and picking it up again skips them.
 /// </summary>
-public sealed class LyricsTask(LyricsFinder finder, MelodexDbContext db) : ITaskHandler
+public sealed class LyricsTask(LyricsFinder finder, MelodexDbContext db, TaskFeed feed) : ITaskHandler
 {
     public const string TaskKind = "library-lyrics";
     public const string Title = "Finding lyrics";
@@ -266,12 +285,13 @@ public sealed class LyricsTask(LyricsFinder finder, MelodexDbContext db) : ITask
         var todo = await finder.Wanting().OrderBy(f => f.Path).Select(f => f.Id).ToListAsync(ct);
         var outcome = new LyricsFinder.Outcome(0, 0, 0, 0);
         var done = 0;
+        var rows = feed.Start(task);
         progress.Report($"Finding lyrics: 0 of {LibraryMatcher.Plural(todo.Count, "file", "files")}");
         foreach (var batch in todo.Chunk(BatchSize))
         {
             ct.ThrowIfCancellationRequested();
             db.ChangeTracker.Clear();
-            outcome += await finder.FindAsync(batch, again: false, ct);
+            outcome += await finder.FindAsync(batch, again: false, ct, rows);
             done += batch.Length;
             progress.Report($"Finding lyrics: {done} of {LibraryMatcher.Plural(todo.Count, "file", "files")}, {outcome.Found} found");
         }

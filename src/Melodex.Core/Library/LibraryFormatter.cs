@@ -99,6 +99,7 @@ public sealed class FormatTask(
     SettingsService settings,
     ConnectorPlugins connectors,
     PlaylistSyncer playlists,
+    TaskFeed feed,
     IOptions<MelodexOptions> options,
     ILogger<FormatTask> logger) : ITaskHandler
 {
@@ -136,7 +137,7 @@ public sealed class FormatTask(
         var total = await formattable.CountAsync(ct);
         // Done before a pause: formatted since this format was asked for.
         var todo = await formattable.Where(f => f.FormattedAt == null || f.FormattedAt < task.CreatedAt)
-            .OrderBy(f => f.EditionId).ThenBy(f => f.Path).Select(f => new { f.Id, f.EditionId }).ToListAsync(ct);
+            .OrderBy(f => f.EditionId).ThenBy(f => f.Path).Select(f => new { f.Id, f.EditionId, f.Path, AlbumId = f.Edition != null ? f.Edition.AlbumId : (Guid?)null }).ToListAsync(ct);
         var done = total - todo.Count;
         var template = job.Options.Move ? (await settings.GetFetchAsync(ct)).PathTemplate : null;
         var root = Path.GetFullPath(options.Value.LibraryPath);
@@ -147,6 +148,14 @@ public sealed class FormatTask(
         var untold = new List<string>();
         var told = DateTime.UtcNow;
         progress.Report(Progress(done, total));
+        // Every file it means to write, listed as it starts, each filled in as it's done.
+        var rows = feed.Start(task);
+        // Each with its album's cover, and a link to the album.
+        var covers = todo.ToDictionary(f => f.Id, f => f.AlbumId is { } album ? (Cover: LibraryView.CoverUrl(album, f.EditionId), Href: $"albums/{album}") : (null, null));
+        void Show(Guid id, string key, TaskRowState state, string title, string? subtitle, string? detail = null) =>
+            rows.Put(key, state, title, subtitle, detail, covers.GetValueOrDefault(id).Href, covers.GetValueOrDefault(id).Cover);
+        foreach (var file in todo)
+            Show(file.Id, file.Path, TaskRowState.Waiting, Path.GetFileName(file.Path), Path.GetDirectoryName(file.Path));
 
         foreach (var batch in todo.GroupBy(f => f.EditionId).SelectMany(g => g.Chunk(BatchSize)))
         {
@@ -164,15 +173,21 @@ public sealed class FormatTask(
                 images,
                 template);
 
+            foreach (var file in files)
+                Show(file.Id, file.Path, TaskRowState.Working, Path.GetFileName(file.Path), Path.GetDirectoryName(file.Path), "Writing");
             var result = await worker.FormatAsync(request, ct);
             removed.AddRange(result.RemovedFolders ?? []);
+            foreach (var folder in result.RemovedFolders ?? [])
+                rows.Put("folder:" + folder, TaskRowState.Done, folder, null, "Removed, as it had no music left in it");
             var now = DateTime.UtcNow;
             foreach (var formatted in result.Files)
             {
                 if (files.FirstOrDefault(f => f.Path == formatted.Path) is not { } file)
                     continue;
+                var wrote = images.Count > 0 ? "Tags and cover written" : job.Options.Artwork == FormatSources.Remove ? "Tags written, cover removed" : "Tags written";
                 if (formatted.NewPath is null)
                 {
+                    Show(file.Id, file.Path, TaskRowState.Failed, Path.GetFileName(file.Path), Path.GetDirectoryName(file.Path), formatted.Error ?? "It couldn't be written");
                     failures.Add($"{formatted.Path}: {formatted.Error}");
                     logger.LogWarning("Couldn't format {Path}: {Reason}", formatted.Path, formatted.Error);
                     continue;
@@ -180,6 +195,8 @@ public sealed class FormatTask(
                 untold.Add(file.Path);
                 if (file.Path != formatted.NewPath)
                     moved.Add(file.Id);
+                Show(file.Id, file.Path, TaskRowState.Done, Path.GetFileName(formatted.NewPath),
+                    file.Path == formatted.NewPath ? Path.GetDirectoryName(file.Path) : $"{file.Path} → {formatted.NewPath}", wrote);
                 file.Path = formatted.NewPath;
                 untold.Add(file.Path);
                 Reread(file, root, logger);
@@ -203,6 +220,10 @@ public sealed class FormatTask(
         {
             var swept = await worker.MusiclessAsync(new MusiclessRequest(true), ct);
             removed.AddRange(swept.Folders);
+            foreach (var folder in swept.Folders)
+                rows.Put("folder:" + folder, TaskRowState.Done, folder, null, "Removed, as it had no music in it");
+            foreach (var failed in swept.Failed)
+                rows.Put("folder:" + failed.Path, TaskRowState.Failed, failed.Path, null, $"Couldn't be removed: {failed.Error}");
             foreach (var failed in swept.Failed)
                 logger.LogWarning("Couldn't remove {Folder}, which has no music in it: {Reason}", failed.Path, failed.Error);
         }

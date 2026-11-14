@@ -17,6 +17,14 @@ What changed in each release of Melodex. Versions follow [semantic versioning](h
   upward, and a tile's is as wide as it needs, and doing either elsewhere with one open opens that one instead. Songs in
   the queue, on its page and in the player's pop-up, have the same menu, to play from there, move them or take them out.
   A playlist's pin is in its square's right corner (#120).
+- **Formatting, lyrics and catalogue updates show what they're doing** in Activity, the way a scan does: open one and
+  its list fills in as it goes, each song with its cover. A format lists every file it means to write, then where each
+  went and what was written, and the folders it removed; finding lyrics says, song by song, where the lyrics came from
+  or why there are none; a catalogue update says which albums were added or are gone. Each task is labelled by what it
+  is: Scan, Format, Lyrics, Bars, Quality or Catalogue. `GET /tasks/{id}/rows` gives the same rows (#16).
+- **Every task keeps its list**, scans included, not just the newest of each kind: once a task finishes, its list is
+  written under `data/tasks` and opens from Activity as before. **Settings → Log** says how long lists are kept, 30
+  days to start with. An earlier scan's files come from `GET /library/scan/files?task=` (#16).
 
 ### Changed
 
