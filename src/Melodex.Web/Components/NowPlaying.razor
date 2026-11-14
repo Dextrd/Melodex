@@ -40,7 +40,7 @@
             <button class="icon @(Player.Panel == PlayerPanel.Lyrics ? "on" : "")" title="Lyrics" @onclick="() => Player.TogglePanel(PlayerPanel.Lyrics)">
                 <svg viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z" /><path d="M8 9h8M8 12h5" /></svg>
             </button>
-            <button class="icon @(Player.Panel == PlayerPanel.Queue ? "on" : "")" title="Queue (@Player.Queue.Count)" @onclick="() => Player.TogglePanel(PlayerPanel.Queue)">
+            <button class="icon @(Player.Panel == PlayerPanel.Queue ? "on" : "")" title="@($"Queue: {Player.Left} to go")" @onclick="() => Player.TogglePanel(PlayerPanel.Queue)">
                 <svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h10M4 18h10M17 15v6l4-3z" /></svg>
             </button>
             <button class="icon" title="Stop and clear the queue" @onclick="Player.ClearAsync">

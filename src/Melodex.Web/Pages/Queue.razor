@@ -1,12 +1,15 @@
 @page "/queue"
 @implements IDisposable
 @inject Player Player
+@using Microsoft.JSInterop
+@inject IJSRuntime JS
 
 <PageTitle>Queue · Melodex</PageTitle>
 
 @*
     The player's queue as a page: the same songs as its pop-up, as a track list, to play from, move about, take out or
-    keep as a playlist. It changes as the player does.
+    keep as a playlist. Songs already played are greyed out above the one playing, and it opens at that one. It changes
+    as the player does.
 *@
 <h1>Queue</h1>
 
@@ -16,10 +19,12 @@
 }
 else
 {
-    var total = Player.Queue.Sum(e => e.DurationSeconds ?? 0);
+    var left = Player.Queue.Skip(Player.Played).Sum(e => e.DurationSeconds ?? 0);
     var keepable = Keepable();
     <div class="toolbar">
-        <span class="muted">@Player.Queue.Count @(Player.Queue.Count == 1 ? "song" : "songs") · @Format.Duration(total)</span>
+        <span class="muted">
+            @Player.Left @(Player.Left == 1 ? "song" : "songs") to go · @Format.Duration(left)@if (Player.Played > 0) { <span> · @Player.Played played</span> }
+        </span>
         <span class="spacer"></span>
         <IconButton Icon="shuffle" On="Player.Shuffle" Title="@(Player.Shuffle ? "Shuffled: click to put it back in order" : "Shuffle what's still to play")"
                     OnClick="() => Player.SetShuffleAsync(!Player.Shuffle)" />
@@ -44,14 +49,14 @@ else
                 </tr>
             </thead>
             @* Only the rows near the screen are drawn: playing a long playlist puts all of it here. *@
-            <tbody>
+            <tbody @ref="_rows">
                 <Virtualize Items="Format.Indexed(Player.Queue)" Context="row" ItemSize="56" OverscanCount="15" SpacerElement="tr">
                     @{
                         var (entry, index) = row;
                         var now = index == Player.Current;
                         var albumHref = entry.AlbumHref;
                     }
-                    <tr @key="entry" class="@(now ? "playing" : "") @(entry.Unplayable ? "dim" : "") @Drag.Class(index)"
+                    <tr @key="entry" class="@(now ? "playing" : index < Player.Current ? "played" : "") @(entry.Unplayable ? "dim" : "") @Drag.Class(index)"
                         @ondragover="() => Drag.Over(index)" @ondragover:preventDefault="true" @ondrop="() => Drag.Drop(index, Player.Move)" @ondrop:preventDefault="true">
                         <td class="num muted"><div class="drag-num"><DragHandle OnStart="() => Drag.Start(index)" OnEnd="Drag.End" />@(index + 1)</div></td>
                         <td class="cover-col">
@@ -93,7 +98,20 @@ else
     private readonly DragOrder Drag = new();
     private IReadOnlyList<PlaylistItem>? _adding;
 
+    private ElementReference _rows;
+    private bool _opened;
+
     protected override void OnInitialized() => Player.Changed += Redraw;
+
+    // Opens at the song playing, with a played one or two above it.
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_opened || Player.Queue.Count == 0)
+            return;
+        _opened = true;
+        if (Player.Current > 0)
+            await JS.InvokeVoidAsync("melodexScroll.toQueueRow", _rows, Player.Current, 56);
+    }
 
     private void Redraw() => InvokeAsync(StateHasChanged);
 

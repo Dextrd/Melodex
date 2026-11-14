@@ -17,6 +17,22 @@ window.melodexScroll = {
         };
         go();
     },
+    // A queue opened at the song playing: its row a quarter of the way down whatever scrolls the list (a pop-up's own
+    // box, or the page), so a played song or two shows above it. Rows are all one height, as the list only draws those
+    // near the screen, so it's found by its place rather than looked for.
+    toQueueRow: (list, index, rowHeight) => {
+        if (!list)
+            return;
+        let scroller = list.parentElement;
+        while (scroller && !/(auto|scroll)/.test(getComputedStyle(scroller).overflowY))
+            scroller = scroller.parentElement;
+        if (!scroller || scroller === document.body || scroller === document.documentElement)
+            scroller = window.melodexScroll.scroller();
+        const page = scroller === document.scrollingElement;
+        const top = list.getBoundingClientRect().top - (page ? 0 : scroller.getBoundingClientRect().top) + scroller.scrollTop;
+        const view = page ? window.innerHeight : scroller.clientHeight;
+        scroller.scrollTo({ top: Math.max(0, top + index * rowHeight - view / 4), behavior: 'instant' });
+    },
     // A row of tabs that scrolls sideways on a phone: the open tab, centred where it can be.
     tabIntoView: () => {
         const tab = document.querySelector('.page-tabs .active');

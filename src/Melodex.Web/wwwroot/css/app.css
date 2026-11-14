@@ -249,7 +249,7 @@ label { display: inline-flex; align-items: center; gap: .4rem; }
 .table th { font-size: .8rem; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); font-weight: 600; }
 .table tr:last-child td { border-bottom: none; }
 .table td.num, .table th.num { text-align: right; font-variant-numeric: tabular-nums; }
-.table tr.dim td { opacity: .6; }
+.table tr.dim td, .table tr.played td { opacity: .6; }
 
 /* Status badges */
 .badge {
@@ -713,7 +713,7 @@ button.icon.play .spinner { margin: 0; vertical-align: middle; }
 .queue-list li:empty { padding: 0; }
 .queue-list li.now { background: var(--bg); }
 .queue-list li.now .queue-title > span:first-child { font-weight: 700; color: var(--accent); }
-.queue-list li.dim { opacity: .55; }
+.queue-list li.dim, .queue-list li.played { opacity: .55; }
 .queue-list .queue-title { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; text-align: left; color: var(--text); }
 .queue-list .queue-title > span { max-width: 100%; }
 .queue-list .queue-cover { width: 2.25rem; flex: none; border-radius: 4px; }

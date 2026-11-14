@@ -4,6 +4,11 @@ What changed in each release of Melodex. Versions follow [semantic versioning](h
 
 ## [Unreleased]
 
+### Changed
+
+- The queue counts what's left to play, on its button and page, rather than every song in it. Songs already played stay
+  above the one playing, greyed out, to go back to, and the queue opens at the song playing, as a page or a pop-up (#113).
+
 ### Fixed
 
 - **Review → Couldn't fetch** keeps to what still needs you. A request leaves it by itself once its song or album is in
