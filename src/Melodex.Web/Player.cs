@@ -138,6 +138,12 @@ public sealed class Player : IAsyncDisposable
 
     public IReadOnlyList<PlayerEntry> Queue => _queue;
     public int Current { get; private set; } = -1;
+
+    /// <summary>The songs before the one playing, kept so they can be gone back to.</summary>
+    public int Played => Math.Max(Current, 0);
+
+    /// <summary>The songs still to play: the one playing and those after it.</summary>
+    public int Left => _queue.Count - Played;
     public PlayerEntry? Now => Current >= 0 && Current < _queue.Count ? _queue[Current] : null;
 
     /// <summary>What's to come is in a random order. Remembered in this browser.</summary>

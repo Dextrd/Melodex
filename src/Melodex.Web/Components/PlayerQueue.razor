@@ -1,22 +1,26 @@
 @inject Player Player
 @inject NavigationManager Nav
+@using Microsoft.JSInterop
+@inject IJSRuntime JS
 @implements IDisposable
 
 @*
-    The queue: what's playing and what's next, to jump to or take out. In the player bar's pop-up and the full-screen
-    player, either of which can open it as a page of its own.
+    The queue: what's playing and what's next, to jump to or take out, with the songs played before it greyed out above
+    to go back to. It opens at the song playing. In the player bar's pop-up and the full-screen player, either of which
+    can open it as a page of its own.
 *@
 <div class="section-head" style="margin: 0 0 .25rem;">
     <h3>Queue</h3>
+    <span class="muted small">@Player.Left to go</span>
     <span class="spacer"></span>
     <button class="link small" @onclick="Player.ClearAsync">Clear</button>
     <IconButton Icon="open" Class="small" Title="Open the queue as a page" OnClick="OpenPage" />
 </div>
 @* Only the songs near the top or bottom of what it shows are drawn: playing a long playlist puts all of it here. *@
-<ol class="queue-list" data-reorder>
+<ol class="queue-list" data-reorder @ref="_list">
     <Virtualize Items="Format.Indexed(Player.Queue)" Context="row" ItemSize="46" OverscanCount="10" SpacerElement="li">
         @{ var (entry, index) = row; }
-        <li class="@(index == Player.Current ? "now" : "") @(entry.Unplayable ? "dim" : "") @Drag.Class(index)"
+        <li class="@(index == Player.Current ? "now" : index < Player.Current ? "played" : "") @(entry.Unplayable ? "dim" : "") @Drag.Class(index)"
             @ondragover="() => Drag.Over(index)" @ondragover:preventDefault="true" @ondrop="() => Drag.Drop(index, Player.Move)" @ondrop:preventDefault="true">
             <DragHandle OnStart="() => Drag.Start(index)" OnEnd="Drag.End" />
             <Cover Url="@entry.CoverUrl" Class="queue-cover" />
@@ -32,6 +36,7 @@
 
 @code {
     private readonly DragOrder Drag = new();
+    private ElementReference _list;
 
     /// <summary>Closes whatever the queue is shown in, as the queue page opens.</summary>
     [Parameter] public EventCallback OnOpenPage { get; set; }
@@ -46,6 +51,12 @@
     }
 
     private void Redraw() => InvokeAsync(StateHasChanged);
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && Player.Current > 0)
+            await JS.InvokeVoidAsync("melodexScroll.toQueueRow", _list, Player.Current, 46);
+    }
 
     public void Dispose() => Player.Changed -= Redraw;
 
