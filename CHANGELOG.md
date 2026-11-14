@@ -6,6 +6,7 @@ What changed in each release of Melodex. Versions follow [semantic versioning](h
 
 ### Fixed
 
+- The **Settings** title stays at the top as a settings page scrolls, as the list of sections does (#126).
 - **Review → Couldn't fetch** keeps to what still needs you. A request leaves it by itself once its song or album is in
   the library, however it got there, and an older request is replaced when the same thing is asked for again, so it's
   listed once. Each can be dismissed, or all of them at once (cancelling a request that needs review or failed through the
