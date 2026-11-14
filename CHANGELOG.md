@@ -4,6 +4,11 @@ What changed in each release of Melodex. Versions follow [semantic versioning](h
 
 ## [Unreleased]
 
+### Fixed
+
+- A listen-now download says **Expired** or **Deleted** as soon as its song is gone, even in the moment before its
+  request has caught up (#133).
+
 ## [1.4.0] - 2026-11-14
 
 The web app, reworked where you use it most. Songs, albums and artists have one menu everywhere, by right-click or a
