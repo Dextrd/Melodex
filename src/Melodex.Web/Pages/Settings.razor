@@ -20,7 +20,7 @@ else
         @foreach (var (value, label, help) in DuplicateOptions)
         {
             <label class="dialog-choice">
-                <input type="radio" name="duplicates" checked="@(_settings.DuplicateTracks == value)" @onchange="() => _settings = _settings with { DuplicateTracks = value }" />
+                <input type="radio" name="duplicates" checked="@(_settings.DuplicateTracks == value)" @onchange="() => Set(_settings with { DuplicateTracks = value })" />
                 <span><strong>@label</strong><span class="muted small">@help</span></span>
             </label>
         }
@@ -48,13 +48,13 @@ else
         <div class="setting-line">
             Send fuzzy matches under
             <NumberField Min="50" Max="100" Label="Confidence, in percent" Value="(int)Math.Round(_settings.MatchThreshold * 100)"
-                         ValueChanged="n => _settings = _settings with { MatchThreshold = n / 100.0 }" />
+                         ValueChanged="n => Set(_settings with { MatchThreshold = n / 100.0 })" />
             % confidence to review
         </div>
         <div class="muted small">Applies from the next scan.</div>
         <div class="setting-line">
             When MusicBrainz is busy, try each album
-            <NumberField Min="1" Max="10" Label="Attempts" Value="_settings.AttemptsWhenBusy" ValueChanged="n => _settings = _settings with { AttemptsWhenBusy = n }" />
+            <NumberField Min="1" Max="10" Label="Attempts" Value="_settings.AttemptsWhenBusy" ValueChanged="n => Set(_settings with { AttemptsWhenBusy = n })" />
             @(_settings.AttemptsWhenBusy == 1 ? "time" : "times") before leaving it for the next scan
         </div>
         <div class="muted small">A busy album goes to the back of the queue, so MusicBrainz gets time to recover before it's tried again.</div>
@@ -64,14 +64,14 @@ else
     <p class="muted small">How the music you have is shown. Matching, and what counts as missing, go by the catalogue either way.</p>
     <div class="card settings-card">
         <label class="dialog-choice">
-            <input type="checkbox" checked="@_settings.PreferFileTags" @onchange="e => _settings = _settings with { PreferFileTags = (bool)e.Value! }" />
+            <input type="checkbox" checked="@_settings.PreferFileTags" @onchange="e => Set(_settings with { PreferFileTags = (bool)e.Value! })" />
             <span>
                 <strong>Use your files' tags</strong>
                 <span class="muted small">Song titles, artists and albums as your files' tags have them, wherever a file has them; the catalogue fills in the rest.</span>
             </span>
         </label>
         <label class="dialog-choice">
-            <input type="checkbox" checked="@_settings.PreferFileCovers" @onchange="e => _settings = _settings with { PreferFileCovers = (bool)e.Value! }" />
+            <input type="checkbox" checked="@_settings.PreferFileCovers" @onchange="e => Set(_settings with { PreferFileCovers = (bool)e.Value! })" />
             <span>
                 <strong>Use your files' cover art</strong>
                 <span class="muted small">A picture embedded in the files, or one like folder.jpg beside them, wherever there's one; otherwise the catalogue's.</span>
@@ -84,7 +84,7 @@ else
     <p class="muted small">Found through the lyrics plugins, set up on the <a href="settings/plugins">Plugins</a> page, and written by the beets worker.</p>
     <div class="card settings-card">
         <label class="dialog-choice">
-            <input type="checkbox" checked="@_settings.FetchLyrics" @onchange="e => _settings = _settings with { FetchLyrics = (bool)e.Value! }" />
+            <input type="checkbox" checked="@_settings.FetchLyrics" @onchange="e => Set(_settings with { FetchLyrics = (bool)e.Value! })" />
             <span>
                 <strong>Find lyrics after each scan</strong>
                 <span class="muted small">For songs without them. A song no source has lyrics for is asked about again after a month. Each song's page can look for them any time.</span>
@@ -94,7 +94,7 @@ else
         @foreach (var (storage, name, hint) in LyricsStorages)
         {
             <label class="dialog-choice">
-                <input type="radio" name="lyrics-storage" checked="@(_settings.LyricsStorage == storage)" @onchange="() => _settings = _settings with { LyricsStorage = storage }" />
+                <input type="radio" name="lyrics-storage" checked="@(_settings.LyricsStorage == storage)" @onchange="() => Set(_settings with { LyricsStorage = storage })" />
                 <span>
                     <strong>@name</strong>
                     <span class="muted small">@hint</span>
@@ -107,33 +107,33 @@ else
     <div class="card settings-card">
         <div class="field">
             <label class="field-label" for="path-template">Folder layout for new albums</label>
-            <input id="path-template" type="text" style="width: 100%; max-width: 32rem;" @bind="_fetchTemplate" />
+            <input id="path-template" type="text" style="width: 100%; max-width: 32rem;" @bind="_fetchTemplate" @bind:after="Changed" />
             <div class="muted small">
                 A <a href="https://beets.readthedocs.io/en/stable/reference/pathformat.html" target="_blank" rel="noopener noreferrer">beets path format</a>.
                 The default, <code>@FetchSettings.DefaultPathTemplate</code>, gives <code>Portishead/Dummy/11 Glory Box.opus</code>.
                 A track for an album you already have goes next to that album's files instead.
                 @if (_fetchTemplate != FetchSettings.DefaultPathTemplate)
                 {
-                    <button class="link small" @onclick="() => _fetchTemplate = FetchSettings.DefaultPathTemplate">Use the default</button>
+                    <button class="link small" @onclick="() => { _fetchTemplate = FetchSettings.DefaultPathTemplate; Changed(); }">Use the default</button>
                 }
             </div>
         </div>
         <div class="setting-line">
             Fetch
-            <NumberField Min="1" Max="8" Label="Fetches at once" Value="_fetch.ParallelFetches" ValueChanged="n => _fetch = _fetch with { ParallelFetches = n }" />
+            <NumberField Min="1" Max="8" Label="Fetches at once" Value="_fetch.ParallelFetches" ValueChanged="n => SetFetch(_fetch with { ParallelFetches = n })" />
             at once
         </div>
         <div class="setting-line">
             Accept a file within
-            <NumberField Min="0" Max="120" Label="Seconds" Value="_fetch.DurationToleranceSeconds" ValueChanged="n => _fetch = _fetch with { DurationToleranceSeconds = n }" />
+            <NumberField Min="0" Max="120" Label="Seconds" Value="_fetch.DurationToleranceSeconds" ValueChanged="n => SetFetch(_fetch with { DurationToleranceSeconds = n })" />
             seconds or
-            <NumberField Min="0" Max="50" Label="Percent" Value="_fetch.DurationTolerancePercent" ValueChanged="n => _fetch = _fetch with { DurationTolerancePercent = n }" />
+            <NumberField Min="0" Max="50" Label="Percent" Value="_fetch.DurationTolerancePercent" ValueChanged="n => SetFetch(_fetch with { DurationTolerancePercent = n })" />
             % of the song's length, whichever is more
         </div>
         <div class="muted small">A file further off is probably a different version, such as a live take or a radio edit.</div>
         <div class="setting-line">
             Try
-            <NumberField Min="1" Max="5" Label="Results per source" Value="_fetch.CandidatesPerPlugin" ValueChanged="n => _fetch = _fetch with { CandidatesPerPlugin = n }" />
+            <NumberField Min="1" Max="5" Label="Results per source" Value="_fetch.CandidatesPerPlugin" ValueChanged="n => SetFetch(_fetch with { CandidatesPerPlugin = n })" />
             of each source's best results, best first whichever source they're from
         </div>
         <div class="muted small">How long listen-now tracks are kept is under <a href="settings/playback">Playback</a>.</div>
@@ -143,22 +143,18 @@ else
     <div class="card settings-card">
         <div class="setting-line">
             Show the last
-            <NumberField Min="1" Max="90" Label="Days" Value="_log!.MemoryDays" ValueChanged="n => _log = _log with { MemoryDays = n }" />
+            <NumberField Min="1" Max="90" Label="Days" Value="_log!.MemoryDays" ValueChanged="n => SetLog(_log with { MemoryDays = n })" />
             days on the Log page
         </div>
         <div class="setting-line">
             Keep backup files for
-            <NumberField Min="1" Max="3650" Label="Days" Value="_log.FileDays" ValueChanged="n => _log = _log with { FileDays = n }" />
+            <NumberField Min="1" Max="3650" Label="Days" Value="_log.FileDays" ValueChanged="n => SetLog(_log with { FileDays = n })" />
             days
         </div>
         <div class="muted small">Every entry is written to a file per day under <code>data/logs</code> as it happens, so a restart loses nothing. Older files are deleted.</div>
     </div>
 
-    <div class="toolbar">
-        <button class="primary" @onclick="SaveAsync">Save</button>
-        @if (_saved) { <span class="muted small">Saved.</span> }
-        @if (_saveError is not null) { <span class="error small" title="@_saveError">@_saveError</span> }
-    </div>
+    <AutoSave @ref="_saver" Save="SaveAsync" />
 
     <p class="muted small">Plugins (sources, the media server and the catalogue) are set up under <a href="settings/plugins">Plugins</a>.</p>
 
@@ -177,8 +173,7 @@ else
     private FetchSettings? _fetch;
     private LogSettings? _log;
     private string _fetchTemplate = "";
-    private bool _saved;
-    private string? _saveError;
+    private AutoSave? _saver;
 
     private static readonly (DuplicateTracks, string, string)[] DuplicateOptions =
     [
@@ -202,25 +197,36 @@ else
 
     // Every kind is written out, so what was read from older settings is kept as it shows.
     private void SetShowing(ReleaseKind kind, ReleaseShowing showing) =>
-        _settings = _settings! with { Showing = Enum.GetValues<ReleaseKind>().ToDictionary(k => k, k => k == kind ? showing : _settings.ShowingOf(k)) };
+        Set(_settings! with { Showing = Enum.GetValues<ReleaseKind>().ToDictionary(k => k, k => k == kind ? showing : _settings.ShowingOf(k)) });
 
     private void ResetShowing() =>
-        _settings = _settings! with { Showing = Enum.GetValues<ReleaseKind>().ToDictionary(k => k, ReleaseKinds.Default) };
+        Set(_settings! with { Showing = Enum.GetValues<ReleaseKind>().ToDictionary(k => k, ReleaseKinds.Default) });
+
+    // Each change is saved in a moment, with whatever else changes meanwhile.
+    private void Set(LibrarySettings settings)
+    {
+        _settings = settings;
+        Changed();
+    }
+
+    private void SetFetch(FetchSettings fetch)
+    {
+        _fetch = fetch;
+        Changed();
+    }
+
+    private void SetLog(LogSettings log)
+    {
+        _log = log;
+        Changed();
+    }
+
+    private void Changed() => _saver?.Changed();
 
     private async Task SaveAsync()
     {
-        _saved = false;
-        _saveError = null;
-        try
-        {
-            await Api.SaveLibrarySettingsAsync(_settings!);
-            await Api.SaveFetchSettingsAsync(_fetch! with { PathTemplate = _fetchTemplate });
-            await Api.SaveLogSettingsAsync(_log!);
-            _saved = true;
-        }
-        catch (MelodexApiException e)
-        {
-            _saveError = e.Message;
-        }
+        await Api.SaveLibrarySettingsAsync(_settings!);
+        await Api.SaveFetchSettingsAsync(_fetch! with { PathTemplate = _fetchTemplate });
+        await Api.SaveLogSettingsAsync(_log!);
     }
 }

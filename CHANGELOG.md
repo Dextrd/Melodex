@@ -8,6 +8,10 @@ What changed in each release of Melodex. Versions follow [semantic versioning](h
 
 - The queue counts what's left to play, on its button and page, rather than every song in it. Songs already played stay
   above the one playing, greyed out, to go back to, and the queue opens at the song playing, as a page or a pop-up (#113).
+- **Settings save as you change them**, without Save buttons: General, Quality and Playback. A change is saved a moment
+  after it's made, along with any others made meanwhile, and leaving the page saves what's still waiting. A note in the
+  corner says it's saving, then saved, or why it couldn't, such as a value the server turned down, with a way to try
+  again. Choosing to keep visualiser bars beside every song still asks first (#38).
 
 ### Fixed
 

@@ -1624,3 +1624,11 @@ table.slots thead th { height: 32px; box-sizing: border-box; }
 .format-folders { margin: -.25rem 0 .75rem; }
 .format-folders summary { cursor: pointer; }
 .format-folders ul { max-height: 12rem; overflow: auto; margin: .4rem 0 0; padding-left: 1.2rem; font-size: .85rem; }
+
+/* Settings saving themselves: a note at the bottom of the window, above the player. */
+.autosave {
+    position: fixed; right: 1rem; bottom: 5.5rem; z-index: 25; display: flex; align-items: center; gap: .5rem; max-width: min(28rem, calc(100vw - 2rem));
+    padding: .4rem .75rem; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); box-shadow: 0 2px 8px rgb(0 0 0 / .12);
+}
+.autosave .spinner { width: .9rem; height: .9rem; }
+.autosave.failed { color: var(--missing); border-color: var(--missing); border-radius: var(--radius); }
