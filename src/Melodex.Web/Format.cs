@@ -59,6 +59,8 @@ public static class Format
         // An upgrade that found nothing better leaves the song as it was, in the library.
         Client.RequestState.InLibrary when r.Upgrade => r.Detail?.StartsWith("Upgraded") == true ? "Upgraded" : "Unchanged",
         Client.RequestState.InLibrary => "In library",
+        Client.RequestState.Playable when r.Ended == ListenNowEnd.Expired => "Expired",
+        Client.RequestState.Playable when r.Ended == ListenNowEnd.Deleted => "Deleted",
         Client.RequestState.Playable => "Ready to play",
         Client.RequestState.NeedsReview => "Needs review",
         Client.RequestState.Failed => "Failed",
@@ -66,7 +68,7 @@ public static class Format
     };
 
     /// <summary>The badge colour for a request, grey while paused.</summary>
-    public static string RequestBadge(RequestInfo r) => r.Paused && r.Active ? "neutral" : RequestBadge(r.State);
+    public static string RequestBadge(RequestInfo r) => r.Paused && r.Active || r.Ended is not null ? "neutral" : RequestBadge(r.State);
 
     /// <summary>The badge colour for a request state.</summary>
     public static string RequestBadge(Client.RequestState state) => state switch

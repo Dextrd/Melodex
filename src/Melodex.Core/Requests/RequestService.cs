@@ -303,9 +303,7 @@ public sealed class RequestService(MelodexDbContext db, RequestSignal signal, Re
         if (request is null)
             return null;
         var children = await db.Requests.Where(r => r.ParentRequestId == id).OrderBy(r => r.CreatedAt).ToListAsync(ct);
-        var childInfos = new List<RequestInfo>();
-        foreach (var child in children)
-            childInfos.Add(await ToInfoAsync(child, ct));
+        var childInfos = await ToInfosAsync(children, ct);
         return (await ToInfoAsync(request, ct)) with
         {
             Children = childInfos,
@@ -320,18 +318,72 @@ public sealed class RequestService(MelodexDbContext db, RequestSignal signal, Re
         if (activeOnly)
             query = query.Where(r => !Finished.Contains(r.Status));
         var requests = await query.OrderByDescending(r => r.CreatedAt).Take(limit).ToListAsync(ct);
-        var infos = new List<RequestInfo>();
-        foreach (var request in requests)
-            infos.Add(await ToInfoAsync(request, ct));
+        return await ToInfosAsync(requests, ct);
+    }
+
+    public async Task<RequestInfo> ToInfoAsync(Request r, CancellationToken ct) => (await ToInfosAsync([r], ct))[0];
+
+    private async Task<List<RequestInfo>> ToInfosAsync(IReadOnlyList<Request> requests, CancellationToken ct)
+    {
+        var targets = await TargetsAsync(requests, ct);
+        var ended = await EndedAsync(requests, ct);
+        var infos = new List<RequestInfo>(requests.Count);
+        foreach (var r in requests)
+            infos.Add(await ToInfoAsync(r, targets.GetValueOrDefault(r.Id), ended.TryGetValue(r.Id, out var end) ? end : null, ct));
         return infos;
     }
 
-    public async Task<RequestInfo> ToInfoAsync(Request r, CancellationToken ct)
+    // Listen-now songs that were ready to play and are gone: deleted by someone, or expired, as are those from before
+    // deleting was told apart.
+    private async Task<Dictionary<Guid, ListenNowEnd>> EndedAsync(IReadOnlyCollection<Request> requests, CancellationToken ct)
+    {
+        var ids = requests.Where(r => r.Mode == RequestMode.ListenNow && r.Status == RequestStatus.Playable).Select(r => r.Id).ToList();
+        if (ids.Count == 0)
+            return [];
+        var gone = await db.ListenNowItems.Where(i => ids.Contains(i.RequestId) && i.State == Data.ListenNowState.Expired)
+            .Select(i => new { i.RequestId, i.DiscardedAt }).ToListAsync(ct);
+        return gone.DistinctBy(i => i.RequestId).ToDictionary(i => i.RequestId, i => i.DiscardedAt is null ? ListenNowEnd.Expired : ListenNowEnd.Deleted);
+    }
+
+    private async Task<RequestInfo> ToInfoAsync(Request r, RequestTarget? target, ListenNowEnd? ended, CancellationToken ct)
     {
         var parts = r.TargetKind == EntityKind.Track ? null : await PartsAsync(r.Id, ct);
         return new RequestInfo(r.Id, ToKind(r.TargetKind), r.TargetId, r.EditionId, r.Title, (RequestState)(int)r.Status, r.Detail,
             r.ParentRequestId, r.CreatedAt, r.UpdatedAt, parts is { Total: > 0 } ? parts : null, ListenNow: r.Mode == RequestMode.ListenNow,
-            Paused: r.Paused, QueueOrder: r.QueueOrder, Upgrade: r.UpgradesFileId != null);
+            Paused: r.Paused, QueueOrder: r.QueueOrder, Upgrade: r.UpgradesFileId != null, Target: target, Ended: ended);
+    }
+
+    // What each request is for, as the catalogue has it now, in a few queries for them all; missing once that's gone from it.
+    private async Task<Dictionary<Guid, RequestTarget>> TargetsAsync(IReadOnlyCollection<Request> requests, CancellationToken ct)
+    {
+        var targets = new Dictionary<Guid, RequestTarget>();
+        var artistIds = requests.Where(r => r.TargetKind == EntityKind.Artist).Select(r => r.TargetId).Distinct().ToList();
+        var albumIds = requests.Where(r => r.TargetKind == EntityKind.Album).Select(r => r.TargetId).Distinct().ToList();
+        var trackIds = requests.Where(r => r.TargetKind == EntityKind.Track).Select(r => r.TargetId).Distinct().ToList();
+        var artists = artistIds.Count == 0 ? [] : await db.Artists.Where(a => artistIds.Contains(a.Id))
+            .Select(a => new { a.Id, a.Name }).ToDictionaryAsync(a => a.Id, a => a.Name, ct);
+        var albums = albumIds.Count == 0 ? [] : await db.Albums.Where(a => albumIds.Contains(a.Id))
+            .Select(a => new { a.Id, a.Title, a.ArtistId, a.ArtistCredit }).ToDictionaryAsync(a => a.Id, ct);
+        var tracks = trackIds.Count == 0 ? [] : await db.Tracks.Where(t => trackIds.Contains(t.Id))
+            .Select(t => new { t.Id, t.Title, t.ArtistId, t.ArtistCredit }).ToDictionaryAsync(t => t.Id, ct);
+        var appearances = (trackIds.Count == 0 ? [] : await db.EditionTracks.Where(e => trackIds.Contains(e.TrackId))
+                .Select(e => new { e.TrackId, e.EditionId, e.Edition.AlbumId, e.Edition.Album.Title }).ToListAsync(ct))
+            .ToLookup(e => e.TrackId);
+        foreach (var r in requests)
+        {
+            if (r.TargetKind == EntityKind.Artist && artists.TryGetValue(r.TargetId, out var name))
+                targets[r.Id] = new RequestTarget(name, r.TargetId, name, null, null, LibraryView.ArtistImageUrl(r.TargetId));
+            else if (r.TargetKind == EntityKind.Album && albums.TryGetValue(r.TargetId, out var album))
+                targets[r.Id] = new RequestTarget(album.Title, album.ArtistId, album.ArtistCredit, r.TargetId, album.Title, LibraryView.CoverUrl(r.TargetId, r.EditionId));
+            else if (r.TargetKind == EntityKind.Track && tracks.TryGetValue(r.TargetId, out var track))
+            {
+                // The album it was asked for from, or else the first it's on.
+                var on = appearances[r.TargetId].FirstOrDefault(e => e.EditionId == r.EditionId) ?? appearances[r.TargetId].FirstOrDefault();
+                targets[r.Id] = new RequestTarget(track.Title, track.ArtistId, track.ArtistCredit, on?.AlbumId, on?.Title,
+                    on is null ? null : LibraryView.CoverUrl(on.AlbumId, r.EditionId ?? on.EditionId));
+            }
+        }
+        return targets;
     }
 
     public static RequestKind ToKind(EntityKind kind) => kind switch

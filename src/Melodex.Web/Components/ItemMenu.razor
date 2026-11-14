@@ -21,11 +21,11 @@
                 {
                     <button type="button" role="menuitem" @onclick="() => Do(() => OnPlay.InvokeAsync())"><Icon Name="play" />@PlayLabel</button>
                 }
-                else if (Entry is not null)
+                else if (Playing is { Count: > 0 } playing)
                 {
-                    <button type="button" role="menuitem" @onclick="() => Do(() => Player.PlayAsync([Entry]))"><Icon Name="play" />Play</button>
-                    <button type="button" role="menuitem" @onclick="() => Do(() => Player.AddAsync([Entry], true))"><Icon Name="play-next" />Play next</button>
-                    <button type="button" role="menuitem" @onclick="() => Do(() => Player.AddAsync([Entry], false))"><Icon Name="play-last" />Play last</button>
+                    <button type="button" role="menuitem" @onclick="() => Do(() => Player.PlayAsync(playing))"><Icon Name="play" />Play</button>
+                    <button type="button" role="menuitem" @onclick="() => Do(() => Player.AddAsync(playing, true))"><Icon Name="play-next" />Play next</button>
+                    <button type="button" role="menuitem" @onclick="() => Do(() => Player.AddAsync(playing, false))"><Icon Name="play-last" />Play last</button>
                 }
                 else if (ListenTrackId is { } listen)
                 {
@@ -50,6 +50,11 @@
                 {
                     <button type="button" role="menuitem" disabled="@(_busy || ScanStatus.Reading)" @onclick="GetAsync"><Icon Name="get" />@GetLabel</button>
                 }
+                @if (OnAddToLibrary.HasDelegate)
+                {
+                    <button type="button" role="menuitem" disabled="@ScanStatus.Reading" title="@(ScanStatus.Reading ? "Wait until the scan has read your files" : null)"
+                            @onclick="() => Do(() => OnAddToLibrary.InvokeAsync())"><Icon Name="add" />Add to your library</button>
+                }
                 @if (OnIgnore.HasDelegate)
                 {
                     <button type="button" role="menuitem" @onclick="() => Do(() => OnIgnore.InvokeAsync())"><Icon Name="ignore" />Ignore: don't count it as missing</button>
@@ -63,6 +68,10 @@
                         </button>
                     }
                 }
+            }
+            @if (OnDelete.HasDelegate)
+            {
+                <button type="button" role="menuitem" class="menu-danger" @onclick="() => Do(() => OnDelete.InvokeAsync())"><Icon Name="discard" />Delete now</button>
             }
             @if (_note is { } note)
             {
@@ -113,6 +122,15 @@
 
     /// <summary>A song you have, as the player has it, to play or queue.</summary>
     [Parameter] public PlayerEntry? Entry { get; set; }
+
+    /// <summary>Songs to play or queue together, such as an album's fetched to listen to; in place of <see cref="Entry"/>.</summary>
+    [Parameter] public IReadOnlyList<PlayerEntry>? Entries { get; set; }
+
+    /// <summary>Adds what was fetched to listen to to the library, without fetching it again.</summary>
+    [Parameter] public EventCallback OnAddToLibrary { get; set; }
+
+    /// <summary>Deletes what was fetched to listen to.</summary>
+    [Parameter] public EventCallback OnDelete { get; set; }
 
     /// <summary>A song you don't have, to fetch to listen to (from <see cref="EditionId"/>, if given).</summary>
     [Parameter] public Guid? ListenTrackId { get; set; }
@@ -176,6 +194,8 @@
 
     private bool _open, _adding, _busy;
     private string? _upgrade, _note;
+
+    private IReadOnlyList<PlayerEntry>? Playing => Entries ?? (Entry is null ? null : [Entry]);
 
     private FormatScope? UpgradeScope => Upgrade ?? (UpgradeTrackId is { } id ? new FormatScope(FormatScopeKind.Track, id) : null);
 

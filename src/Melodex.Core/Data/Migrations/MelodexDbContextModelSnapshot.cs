@@ -566,6 +566,9 @@ namespace Melodex.Core.Data.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("TEXT");
 
+                    b.Property<DateTime?>("DiscardedAt")
+                        .HasColumnType("TEXT");
+
                     b.Property<TimeSpan?>("Duration")
                         .HasColumnType("TEXT");
 

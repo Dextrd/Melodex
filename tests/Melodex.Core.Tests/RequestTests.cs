@@ -632,7 +632,11 @@ public sealed class RequestTests(RequestFixture fixture, ITestOutputHelper outpu
             var second = await Api.CreateRequestAsync(new CreateRequest(RequestKind.Artist, album.ArtistId));
             Assert.Equal(first.Id, second.Id);
             await Api.CancelRequestAsync(first.Id);
-            Assert.Equal(RequestState.Cancelled, (await Api.GetRequestAsync(first.Id))!.State);
+            var cancelled = (await Api.GetRequestAsync(first.Id))!;
+            Assert.Equal(RequestState.Cancelled, cancelled.State);
+            // It says what it's for, to link to.
+            Assert.Equal(album.ArtistId, cancelled.Target?.ArtistId);
+            Assert.Equal("Portishead", cancelled.Target?.Name);
         }
         finally
         {

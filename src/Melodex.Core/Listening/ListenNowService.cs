@@ -148,6 +148,7 @@ public sealed class ListenNowService(
         if (request is not null && !RequestService.Finished.Contains(request.Status))
             await requests.CancelAsync(request, ct);
         Expire(item);
+        item.DiscardedAt = DateTime.UtcNow;
         await db.SaveChangesAsync(ct);
     }
 

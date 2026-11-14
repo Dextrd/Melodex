@@ -73,10 +73,24 @@ public sealed record RequestInfo(
     bool ListenNow = false,
     bool Paused = false,
     double QueueOrder = 0,
-    bool Upgrade = false)
+    bool Upgrade = false,
+    RequestTarget? Target = null,
+    ListenNowEnd? Ended = null)
 {
     /// <summary>Whether it can still change: not in the library, failed, needing review or cancelled.</summary>
     public bool Active => State is not (RequestState.InLibrary or RequestState.NeedsReview or RequestState.Failed or RequestState.Cancelled or RequestState.Playable);
+}
+
+/// <summary>What a request is for, to link to: the song, album or artist, and the album and artist it's by.</summary>
+/// <param name="Name">The song's, album's or artist's own name, without the artist's.</param>
+/// <param name="AlbumId">The album: the one asked for, or the one a song was asked for from.</param>
+public sealed record RequestTarget(string Name, Guid? ArtistId, string? ArtistName, Guid? AlbumId, string? AlbumTitle, string? CoverUrl);
+
+/// <summary>How a listen-now song that was ready to play went: its time ran out, or someone deleted it.</summary>
+public enum ListenNowEnd
+{
+    Expired,
+    Deleted,
 }
 
 /// <summary>How the parts of an artist or album request stand.</summary>
