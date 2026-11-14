@@ -513,8 +513,18 @@ a.button:hover { text-decoration: none; border-color: var(--accent); }
     font: inherit; font-weight: 600; border: none; background: none; padding: 0; color: var(--text); text-align: left;
     display: grid; grid-template-columns: .9rem minmax(0, 1fr); gap: .5rem; align-items: center; min-width: 0;
 }
-button.request-toggle { cursor: pointer; }
+button.request-toggle, div.request-toggle { cursor: pointer; }
+/* A download, with its album's cover or its artist's picture. */
+.request-toggle.with-cover { grid-template-columns: .9rem 2.5rem minmax(0, 1fr); }
+.request-toggle.with-cover .cover { width: 2.5rem; }
+.request-head:has(.with-cover) ~ :is(.request-detail, .request-meter) { margin-left: 4.4rem; }
+.request-toggle .chevron-button { border: none; background: none; padding: 0; width: .9rem; height: 1.2rem; display: grid; place-items: center; cursor: pointer; }
 .request-title { overflow-wrap: anywhere; }
+.request-title a { color: inherit; text-decoration: none; }
+.request-title a.by { color: var(--accent); font-weight: 400; }
+/* The artist, and a song's album, on a line under the title. */
+.request-by { display: block; font-weight: 400; }
+.request-title a:hover { text-decoration: underline; }
 .request-state { min-width: 0; }
 .request-time { text-align: right; white-space: nowrap; }
 .request-actions { display: flex; justify-content: flex-end; gap: .3rem; }
@@ -530,6 +540,14 @@ button.request-toggle { cursor: pointer; }
 }
 .section-toggle.small { font-weight: 500; font-size: .9rem; text-align: left; }
 .job { padding: .5rem 0; border-top: 1px dashed var(--border); }
+/* A download's attempts, one at a time, with arrows either side; scrolls sideways too (attempts.js). */
+.attempts { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 0 .4rem; align-items: start; border-top: 1px dashed var(--border); padding-top: .3rem; }
+.attempts-count { grid-column: 1 / -1; text-align: center; }
+.attempts > .icon-button { margin-top: .5rem; }
+.attempts-track { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; overscroll-behavior-x: contain; }
+.attempts-track::-webkit-scrollbar { display: none; }
+.attempt-slide { flex: 0 0 100%; min-width: 0; box-sizing: border-box; padding: 0 .5rem; scroll-snap-align: start; scroll-snap-stop: always; }
+.attempt-slide > .job { border-top: none; }
 .job details > summary { margin: .3rem 0; }
 .job-log { margin: 0; padding: .5rem .75rem; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; font-size: .8rem; white-space: pre-wrap; overflow-wrap: anywhere; }
 .notice.error { max-width: none; white-space: normal; }
@@ -847,25 +865,20 @@ button.play-link svg { width: .8rem; height: .8rem; fill: currentColor; }
 tr.playing td { background: var(--bg); }
 tr.playing td:nth-child(2) { color: var(--accent); font-weight: 600; }
 
-/* Listen now: one row per track, with how long it's kept. */
-.listen-item { display: grid; grid-template-columns: 3rem minmax(0, 1fr) auto; gap: .75rem; align-items: center; padding: .6rem 1rem; }
-.listen-item + .listen-item, .card > .listen-song + *, .card > .listen-album + * { border-top: 1px solid var(--border); }
-/* With a chevron that opens it: an album's songs, or how a song was fetched (#64). */
-.listen-item.toggled { grid-template-columns: 1rem 3rem minmax(0, 1fr) auto; padding-left: .6rem; }
-.listen-toggle { display: grid; place-items: center; width: 1.5rem; height: 2rem; margin: 0 -.25rem; padding: 0; border: none; background: none; cursor: pointer; }
-button.link.listen-album-title { display: block; max-width: 100%; color: var(--text); text-align: left; font: inherit; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.listen-album-songs { border-top: 1px solid var(--border); background: color-mix(in srgb, var(--text) 3%, transparent); }
-.listen-album-songs .listen-song + .listen-song { border-top: 1px solid var(--border); }
-.listen-number { text-align: center; font-variant-numeric: tabular-nums; }
-.listen-detail { padding: 0 1rem .75rem 2.5rem; }
-.listen-status { gap: .4rem .75rem; margin-top: .4rem; flex-wrap: wrap; }
-.listen-actions { display: flex; gap: .3rem; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
-@media (max-width: 640px) {
-    .listen-item { grid-template-columns: 2.5rem minmax(0, 1fr); }
-    .listen-item.toggled { grid-template-columns: 1rem 2.5rem minmax(0, 1fr); }
-    .listen-detail { padding-left: 1rem; }
-    .listen-actions { grid-column: 1 / -1; justify-content: flex-start; }
-}
+/* Library → Listen now: songs in a track table, an album's under it (#121). */
+.track-list col.left-col { width: 9.5rem; }
+.listen-table td:nth-child(5) { white-space: nowrap; }
+/* The fold column comes first, so a playing song's title is the third cell. */
+.listen-table tr.playing td:nth-child(2) { color: inherit; font-weight: inherit; }
+.listen-table tr.playing td:nth-child(3) { color: var(--accent); font-weight: 600; }
+/* Two buttons, their gap and the cell's padding. */
+.track-list col.listen-action-col { width: 6.5rem; }
+.listen-table tr.listen-album td { background: color-mix(in srgb, var(--text) 3%, transparent); }
+.listen-table tr.listen-track td.num:nth-child(2) { text-align: center; font-variant-numeric: tabular-nums; }
+/* An album's fold arrow, on its left as elsewhere. */
+.listen-table col.fold-col { width: 2rem; }
+.listen-table td.fold-col { padding-right: 0; }
+.listen-table .chevron-button { border: none; background: none; padding: 0; width: 1.2rem; height: 2rem; display: grid; place-items: center; cursor: pointer; }
 
 /* Loading: a spinner beside what's loading. */
 .loading { display: flex; align-items: center; justify-content: center; gap: .6rem; padding: 2rem; color: var(--muted); }

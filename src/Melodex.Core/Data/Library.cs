@@ -381,6 +381,9 @@ public class ListenNowItem
     /// </summary>
     public DateTime? ExpiresAt { get; set; }
 
+    /// <summary>When someone deleted it rather than letting it expire; null for one that expired, or from before this was kept.</summary>
+    public DateTime? DiscardedAt { get; set; }
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }
 

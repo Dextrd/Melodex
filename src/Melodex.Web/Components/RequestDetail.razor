@@ -1,4 +1,6 @@
 @inject MelodexClient Api
+@using Microsoft.JSInterop
+@inject IJSRuntime Js
 
 @* A request's parts and attempts, for the Activity page. *@
 <div class="request-body">
@@ -29,45 +31,26 @@
         </table>
     }
 
-    @foreach (var job in Request.Jobs ?? [])
+    @if (Request.Jobs is { Count: 1 } one)
     {
-        <div class="job">
-            <div class="row small">
-                <strong>Attempt @job.Attempt</strong>
-                <span>@(job.Plugin ?? "removed plugin")</span>
-                <span class="badge @JobBadge(job)">@JobLabel(job)</span>
-                @if (job.VerificationDetail is not null) { <span class="muted">@job.VerificationDetail</span> }
+        @Attempt(one[0])
+    }
+    else if (Request.Jobs is { Count: > 1 } jobs)
+    {
+        @*
+            One attempt at a time, the latest first: the arrows, or scrolling sideways, go back through the earlier ones
+            (attempts.js).
+        *@
+        <div class="attempts" @ref="_attempts">
+            <div class="attempts-count muted small">Attempt <span>@jobs.Count</span> of @jobs.Count</div>
+            <IconButton Icon="back" Class="small attempts-earlier" Title="Earlier attempt" />
+            <div class="attempts-track">
+                @foreach (var job in jobs)
+                {
+                    <div class="attempt-slide" @key="job.Id">@Attempt(job)</div>
+                }
             </div>
-            @if (job.Candidate is { } fetched)
-            {
-                <div class="small"><Candidate Value="fetched" /></div>
-            }
-            <details>
-                <summary class="small">Log</summary>
-                <pre class="job-log">@job.Log</pre>
-            </details>
-            @if (job.Candidates.Count > 0)
-            {
-                <details>
-                    <summary class="small">All @job.Candidates.Count candidates from @job.Plugin</summary>
-                    <table class="table small">
-                        <tbody>
-                            @foreach (var candidate in job.Candidates)
-                            {
-                                <tr>
-                                    <td><Candidate Value="candidate" /></td>
-                                    <td class="num">
-                                        @if (CanChoose)
-                                        {
-                                            <button class="link small" disabled="@_busy" @onclick="() => ChooseAsync(job, candidate)">Fetch this</button>
-                                        }
-                                    </td>
-                                </tr>
-                            }
-                        </tbody>
-                    </table>
-                </details>
-            }
+            <IconButton Icon="forward" Class="small attempts-later" Title="Later attempt" />
         </div>
     }
 
@@ -78,11 +61,60 @@
 </div>
 
 @code {
+    private RenderFragment Attempt(JobInfo job) =>
+        @<text>
+    <div class="job">
+        <div class="row small">
+            <strong>Attempt @job.Attempt</strong>
+            <span>@(job.Plugin ?? "removed plugin")</span>
+            <span class="badge @JobBadge(job)">@JobLabel(job)</span>
+            @if (job.VerificationDetail is not null) { <span class="muted">@job.VerificationDetail</span> }
+        </div>
+        @if (job.Candidate is { } fetched)
+        {
+            <div class="small"><Candidate Value="fetched" /></div>
+        }
+        <details>
+            <summary class="small">Log</summary>
+            <pre class="job-log">@job.Log</pre>
+        </details>
+        @if (job.Candidates.Count > 0)
+        {
+            <details>
+                <summary class="small">All @job.Candidates.Count candidates from @job.Plugin</summary>
+                <table class="table small">
+                    <tbody>
+                        @foreach (var candidate in job.Candidates)
+                        {
+                            <tr>
+                                <td><Candidate Value="candidate" /></td>
+                                <td class="num">
+                                    @if (CanChoose)
+                                    {
+                                        <button class="link small" disabled="@_busy" @onclick="() => ChooseAsync(job, candidate)">Fetch this</button>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </details>
+        }
+    </div>
+        </text>;
+
     [Parameter, EditorRequired] public RequestInfo Request { get; set; } = null!;
     [Parameter] public EventCallback OnChanged { get; set; }
 
     private readonly Dictionary<Guid, RequestInfo?> _open = [];
     private bool _busy;
+    private ElementReference _attempts;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (Request.Jobs is { Count: > 1 })
+            await Js.InvokeVoidAsync("melodexAttempts.update", _attempts);
+    }
 
     // A candidate can be picked once the request has stopped without its file, and only for a request without parts.
     private bool CanChoose => !Request.Active && Request.State != RequestState.InLibrary && Request.Children is not { Count: > 0 };

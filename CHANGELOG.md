@@ -20,6 +20,19 @@ What changed in each release of Melodex. Versions follow [semantic versioning](h
 
 ### Changed
 
+- **Activity** and **Downloads** are one page with two tabs: **Tasks** (scans, formatting, lyrics, catalogue
+  updates) and **Downloads** (everything fetched, for the library or to listen to now, no longer grouped by album). Each
+  shows what's recent (still going, or changed in the last hour) or earlier, can be filtered and sorted, and links its
+  songs, albums and artists to their pages. The page remembers the tab you were on. Requests from the API say what
+  they're for, in `target` (#121).
+- **Listen now** is a tab of the **Library**, beside Browse and Playlists: the songs fetched to listen to that are still
+  here, each once however many times it was fetched, in a track list grouped by album. Filter and sort it, play it all,
+  and add songs or albums to your library or delete them from their ⋯ menus (#121).
+- **Downloads** show each one's album cover or artist picture, and a song fetched to listen to says **Expired** or
+  **Deleted** once it's gone, rather than **Ready to play**. Those gone before this release say Expired. Requests from
+  the API say so in `ended` (#121).
+- A download tried more than once shows one attempt at a time, the latest first: the arrows either side, or scrolling
+  sideways, go back through the earlier ones (#121).
 - The queue counts what's left to play, on its button and page, rather than every song in it. Songs already played stay
   above the one playing, greyed out, to go back to, and the queue opens at the song playing, as a page or a pop-up (#113).
 - **Settings save as you change them**, without Save buttons: General, Quality and Playback. A change is saved a moment

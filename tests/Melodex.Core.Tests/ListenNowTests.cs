@@ -93,6 +93,8 @@ public sealed class ListenNowTests(RequestFixture fixture, ITestOutputHelper out
         Assert.DoesNotContain(await Api.ListListeningAsync(), i => i.Id == second.Id);
         // It's still in the list of every download.
         Assert.Contains(await Api.ListListeningAsync(all: true), i => i.Id == second.Id && i.State == ListenNowState.Expired);
+        // Its download says it was deleted, not that it's ready to play.
+        Assert.Equal(ListenNowEnd.Deleted, (await Api.GetRequestAsync(second.RequestId))!.Ended);
     }
 
     [TestLibraryFact]
@@ -126,6 +128,7 @@ public sealed class ListenNowTests(RequestFixture fixture, ITestOutputHelper out
         }
         Assert.False(File.Exists(file));
         Assert.Equal(ListenNowState.Expired, (await Api.GetListeningAsync(item.Id))!.State);
+        Assert.Equal(ListenNowEnd.Expired, (await Api.GetRequestAsync(item.RequestId))!.Ended);
     }
 
     [TestLibraryFact]

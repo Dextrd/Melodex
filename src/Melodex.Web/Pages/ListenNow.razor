@@ -1,0 +1,279 @@
+@page "/listen-now"
+@implements IDisposable
+@inject MelodexClient Api
+@inject AuthState Auth
+@inject Player Player
+@inject ServerEvents Events
+@inject Preferences Prefs
+
+<PageTitle>Listen now · Melodex</PageTitle>
+
+@*
+    The songs fetched to listen to that are still here: a tab of the Library, to play them, add them to it, or delete
+    them. Grouped by album, an album's songs in its order. Each song shows once, however many times it was fetched; what
+    was fetched, and what couldn't be, is under Activity → Downloads.
+*@
+<h1>Library</h1>
+<LibraryTabs Current="listen-now" />
+
+<div class="toolbar">
+    <button class="primary" disabled="@(Shown.Count == 0)" @onclick="() => PlayAsync(Shown, 0)">Play all</button>
+    <input class="filter" type="search" placeholder="Filter by song, album or artist" aria-label="Filter" @bind="_filter" @bind:event="oninput" />
+    <SortMenu Options="SortOptions" Value="@_sort" Descending="_descending" DirectionHint="@DirectionHint"
+              OnChange="@(key => SortAsync(key, key == "newest"))" OnReverse="() => SortAsync(_sort, !_descending)" />
+    @if (_error is not null) { <span class="error small" title="@_error">@_error</span> }
+</div>
+<p class="muted small">
+    Songs fetched to listen to without adding them to your library. Each is kept for @Format.Minutes(_expiry) after you last
+    play it, unless you add it.
+</p>
+
+@if (_items is null)
+{
+    <Loading />
+}
+else if (Shown.Count == 0)
+{
+    <div class="empty card">
+        @if (_filter.Length > 0) { <span>Nothing matches.</span> }
+        else { <span>Nothing to play right now. Use the listen buttons on album and search pages; what's being fetched is under <a href="activity/downloads">Activity → Downloads</a>.</span> }
+    </div>
+}
+else
+{
+    var shown = Shown;
+    <div class="card">
+        <table class="table track-list listen-table">
+            <colgroup><col class="fold-col" /><col class="cover-col" /><col /><col class="length-col hide-narrow" /><col class="left-col hide-narrow" /><col class="listen-action-col" /></colgroup>
+            <tbody>
+                @foreach (var group in Groups())
+                {
+                    if (group.Items.Count == 1)
+                    {
+                        @SongRow(group.Items[0], shown, number: null, albumArtist: null)
+                        continue;
+                    }
+                    var albumId = group.AlbumId!.Value;
+                    var open = !_closed.Contains(albumId);
+                    var first = group.Items[0];
+                    <tr class="listen-album" @key="albumId">
+                        <td class="fold-col">
+                            <button class="chevron-button" aria-expanded="@(open ? "true" : "false")" aria-label="@(open ? "Hide its songs" : "Show its songs")" @onclick="() => Fold(albumId)">
+                                <span class="chevron @(open ? "open" : "")" aria-hidden="true"></span>
+                            </button>
+                        </td>
+                        <td class="cover-col"><a href="albums/@albumId" tabindex="-1"><Cover Url="@first.CoverUrl" /></a></td>
+                        <td>
+                            <div class="ellipsis"><a class="plain" href="albums/@albumId"><strong>@first.AlbumTitle</strong></a></div>
+                            <div class="muted small ellipsis">
+                                @if (first.ArtistId is { } artist) { <a href="artists/@artist">@first.ArtistCredit</a> } else { @first.ArtistCredit }
+                                <span> · @Format.Count(group.Items.Count, "song", "songs")</span>
+                            </div>
+                        </td>
+                        <td class="num muted hide-narrow">@Format.Duration(group.Items.Sum(i => i.DurationSeconds ?? 0))</td>
+                        <td class="muted small hide-narrow">@Left(group.Items.Min(i => i.ExpiresAt))</td>
+                        <td class="num actions">
+                            <IconButton Icon="listen" Requires="@UserPermissions.Listen" Title="Play its songs, in order" OnClick="() => PlayAsync(group.Items, 0)" />
+                            <ItemMenu What="album" Name="@(first.AlbumTitle ?? "")" Entries="group.Items.Select(PlayerEntry.Listening).ToList()"
+                                      AlbumHref="@($"albums/{albumId}")" ArtistHref="@(first.ArtistId is { } a ? $"artists/{a}" : null)"
+                                      OnAddToLibrary="@(Addable(group.Items).Count > 0 ? EventCallback.Factory.Create(this, () => EachAsync(Addable(group.Items), i => Api.AddListeningAsync(i.Id))) : default)"
+                                      OnDelete="@EventCallback.Factory.Create(this, () => EachAsync(group.Items, i => Api.DiscardListeningAsync(i.Id)))" />
+                        </td>
+                    </tr>
+                    @if (open)
+                    {
+                        @foreach (var item in group.Items)
+                        {
+                            @SongRow(item, shown, Number(item, group.Items), first.ArtistCredit)
+                        }
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    // A song: on its own, with its cover, artist and album; under its album, with its number.
+    private RenderFragment SongRow(ListenNowInfo item, List<ListenNowInfo> shown, string? number, string? albumArtist) =>
+        @<tr class="@(number is null ? null : "listen-track") @(Player.IsNow(item.TrackId) ? "playing" : "")" @key="item.Id">
+            <td class="fold-col"></td>
+            @if (number is null)
+            {
+                <td class="cover-col">@if (item.AlbumId is { } album) { <a href="albums/@album" tabindex="-1"><Cover Url="@item.CoverUrl" /></a> } else { <Cover Url="@item.CoverUrl" /> }</td>
+            }
+            else
+            {
+                <td class="num muted">@number</td>
+            }
+            <td>
+                <div class="ellipsis">
+                    <a class="plain" href="tracks/@item.TrackId">@item.Title</a>
+                    @if (item.State == ListenNowState.Importing) { <span class="badge active small">Adding to library</span> }
+                </div>
+                <div class="muted small ellipsis">
+                    @if (number is null)
+                    {
+                        @if (item.ArtistId is { } artist) { <a href="artists/@artist">@item.ArtistCredit</a> } else { @item.ArtistCredit }
+                        @if (item.AlbumId is { } album) { <span> · </span><a href="albums/@album">@item.AlbumTitle</a> }
+                        <span class="hide-narrow"> · </span>
+                    }
+                    else if (item.ArtistCredit != albumArtist) { <span>@item.ArtistCredit · </span> }
+                    <span class="hide-narrow">@item.Codec?.ToUpperInvariant()@(item.BitrateKbps is { } kbps ? $" · {kbps} kbps" : "")</span>
+                </div>
+            </td>
+            <td class="num muted hide-narrow">@Format.Duration(item.DurationSeconds)</td>
+            <td class="muted small hide-narrow" title="@item.ExpiresAt?.ToLocalTime().ToString("f")">@Left(item.ExpiresAt)</td>
+            <td class="num actions">
+                <IconButton Icon="listen" Requires="@UserPermissions.Listen" Title="@(Player.IsNow(item.TrackId) ? "Playing" : "Play from here")" Primary="@Player.IsNow(item.TrackId)"
+                            OnClick="() => PlayAsync(shown, shown.IndexOf(item))" />
+                <ItemMenu Entry="PlayerEntry.Listening(item)" Name="@item.Title"
+                          AlbumHref="@(number is null && item.AlbumId is { } a ? $"albums/{a}" : null)" ArtistHref="@(item.ArtistId is { } ar ? $"artists/{ar}" : null)"
+                          OnAddToLibrary="@(item.State == ListenNowState.Playable ? EventCallback.Factory.Create(this, () => EachAsync([item], i => Api.AddListeningAsync(i.Id))) : default)"
+                          OnDelete="@(item.State == ListenNowState.Playable ? EventCallback.Factory.Create(this, () => EachAsync([item], i => Api.DiscardListeningAsync(i.Id))) : default)" />
+            </td>
+        </tr>;
+
+    private const string SortKey = "listenNow.sort", DescendingKey = "listenNow.descending";
+
+    private static readonly IReadOnlyList<(string Key, string Label)> SortOptions =
+        [("newest", "Newest"), ("name", "Title"), ("artist", "Artist"), ("album", "Album")];
+
+    private List<ListenNowInfo>? _items;
+    private string _filter = "";
+    private string _sort = "newest";
+    private bool _descending = true;
+    private int _expiry = 60;
+    private string? _error;
+
+    // Albums folded away; the rest show their songs.
+    private readonly HashSet<Guid> _closed = [];
+
+    private string DirectionHint => _sort == "newest"
+        ? $"{(_descending ? "Newest" : "Oldest")} first; click to reverse"
+        : $"Sorted {(_descending ? "Z to A" : "A to Z")}; click to reverse";
+
+    /// <summary>Songs from one album, or a song from none.</summary>
+    private sealed record Group(Guid? AlbumId, List<ListenNowInfo> Items);
+
+    // Songs from the same album together, in the album's order, where the newest of them would be; the rest each on
+    // their own. Then in the order asked for: newest first, or by name.
+    private List<Group> Groups()
+    {
+        var groups = new List<Group>();
+        var albums = new Dictionary<Guid, Group>();
+        foreach (var item in _items!.Where(Matches))
+        {
+            if (item.AlbumId is { } album && albums.TryGetValue(album, out var group))
+                group.Items.Add(item);
+            else
+            {
+                group = new Group(item.AlbumId, [item]);
+                groups.Add(group);
+                if (item.AlbumId is { } id)
+                    albums[id] = group;
+            }
+        }
+        foreach (var group in groups)
+            group.Items.Sort((a, b) => (a.Disc ?? int.MaxValue, a.Position ?? int.MaxValue).CompareTo((b.Disc ?? int.MaxValue, b.Position ?? int.MaxValue)));
+        if (_sort == "newest")
+        {
+            if (!_descending)
+                groups.Reverse();
+            return groups;
+        }
+        Func<Group, string> key = _sort switch
+        {
+            "artist" => g => g.Items[0].ArtistCredit,
+            "album" => g => g.Items[0].AlbumTitle ?? "",
+            _ => g => g.Items.Count > 1 ? g.Items[0].AlbumTitle ?? "" : g.Items[0].Title,
+        };
+        var text = StringComparer.CurrentCultureIgnoreCase;
+        return (_descending ? groups.OrderByDescending(key, text) : groups.OrderBy(key, text)).ToList();
+    }
+
+    // In the order shown, an album's songs in its order: what Play all and a song's play button play.
+    private List<ListenNowInfo> Shown => _items is null ? [] : Groups().SelectMany(g => g.Items).ToList();
+
+    private bool Matches(ListenNowInfo item) =>
+        _filter.Length == 0 || new[] { item.Title, item.ArtistCredit, item.AlbumTitle }.Any(s => s?.Contains(_filter, StringComparison.CurrentCultureIgnoreCase) == true);
+
+    private static List<ListenNowInfo> Addable(List<ListenNowInfo> items) => items.Where(i => i.State == ListenNowState.Playable).ToList();
+
+    private static string Number(ListenNowInfo item, List<ListenNowInfo> album) =>
+        item.Position is not { } position ? "" : album.Select(i => i.Disc).Distinct().Count() > 1 ? $"{item.Disc}-{position}" : $"{position}";
+
+    private static string Left(DateTime? expires) => expires is { } at ? $"Deleted {Format.Until(at)}" : "";
+
+    private void Fold(Guid album)
+    {
+        if (!_closed.Remove(album))
+            _closed.Add(album);
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        Events.Received += OnEvent;
+        Player.Changed += Redraw;
+        _sort = await Prefs.GetAsync(SortKey, "newest");
+        _descending = await Prefs.GetAsync(DescendingKey, true);
+        // Only someone who may read the settings can see how long songs are kept; the rest see the usual hour.
+        if (Auth.May(UserPermissions.Settings))
+            _expiry = (await Api.GetFetchSettingsAsync()).ListenNowExpiryMinutes;
+        await LoadAsync();
+    }
+
+    // What can be played or is being added, each song once: the newest fetch of it.
+    private async Task LoadAsync()
+    {
+        var items = await Api.ListListeningAsync(false);
+        _items = items.Where(i => i.State is ListenNowState.Playable or ListenNowState.Importing)
+            .OrderByDescending(i => i.CreatedAt)
+            .DistinctBy(i => i.TrackId)
+            .ToList();
+    }
+
+    private async Task SortAsync(string key, bool descending)
+    {
+        (_sort, _descending) = (key, descending);
+        await Prefs.SetAsync(SortKey, key);
+        await Prefs.SetAsync(DescendingKey, descending);
+    }
+
+    private void OnEvent(string type)
+    {
+        if (type is "listen" or "connected")
+            InvokeAsync(async () =>
+            {
+                await LoadAsync();
+                StateHasChanged();
+            });
+    }
+
+    private void Redraw() => InvokeAsync(StateHasChanged);
+
+    private Task PlayAsync(List<ListenNowInfo> items, int start) =>
+        Player.PlayAsync(items.Select(PlayerEntry.Listening).ToList(), Math.Max(start, 0));
+
+    // Every copy of the song, so one fetched more than once goes with it.
+    private async Task EachAsync(List<ListenNowInfo> items, Func<ListenNowInfo, Task> action)
+    {
+        _error = null;
+        try
+        {
+            foreach (var item in items)
+                await action(item);
+        }
+        catch (MelodexApiException e)
+        {
+            _error = e.Message;
+        }
+        await LoadAsync();
+    }
+
+    public void Dispose()
+    {
+        Events.Received -= OnEvent;
+        Player.Changed -= Redraw;
+    }
+}
