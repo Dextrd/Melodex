@@ -145,6 +145,11 @@ public sealed class MelodexClient(HttpClient http)
     public Task<TaskInfo?> GetTaskAsync(Guid id, CancellationToken ct = default) =>
         http.GetFromJsonAsync<TaskInfo>($"{Api}/tasks/{id}", MelodexJson.Options, ct);
 
+    /// <summary>What the task has done, row by row; null when it has none kept, as only the newest of each kind does.</summary>
+    /// <param name="since">The <see cref="TaskRowsPage.Latest"/> from the last call, to get only what changed; 0 for every row.</param>
+    public Task<TaskRowsPage?> GetTaskRowsAsync(Guid id, long since = 0, CancellationToken ct = default) =>
+        GetOrNullAsync<TaskRowsPage>($"{Api}/tasks/{id}/rows?since={since}", ct);
+
     /// <param name="quick">Answer at once with what's known, rather than fetching a discography first; see <see cref="ArtistDetail.Fetching"/>.</param>
     public Task<ArtistDetail?> GetArtistAsync(Guid id, bool quick = false, CancellationToken ct = default) =>
         GetOrNullAsync<ArtistDetail>(quick ? $"{Api}/artists/{id}?quick=true" : $"{Api}/artists/{id}", ct);
@@ -206,6 +211,10 @@ public sealed class MelodexClient(HttpClient http)
     /// <param name="since">The <see cref="ScanFeedPage.Latest"/> from the last call, to get only what changed; 0 for every file.</param>
     public async Task<ScanFeedPage> GetScanFilesAsync(long since = 0, CancellationToken ct = default) =>
         (await http.GetFromJsonAsync<ScanFeedPage>($"{Api}/library/scan/files?since={since}", MelodexJson.Options, ct))!;
+
+    /// <summary>One scan's files, the running one or an earlier one; null once an earlier one's list isn't kept.</summary>
+    public Task<ScanFeedPage?> GetScanFilesAsync(Guid task, long since = 0, CancellationToken ct = default) =>
+        GetOrNullAsync<ScanFeedPage>($"{Api}/library/scan/files?task={task}&since={since}", ct);
 
     public async Task<LogPage> GetLogAsync(long after = 0, int limit = 1000, CancellationToken ct = default) =>
         await http.GetFromJsonAsync<LogPage>($"{Api}/log?after={after}&limit={limit}", MelodexJson.Options, ct) ?? new LogPage([], after);

@@ -24,7 +24,7 @@ public sealed class LibraryScannerTests : IDisposable
         _connection.Open();
         _db = new MelodexDbContext(new DbContextOptionsBuilder<MelodexDbContext>().UseSqlite(_connection, MelodexDbContext.Sqlite).Options);
         _db.Database.Migrate();
-        _scanner = new LibraryScanner(_db, Options.Create(new MelodexOptions { LibraryPath = _music }), new ScanFeed(), NullLogger<LibraryScanner>.Instance);
+        _scanner = new LibraryScanner(_db, Options.Create(new MelodexOptions { LibraryPath = _music }), new ScanFeed(new Melodex.Core.Tasks.TaskArchive(Options.Create(new MelodexOptions { DataPath = _music + "-data" }), NullLogger<Melodex.Core.Tasks.TaskArchive>.Instance)), NullLogger<LibraryScanner>.Instance);
     }
 
     public void Dispose()

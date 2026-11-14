@@ -16,7 +16,7 @@
 }
 else if (_files.Count == 0)
 {
-    <div class="muted small">Nothing new to read: every file is as it was at the last scan.</div>
+    <div class="muted small">@(_kept ? "Nothing new to read: every file was as it was at the scan before." : TaskRowList.NotKept)</div>
 }
 else
 {
@@ -85,6 +85,11 @@ else
 @code {
     /// <summary>Whether the scan is still running, so the list keeps updating.</summary>
     [Parameter] public bool Active { get; set; }
+
+    /// <summary>The scan task: the running one, or an earlier one's list as it was kept.</summary>
+    [Parameter, EditorRequired] public Guid Task { get; set; }
+
+    private bool _kept = true;
 
     private const string NewestFirstKey = "scanNewestFirst";
 
@@ -155,15 +160,18 @@ else
 
     private async Task LoadAsync()
     {
-        ScanFeedPage page;
+        ScanFeedPage? page;
         try
         {
-            page = await Api.GetScanFilesAsync(_files is null ? 0 : _latest);
-            // A new scan has started: its changes since our number aren't the whole list, so ask for all of it.
-            if (_files is not null && page.Scan != _scan)
-                page = await Api.GetScanFilesAsync(0);
+            page = await Api.GetScanFilesAsync(Task, _files is null ? 0 : _latest);
         }
         catch (HttpRequestException)
+        {
+            _files ??= [];
+            return;
+        }
+        _kept = page is not null;
+        if (page is null)
         {
             _files ??= [];
             return;

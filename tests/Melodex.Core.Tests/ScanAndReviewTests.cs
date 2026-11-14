@@ -38,6 +38,13 @@ public sealed class ScanAndReviewTests(RequestFixture fixture)
         var later = await Api.GetScanFilesAsync(page.Latest);
         Assert.Equal(page.Scan, later.Scan);
         Assert.Empty(later.Files);
+
+        // The list is the scan task's, and it's kept once another scan has started its own.
+        await ScanAsync();
+        Assert.NotEqual(page.Scan, (await Api.GetScanFilesAsync()).Scan);
+        var kept = (await Api.GetScanFilesAsync(page.Scan))!;
+        Assert.Equal(files.Select(f => (f.Path, f.State)), kept.Files.Select(f => (f.Path, f.State)));
+        Assert.Null(await Api.GetScanFilesAsync(Guid.NewGuid()));
     }
 
     [TestLibraryFact]

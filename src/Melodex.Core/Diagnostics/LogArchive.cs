@@ -9,9 +9,10 @@ namespace Melodex.Core.Diagnostics;
 /// <summary>
 /// Keeps the activity log on disk, one JSON Lines file per day under <c>data/logs</c>. Every entry is written as it
 /// happens, so nothing is lost on a restart. Memory keeps the newest entries for the Log page; the files are kept
-/// longer and deleted once older than the backup retention. Both ages are in <see cref="LogSettings"/>.
+/// longer and deleted once older than the backup retention. Both ages are in <see cref="LogSettings"/>, with how long
+/// tasks' lists are kept, which are tidied here too.
 /// </summary>
-public sealed class LogArchive(ActivityLog log, IServiceScopeFactory scopes, IOptions<MelodexOptions> options, ILogger<LogArchive> logger)
+public sealed class LogArchive(ActivityLog log, Tasks.TaskArchive tasks, IServiceScopeFactory scopes, IOptions<MelodexOptions> options, ILogger<LogArchive> logger)
     : BackgroundService
 {
     private static readonly TimeSpan TidyEvery = TimeSpan.FromHours(1);
@@ -53,7 +54,7 @@ public sealed class LogArchive(ActivityLog log, IServiceScopeFactory scopes, IOp
         await writing;
     }
 
-    /// <summary>Applies the retention settings now: drops old entries from memory and deletes old files.</summary>
+    /// <summary>Applies the retention settings now: drops old entries from memory and deletes old files and task lists.</summary>
     public async Task TidyAsync(CancellationToken ct)
     {
         var settings = await GetSettingsAsync(ct);
@@ -62,6 +63,7 @@ public sealed class LogArchive(ActivityLog log, IServiceScopeFactory scopes, IOp
         foreach (var file in System.IO.Directory.EnumerateFiles(Directory, "activity-*.jsonl"))
             if (DayOf(file) is { } day && day < oldest)
                 File.Delete(file);
+        tasks.Tidy(settings.TaskDays);
     }
 
     private async Task WriteAsync(CancellationToken ct)

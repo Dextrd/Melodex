@@ -15,7 +15,7 @@ public interface ITaskHandler
 }
 
 /// <summary>Queues internal work in the database, so it survives restarts, and wakes the worker.</summary>
-public sealed class TaskQueue(MelodexDbContext db, TaskSignal signal, TaskCancellations cancellations)
+public sealed class TaskQueue(MelodexDbContext db, TaskSignal signal, TaskCancellations cancellations, TaskFeed rows, Library.ScanFeed scans)
 {
     /// <summary>
     /// Queues a task, or returns the queued or running one of the same kind and payload. Asking again for a paused
@@ -45,12 +45,19 @@ public sealed class TaskQueue(MelodexDbContext db, TaskSignal signal, TaskCancel
     {
         if (task.Status is not (BackgroundTaskStatus.Queued or BackgroundTaskStatus.Running))
             return false;
+        var running = task.Status == BackgroundTaskStatus.Running;
         task.Status = BackgroundTaskStatus.Cancelled;
         task.Paused = false;
         task.FinishedAt = DateTime.UtcNow;
         await db.SaveChangesAsync(ct);
         cancellations.Cancel(task.Id);
         signal.Wake();
+        // One that's running keeps its list once it stops; a paused one has stopped already.
+        if (!running)
+        {
+            rows.Finish(task.Id);
+            scans.Finish(task.Id);
+        }
         return true;
     }
 
@@ -213,7 +220,22 @@ public sealed class TaskWorker(IServiceScopeFactory scopes, TaskSignal signal, T
         {
             cancellations.Unregister(task.Id);
         }
+        if (!ct.IsCancellationRequested)
+            await KeepListAsync(task.Id);
         return true;
+    }
+
+    // A task that's done, however it ended, keeps its list; a paused one carries on with it when resumed.
+    private async Task KeepListAsync(Guid id)
+    {
+        using var scope = scopes.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<MelodexDbContext>();
+        if (await db.BackgroundTasks.Where(t => t.Id == id).Select(t => (BackgroundTaskStatus?)t.Status).FirstOrDefaultAsync() is
+            BackgroundTaskStatus.Succeeded or BackgroundTaskStatus.Failed or BackgroundTaskStatus.Cancelled)
+        {
+            scope.ServiceProvider.GetRequiredService<TaskFeed>().Finish(id);
+            scope.ServiceProvider.GetRequiredService<Library.ScanFeed>().Finish(id);
+        }
     }
 
     private async Task FinishAsync(Guid id, BackgroundTaskStatus status, string? error)

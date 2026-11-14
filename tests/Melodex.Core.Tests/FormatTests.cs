@@ -80,6 +80,14 @@ public sealed class FormatTests(RequestFixture fixture)
         Assert.Equal(TaskState.Succeeded, task.State);
         Assert.StartsWith("Formatted", task.Progress);
 
+        // Activity can show each file it wrote, and where it went.
+        var rows = (await Api.GetTaskRowsAsync(task.Id))!.Rows.Where(r => !r.Key.StartsWith("folder:")).ToList();
+        Assert.NotEmpty(rows);
+        Assert.All(rows, r => Assert.Equal(TaskRowState.Done, r.State));
+        Assert.All(rows, r => Assert.Equal("Tags written", r.Detail));
+        Assert.Empty((await Api.GetTaskRowsAsync(task.Id, (await Api.GetTaskRowsAsync(task.Id))!.Latest))!.Rows);
+        Assert.Null(await Api.GetTaskRowsAsync(Guid.NewGuid()));
+
         var sent = fixture.Importer.Formats.Last();
         Assert.Equal("$albumartist/$album%aunique{}/$track $title", sent.PathTemplate);
         var first = sent.Files[0];

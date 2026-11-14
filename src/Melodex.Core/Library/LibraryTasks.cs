@@ -49,7 +49,7 @@ public sealed class LibraryScanTask(
         using (reading.Begin())
         {
             progress.Report("Reading files");
-            feed.Clear();
+            feed.Clear(task.Id);
             scan = await scanner.ScanAsync(progress, ct);
             var again = await RematchAsync(RematchOf(task.PayloadJson), task.CreatedAt, ct);
             progress.Report($"Found {scan.Files} files ({scan.Added} new, {scan.Changed} changed, {scan.Removed} removed"
@@ -116,7 +116,7 @@ public sealed class LibraryScanTask(
 }
 
 /// <summary>Fills in one artist's catalogue after their page is opened, so non-library artists get full statuses.</summary>
-public sealed class ArtistRefreshTask(CatalogueRefresher refresher) : ITaskHandler
+public sealed class ArtistRefreshTask(CatalogueRefresher refresher, TaskFeed feed) : ITaskHandler
 {
     public const string TaskKind = "artist-refresh";
 
@@ -125,7 +125,7 @@ public sealed class ArtistRefreshTask(CatalogueRefresher refresher) : ITaskHandl
     public static string Payload(Guid artistId) => JsonSerializer.Serialize(artistId);
 
     public Task RunAsync(BackgroundTask task, IProgress<string> progress, CancellationToken ct) =>
-        refresher.RefreshArtistsAsync([JsonSerializer.Deserialize<Guid>(task.PayloadJson!)], progress, ct);
+        refresher.RefreshArtistsAsync([JsonSerializer.Deserialize<Guid>(task.PayloadJson!)], progress, ct, feed.Start(task));
 }
 
 /// <summary>
@@ -142,7 +142,8 @@ public sealed class CatalogueRefresher(
 {
     private enum Outcome { Done, Busy, Failed }
 
-    public async Task<int> RefreshArtistsAsync(IReadOnlyList<Guid> artistIds, IProgress<string> progress, CancellationToken ct)
+    /// <param name="rows">Where a task shows what happened to each artist, if it does.</param>
+    public async Task<int> RefreshArtistsAsync(IReadOnlyList<Guid> artistIds, IProgress<string> progress, CancellationToken ct, TaskRows? rows = null)
     {
         var library = await settings.GetLibraryAsync(ct);
         var backoff = new SourceBackoff(httpOptions.Value, logger);
@@ -159,14 +160,19 @@ public sealed class CatalogueRefresher(
             var status = $"Updating catalogue: {artist.Name} ({done + 1} of {artistIds.Count})";
             progress.Report(status);
             var name = artist.Name;
+            var href = $"artists/{next.Id}";
+            rows?.Put(next.Id.ToString(), TaskRowState.Working, name, null, "Looking up the discography", href, LibraryView.ArtistImageUrl(next.Id));
+            var before = rows is null ? [] : await db.Albums.Where(a => a.ArtistId == next.Id).Select(a => a.Id).ToListAsync(ct);
             switch (await TryAsync(() => catalogue.RefreshDiscographyAsync(artist, false, ct), $"the discography of {name}", next.Attempt, library.AttemptsWhenBusy, backoff, progress, status, ct))
             {
                 case Outcome.Busy when next.Attempt < library.AttemptsWhenBusy:
                     artists.Enqueue((next.Id, next.Attempt + 1));
+                    rows?.Put(next.Id.ToString(), TaskRowState.Waiting, name, null, "The catalogue source is busy; tried again shortly", href, LibraryView.ArtistImageUrl(next.Id));
                     continue;
                 case Outcome.Busy or Outcome.Failed:
                     done++;
                     failures++;
+                    rows?.Put(next.Id.ToString(), TaskRowState.Failed, name, null, "Couldn't be looked up; tried again next scan", href, LibraryView.ArtistImageUrl(next.Id));
                     continue;
             }
 
@@ -177,12 +183,15 @@ public sealed class CatalogueRefresher(
                 .ToListAsync(ct);
             var wanted = new Queue<(Guid Id, int Attempt)>(albums.Where(a => library.ShowingOf(a) != ReleaseShowing.Hide).Select(a => (a.Id, 1)));
             int checkedAlbums = 0, albumFailures = 0, total = wanted.Count;
+            var after = rows is null ? [] : await db.Albums.Where(a => a.ArtistId == next.Id).Select(a => a.Id).ToListAsync(ct);
+            var changes = Changes(after.Except(before).Count(), before.Except(after).Count());
             while (wanted.TryDequeue(out var albumItem))
             {
                 if (backoff.GaveUp)
                     return failures + albumFailures + wanted.Count + 1 + artists.Count;
                 var albumStatus = $"Updating catalogue: {name}, album {checkedAlbums + 1} of {total} ({done + 1} of {artistIds.Count} artists)";
                 progress.Report(albumStatus);
+                rows?.Put(next.Id.ToString(), TaskRowState.Working, name, changes, $"Checking album {checkedAlbums + 1} of {total}", href, LibraryView.ArtistImageUrl(next.Id));
                 // Loaded one at a time with a clear tracker: a big discography tracks thousands of entities otherwise,
                 // and every query and save would scan them all.
                 db.ChangeTracker.Clear();
@@ -202,6 +211,10 @@ public sealed class CatalogueRefresher(
             db.ChangeTracker.Clear();
             done++;
             failures += albumFailures;
+            rows?.Put(next.Id.ToString(), albumFailures > 0 ? TaskRowState.Failed : changes is null && total == 0 ? TaskRowState.Skipped : TaskRowState.Done,
+                name, changes,
+                (total == 0 ? "Up to date" : $"{LibraryMatcher.Plural(total, "album", "albums")} checked")
+                + (albumFailures > 0 ? $"; {albumFailures} couldn't be looked up, tried again next scan" : ""), href, LibraryView.ArtistImageUrl(next.Id));
             if (total == 0)
                 logger.LogInformation("[{Done}/{Total} artists] The catalogue for {Artist} is up to date", done, artistIds.Count, name);
             else
@@ -210,6 +223,16 @@ public sealed class CatalogueRefresher(
         }
         return failures;
     }
+
+    // Albums the discography gained and lost, or null for neither.
+    private static string? Changes(int added, int gone) =>
+        (added, gone) switch
+        {
+            (0, 0) => null,
+            (_, 0) => $"{LibraryMatcher.Plural(added, "album", "albums")} added",
+            (0, _) => $"{LibraryMatcher.Plural(gone, "album", "albums")} gone",
+            _ => $"{LibraryMatcher.Plural(added, "album", "albums")} added, {gone} gone",
+        };
 
     private async Task<Outcome> TryAsync(Func<Task> refresh, string what, int attempt, int attempts, SourceBackoff backoff,
         IProgress<string> progress, string status, CancellationToken ct)

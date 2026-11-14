@@ -185,10 +185,13 @@ public static class LibraryEndpoints
         library.MapGet("/missing", (LibraryView view, CancellationToken ct) => view.GetMissingAsync(ct))
             .WithName("GetMissing").WithSummary("Missing albums across the library, after the default filters and ignores.");
 
-        library.MapGet("/scan/files", (ScanFeed feed, long? since) => feed.Since(since ?? 0))
+        library.MapGet("/scan/files", (ScanFeed feed, long? since, Guid? task) =>
+                task is { } id ? feed.Since(id, since ?? 0) is { } page ? Results.Ok(page) : Results.NotFound() : Results.Ok(feed.Since(since ?? 0)))
             .WithName("ScanFiles")
             .WithSummary("The files the running or last scan read or matched, in the order it first saw them: each file's name while it's read, "
-                         + "then the song it matched or why it needs review. Pass since (the last response's latest) to get only what changed.");
+                         + "then the song it matched or why it needs review. Pass since (the last response's latest) to get only what changed, "
+                         + "and task for an earlier scan's, kept as long as the log settings keep task lists.")
+            .Produces<ScanFeedPage>().Produces(StatusCodes.Status404NotFound);
 
         library.MapGet("/removal", (LibraryItemKind kind, Guid id, LibraryRemover remover, CancellationToken ct) => remover.PreviewAsync(kind, id, ct))
             .RequireScope(Scopes.Remove).WithName("GetRemoval").WithSummary("What removing an artist, album or file from the library would affect: how many files, their size and folders.");
@@ -553,6 +556,13 @@ public static class LibraryEndpoints
                 await db.BackgroundTasks.FindAsync([id], ct) is { } task ? Results.Ok((await TitledAsync(db, [task], ct))[0]) : Results.NotFound())
             .WithTags("Library").WithName("GetTask").WithSummary("Status of a background task.")
             .Produces<TaskInfo>().Produces(StatusCodes.Status404NotFound);
+
+        api.MapGet("/tasks/{id:guid}/rows", (Guid id, Melodex.Core.Tasks.TaskFeed feed, long? since) =>
+                feed.Since(id, since ?? 0) is { } page ? Results.Ok(page) : Results.NotFound())
+            .WithTags("Library").WithName("GetTaskRows")
+            .WithSummary("What a task has done, row by row: a file formatted, an artist's catalogue updated, a song's lyrics looked for. "
+                         + "Kept for as long as the log settings keep task lists; pass since to get only what changed.")
+            .Produces<TaskRowsPage>().Produces(StatusCodes.Status404NotFound);
 
         // Stopping and ordering background work. Each answers 409 when the task is past it, such as cancelling a finished one.
         api.MapPost("/tasks/{id:guid}/cancel", (Guid id, MelodexDbContext db, TaskQueue queue, CancellationToken ct) =>

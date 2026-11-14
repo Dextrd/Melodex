@@ -69,14 +69,13 @@ else
             @if (item.Task is { } task)
             {
                 var isScan = task.Kind == "library-scan";
-                // Only the newest scan has files to show: the feed holds one scan at a time.
-                var canOpen = isScan && task.Id == _tasks.FirstOrDefault(t => t.Kind == "library-scan")?.Id;
-                var taskOpen = canOpen && (_openScan ?? task.Active);
+                var canOpen = Opens.Contains(task.Kind);
+                var taskOpen = canOpen && (_openTasks.TryGetValue(task.Id, out var opened) ? opened : task.Active);
                 <div class="request">
                     <div class="request-head">
                         @if (canOpen)
                         {
-                            <button class="request-toggle" aria-expanded="@(taskOpen ? "true" : "false")" @onclick="() => _openScan = !taskOpen">
+                            <button class="request-toggle" aria-expanded="@(taskOpen ? "true" : "false")" @onclick="() => _openTasks[task.Id] = !taskOpen">
                                 <span class="chevron @(taskOpen ? "open" : "")" aria-hidden="true"></span>
                                 <span class="request-title">@task.Title</span>
                             </button>
@@ -97,7 +96,10 @@ else
                     else if (task.Progress is not null) { <div class="muted small request-detail">@task.Progress</div> }
                     @if (taskOpen)
                     {
-                        <div class="request-body"><ScanFiles Active="task.Active" /></div>
+                        <div class="request-body">
+                            @if (isScan) { <ScanFiles Task="task.Id" Active="task.Active" /> }
+                            else { <TaskRowList Task="task.Id" Active="task.Active" /> }
+                        </div>
                     }
                 </div>
                 continue;
@@ -190,7 +192,11 @@ else
     private bool _loaded;
 
     // The newest scan opens while it runs; a click overrides that.
-    private bool? _openScan;
+    // Tasks opened or closed here; the rest are open while they run.
+    private readonly Dictionary<Guid, bool> _openTasks = [];
+
+    // Kinds of task that show what they're doing, row by row.
+    private static readonly HashSet<string> Opens = ["library-scan", "library-format", "library-lyrics", "artist-refresh"];
     private static readonly IReadOnlyList<(bool Value, string Label, string? Hint)> Times =
         [(true, "Recent", "Still going, or changed in the last hour"), (false, "Earlier", "Everything before that")];
 
