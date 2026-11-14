@@ -27,7 +27,7 @@ else
         @foreach (var (value, name, hint) in GaplessChoices)
         {
             <label class="dialog-choice">
-                <input type="radio" name="gapless" checked="@(_gapless == value)" @onchange="() => { _gapless = value; _saved = false; }" />
+                <input type="radio" name="gapless" checked="@(_gapless == value)" @onchange="() => { _gapless = value; _saver?.Changed(); }" />
                 <span>
                     <strong>@name</strong>
                     <span class="muted small">@hint</span>
@@ -68,23 +68,19 @@ else
     <div class="card settings-card">
         <div class="setting-line">
             Keep listen-now tracks for
-            <NumberField Min="5" Max="10080" Step="5" Label="Minutes" Value="_fetch.ListenNowExpiryMinutes" ValueChanged="n => _fetch = _fetch with { ListenNowExpiryMinutes = n }" />
+            <NumberField Min="5" Max="10080" Step="5" Label="Minutes" Value="_fetch.ListenNowExpiryMinutes" ValueChanged="n => { _fetch = _fetch with { ListenNowExpiryMinutes = n }; _saver?.Changed(); }" />
             minutes after they were last played
         </div>
         <div class="muted small">A track fetched to listen to, and not added to the library, is deleted after this.</div>
     </div>
 
-    <div class="toolbar">
-        <button class="primary" @onclick="() => SaveAsync(false)">Save</button>
-        @if (_saved) { <span class="muted small">Saved.</span> }
-        @if (_saveError is not null) { <span class="error small" title="@_saveError">@_saveError</span> }
-    </div>
+    <AutoSave @ref="_saver" Save="SaveAsync" />
 
     @if (_warning)
     {
         <Dialog Title="Keep bars beside every song?" OnClose="() => { _warning = false; _visualiser = _status.Settings.Visualiser; }" Alert="true">
             <p>
-                Every song in your library gets a .bars file beside it, made after each scan, starting when you save. For your
+                Every song in your library gets a .bars file beside it, made after each scan, starting with the next. For your
                 @Plural(_status.Songs, "song", "songs") that's about <strong>@Size(_status.EstimatedBytes)</strong> in your music folder,
                 about 1.4 KB for each second of music.
             </p>
@@ -94,14 +90,14 @@ else
             </p>
             <div class="toolbar dialog-buttons">
                 <button @onclick="() => { _warning = false; _visualiser = _status.Settings.Visualiser; }">Cancel</button>
-                <button class="primary" @onclick="() => _warning = false">Keep bars beside songs</button>
+                <button class="primary" @onclick="() => { _warning = false; _saver?.Changed(); }">Keep bars beside songs</button>
             </div>
         </Dialog>
     }
 
     @if (_deleting)
     {
-        <Dialog Title="Delete the .bars files?" OnClose="() => _deleting = false" Alert="true">
+        <Dialog Title="Delete the .bars files?" OnClose="CloseDeleting" Alert="true">
             <p>@DeletingText</p>
             <div class="toolbar dialog-buttons">
                 <button @onclick="() => FinishLeavingAsync(false)">Keep them</button>
@@ -133,8 +129,8 @@ else
     private GaplessPlayback _gapless;
     private FetchSettings? _fetch;
     private VisualiserBars _visualiser;
-    private bool _warning, _deleting, _leaving, _saved;
-    private string? _saveError;
+    private bool _warning, _deleting, _leaving, _deleteBarsFiles;
+    private AutoSave? _saver;
     private bool _gaplessWorks = true;
 
     protected override async Task OnInitializedAsync()
@@ -146,48 +142,47 @@ else
         _gaplessWorks = await Player.GaplessWorksAsync();
     }
 
+    // Saved as it's chosen, except that making bars beside every song is warned of first, for the room they take,
+    // and leaving that asks whether to delete the files made.
     private void Choose(VisualiserBars value)
     {
         _visualiser = value;
-        _saved = false;
-        // Warned of the room they take before they're made.
-        _warning = value == VisualiserBars.WhenMatching && _status!.Settings.Visualiser != VisualiserBars.WhenMatching;
-    }
-
-    private async Task SaveAsync(bool deleteBarsFiles)
-    {
-        // Leaving bars made when matching, there may be files to delete: asked first.
-        if (!_leaving && _status!.Settings.Visualiser == VisualiserBars.WhenMatching && _visualiser != VisualiserBars.WhenMatching)
-        {
+        var was = _status!.Settings.Visualiser;
+        if (value == VisualiserBars.WhenMatching && was != VisualiserBars.WhenMatching)
+            _warning = true;
+        else if (was == VisualiserBars.WhenMatching && value != VisualiserBars.WhenMatching)
             _leaving = _deleting = true;
-            return;
-        }
-        _saved = false;
-        _saveError = null;
-        try
-        {
-            await Api.SavePlaybackSettingsAsync(new SavePlayback(_visualiser, deleteBarsFiles, _gapless));
-            await Api.SaveFetchSettingsAsync(_fetch!);
-            _status = await Api.GetPlaybackSettingsAsync();
-            _saved = true;
-        }
-        catch (Exception e) when (e is MelodexApiException or HttpRequestException)
-        {
-            _saveError = e.Message;
-        }
+        else
+            _saver?.Changed();
     }
 
-    // Asked whether to delete them: on leaving bars made when matching, as part of saving; otherwise on their own.
+    private async Task SaveAsync()
+    {
+        await Api.SavePlaybackSettingsAsync(new SavePlayback(_visualiser, _deleteBarsFiles, _gapless));
+        _deleteBarsFiles = false;
+        await Api.SaveFetchSettingsAsync(_fetch!);
+        _status = await Api.GetPlaybackSettingsAsync();
+    }
+
+    // Asked whether to delete them: on leaving bars made when matching, with the change; otherwise on their own.
     private async Task FinishLeavingAsync(bool delete)
     {
         _deleting = false;
+        if (!_leaving && !delete)
+            return;
+        _leaving = false;
+        _deleteBarsFiles = delete;
+        if (_saver is not null)
+            await _saver.SaveNowAsync();
+    }
+
+    // Closed without an answer: on leaving bars made when matching, the change is taken back.
+    private void CloseDeleting()
+    {
+        _deleting = false;
         if (_leaving)
-        {
-            await SaveAsync(delete);
-            _leaving = false;
-        }
-        else if (delete)
-            await SaveAsync(true);
+            _visualiser = _status!.Settings.Visualiser;
+        _leaving = false;
     }
 
     private string DeletingText =>
