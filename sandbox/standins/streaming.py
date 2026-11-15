@@ -497,7 +497,8 @@ def _slskd_name(text: str) -> str:
 
 def _slskd_shared(album: dict[str, Any], peer: str) -> dict[str, Any]:
     flac = peer == "standin-flac"
-    folder = f"Music\\{_slskd_name(album['artist'])}\\{_slskd_name(album['title'])} [{'FLAC' if flac else 'MP3 320'}]"
+    # Each release in a folder of its own, as people keep them: an album's editions are told apart by their number.
+    folder = f"Music\\{_slskd_name(album['artist'])}\\{_slskd_name(album['title'])} ({album['id']}) [{'FLAC' if flac else 'MP3 320'}]"
     files = []
     for track in album["tracks"]:
         name = f"{folder}\\{track['position']:02} - {_slskd_name(track['title'])}.{'flac' if flac else 'mp3'}"
