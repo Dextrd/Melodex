@@ -61,6 +61,27 @@ window.melodexScroll = {
         }, 280);
     },
     touched: 0,
+    // A link's landing: the element it names (by its id, or the first a selector such as ".review-item" finds), once
+    // the page has drawn it, scrolled to the middle of the screen and flashed so it stands out. Gives up after a few
+    // seconds if it never comes.
+    land: id => {
+        const started = Date.now();
+        const go = () => {
+            const element = id.startsWith('.') ? document.querySelector(id) : document.getElementById(id);
+            if (!element) {
+                if (Date.now() - started < 5000)
+                    setTimeout(go, 100);
+                return;
+            }
+            const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+            element.scrollIntoView({ block: 'center', behavior: reduce ? 'instant' : 'smooth' });
+            element.classList.remove('landed');
+            void element.offsetWidth;
+            element.classList.add('landed');
+            setTimeout(() => element.classList.remove('landed'), 2200);
+        };
+        go();
+    },
     // A row of tabs that scrolls sideways on a phone: the open tab, centred where it can be.
     tabIntoView: () => {
         const tab = document.querySelector('.page-tabs .active');

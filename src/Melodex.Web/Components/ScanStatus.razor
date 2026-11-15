@@ -9,7 +9,7 @@
 <div class="row small scan-status">
     @if (_status?.CurrentTask is { } task)
     {
-        <a class="muted scan-progress" href="activity" title="See what it's doing">@(task.Progress ?? "Starting…")</a>
+        <a class="muted scan-progress" href="activity?open=@task.Id" title="See what it's doing">@(task.Progress ?? "Starting…")</a>
     }
     else if (_status?.Preparing == true)
     {

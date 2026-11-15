@@ -15,7 +15,7 @@ else
 {
     @if (FetchNote.CouldntFetch(Tracker, Kind, Id) is { } ended)
     {
-        <a class="icon-button review-flag @(Large ? "large" : "")" href="review/couldnt-fetch"
+        <a class="icon-button review-flag @(Large ? "large" : "")" href="review/couldnt-fetch?item=@ended.Id"
            title="@($"Couldn't fetch it: {ended.Detail ?? "see what went wrong"}. Open Review to look again.")">
             <Icon Name="attention" />@if (Large) { <span>Couldn't fetch</span> }
         </a>

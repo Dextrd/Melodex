@@ -217,7 +217,7 @@ else
         {
             @if (waiting.Song is { } song)
             {
-                <div class="card review-item matching" @key="song.LineId">
+                <div class="card review-item matching" @key="song.LineId" id="review-@song.LineId">
                     <div>
                         <div class="label">Imported</div>
                         <ReviewSong Title="@(song.Song.Title.Length > 0 ? song.Song.Title : "A YouTube video")" Artist="@song.Song.Artist" ArtistHref="@ArtistHref(song.Song.Artist)">
@@ -270,7 +270,7 @@ else
                 continue;
             }
             var item = waiting.File!;
-            <div class="card review-item matching" @key="item.FileId">
+            <div class="card review-item matching" @key="item.FileId" id="review-@item.FileId">
                 <div>
                     <div class="label">File</div>
                     <ReviewSong CoverUrl="@item.CoverUrl" Title="@(item.Title ?? Path.GetFileNameWithoutExtension(item.Path))" Artist="@item.Artist" ArtistHref="@ArtistHref(item.Artist)">
@@ -338,7 +338,7 @@ else
         }
         @foreach (var file in VisibleSuspects)
         {
-            <div class="card review-item">
+            <div class="card review-item" id="review-@file.Id">
                 <div>
                     <div class="label">File</div>
                     <ReviewSong CoverUrl="@file.CoverUrl" Title="@(file.Title ?? Path.GetFileNameWithoutExtension(file.Path))" Artist="@file.Artist"
@@ -386,7 +386,7 @@ else
         {
             var (title, artist) = ReviewSong.Split(request.Title);
             var keepable = Keepable(request);
-            <div class="card review-item">
+            <div class="card review-item" id="review-@request.Id">
                 <div>
                     <div class="label">Asked for</div>
                     <ReviewSong CoverUrl="@RequestCover(request)" Title="@title" Artist="@artist" ArtistHref="@ArtistHref(artist)" Href="@RequestHref(request)">
@@ -443,7 +443,7 @@ else
         @foreach (var held in VisibleHeld)
         {
             var (title, artist) = ReviewSong.Split(held.Title);
-            <div class="card review-item">
+            <div class="card review-item" id="review-@held.Id">
                 <div>
                     <div class="label">Replaced</div>
                     <ReviewSong CoverUrl="@held.CoverUrl" Title="@title" Artist="@artist" ArtistHref="@ArtistHref(artist)" Href="@(held.TrackId is { } track ? $"tracks/{track}" : null)">
@@ -886,6 +886,12 @@ else
 
     /// <summary>Opened filtered, such as to the file a playlist's song looks to be.</summary>
     [SupplyParameterFromQuery(Name = "filter")] public string? Filter { get; set; }
+
+    /// <summary>The file, imported song, request or replaced file a link points at, to scroll to and flash.</summary>
+    [SupplyParameterFromQuery(Name = "item")] public Guid? Item { get; set; }
+
+    // The link last landed on, so it's done once; opened filtered, the first left is landed on.
+    private string? _landed;
     private bool _busy;
     private bool _filterOpen, _focusFilter;
     private ElementReference _filterDrop;
@@ -1008,6 +1014,12 @@ else
         {
             _focusFilter = false;
             await _filterDrop.FocusAsync();
+        }
+        var landing = Item is { } item ? $"review-{item}" : Filter is { Length: > 0 } ? ".review-item" : null;
+        if (landing is not null && Loaded && $"{Nav.Uri}" != _landed)
+        {
+            _landed = Nav.Uri;
+            await JS.InvokeVoidAsync("melodexScroll.land", landing);
         }
     }
 
