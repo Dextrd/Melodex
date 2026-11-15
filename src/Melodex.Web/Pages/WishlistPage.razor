@@ -1,0 +1,177 @@
+@page "/wishlist"
+@implements IDisposable
+@inject WishlistStore Wishlist
+@inject Player Player
+@inject ServerEvents Events
+@inject Preferences Prefs
+
+<PageTitle>Wishlist · Melodex</PageTitle>
+
+@*
+    Your wishlist: songs and albums you'd like, a tab of the Library. Each can be got or listened to once something can
+    fetch it, or taken off. What the library has now isn't on it.
+*@
+<h1>Library</h1>
+<LibraryTabs Current="wishlist" />
+
+<div class="toolbar">
+    <input class="filter" type="search" placeholder="Filter by song, album or artist" aria-label="Filter" @bind="_filter" @bind:event="oninput" />
+    <SortMenu Options="SortOptions" Value="@_sort" Descending="_descending" DirectionHint="@DirectionHint"
+              OnChange="@(key => SortAsync(key, key == "newest"))" OnReverse="() => SortAsync(_sort, !_descending)" />
+    @if (_error is not null) { <span class="error small" title="@_error">@_error</span> }
+</div>
+<p class="muted small">
+    Songs and albums you'd like, kept until your library has them.
+    @if (!Wishlist.CanFetch) { <span>Nothing can fetch them now: turn on a retriever in <a href="settings/plugins">Plugins</a> to get them or listen to them.</span> }
+</p>
+
+@if (!Wishlist.Loaded)
+{
+    <Loading />
+}
+else if (Shown.Count == 0)
+{
+    <div class="empty card">
+        @if (_filter.Length > 0) { <span>Nothing matches.</span> }
+        else { <span>Nothing on it. Add songs and albums you don't have from their menus, or with the star where Listen now would be when nothing can fetch.</span> }
+    </div>
+}
+else
+{
+    <div class="card">
+        <table class="table track-list wishlist-table">
+            <colgroup><col class="cover-col" /><col /><col class="length-col hide-narrow" /><col class="left-col hide-narrow" /><col class="listen-action-col" /></colgroup>
+            <tbody>
+                @foreach (var item in Shown)
+                {
+                    var album = item.Kind == RequestKind.Album;
+                    var href = album ? $"albums/{item.TargetId}" : $"tracks/{item.TargetId}";
+                    <tr @key="item.Id">
+                        <td class="cover-col"><a href="@href" tabindex="-1"><Cover Url="@item.CoverUrl" /></a></td>
+                        <td>
+                            <div class="ellipsis">
+                                <a class="plain" href="@href">@if (album) { <strong>@item.Title</strong> } else { @item.Title }</a>
+                            </div>
+                            <div class="muted small ellipsis">
+                                <a href="artists/@item.ArtistId">@item.ArtistCredit</a>
+                                @if (album) { <span> · Album</span> }
+                                else if (item.AlbumId is { } on) { <span> · </span><a href="albums/@on">@item.AlbumTitle</a> }
+                            </div>
+                        </td>
+                        <td class="num muted hide-narrow">@(album ? "" : Format.Duration(item.DurationSeconds))</td>
+                        <td class="muted small hide-narrow" title="@item.AddedAt.ToLocalTime().ToString("f")">Added @Format.Ago(item.AddedAt)</td>
+                        <td class="num actions">
+                            @if (Wishlist.CanFetch)
+                            {
+                                <FetchButton Kind="item.Kind" Id="item.TargetId" EditionId="item.EditionId" Button="false">
+                                    <IconButton Icon="listen" Requires="@UserPermissions.Listen" Title="Listen: fetch it to play now, without adding it to your library"
+                                                OnClick="() => ListenAsync(item)" />
+                                    @Menu(item)
+                                </FetchButton>
+                            }
+                            else
+                            {
+                                <IconButton Icon="wished" On="true" Title="Take it off your wishlist" OnClick="() => RemoveAsync(item)" />
+                                @Menu(item)
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    private RenderFragment Menu(WishlistItem item) =>
+        @<ItemMenu What="@(item.Kind == RequestKind.Album ? "album" : "song")" Name="@item.Title" EditionId="item.EditionId"
+                   ListenTrackId="@(item.Kind == RequestKind.Track ? item.TargetId : null)"
+                   AlbumId="@(item.Kind == RequestKind.Album ? item.TargetId : null)" AlbumStatus="@(item.Kind == RequestKind.Album ? AlbumStatus.Missing : null)"
+                   Get="@(Wishlist.CanFetch ? (item.Kind, item.TargetId) : null)"
+                   GetLabel="@(item.Kind == RequestKind.Album ? "Get the album into your library" : "Get it into your library")"
+                   AlbumHref="@(item.Kind == RequestKind.Track && item.AlbumId is { } a ? $"albums/{a}" : null)" ArtistHref="@($"artists/{item.ArtistId}")"
+                   OnTakeOut="@EventCallback.Factory.Create(this, () => RemoveAsync(item))" TakeOutLabel="Take it off your wishlist" />;
+
+    private const string SortKey = "wishlist.sort", DescendingKey = "wishlist.descending";
+
+    private static readonly IReadOnlyList<(string Key, string Label)> SortOptions =
+        [("newest", "Newest"), ("name", "Title"), ("artist", "Artist"), ("album", "Album")];
+
+    private string _filter = "";
+    private string _sort = "newest";
+    private bool _descending = true;
+    private string? _error;
+
+    private string DirectionHint => _sort == "newest"
+        ? $"{(_descending ? "Newest" : "Oldest")} first; click to reverse"
+        : $"Sorted {(_descending ? "Z to A" : "A to Z")}; click to reverse";
+
+    private List<WishlistItem> Shown
+    {
+        get
+        {
+            var items = Wishlist.Items.Where(Matches);
+            if (_sort == "newest")
+                return (_descending ? items : items.Reverse()).ToList();
+            Func<WishlistItem, string> key = _sort switch
+            {
+                "artist" => i => i.ArtistCredit,
+                "album" => i => i.AlbumTitle ?? "",
+                _ => i => i.Title,
+            };
+            var text = StringComparer.CurrentCultureIgnoreCase;
+            return (_descending ? items.OrderByDescending(key, text) : items.OrderBy(key, text)).ToList();
+        }
+    }
+
+    private bool Matches(WishlistItem item) =>
+        _filter.Length == 0 || new[] { item.Title, item.ArtistCredit, item.AlbumTitle }.Any(s => s?.Contains(_filter, StringComparison.CurrentCultureIgnoreCase) == true);
+
+    protected override async Task OnInitializedAsync()
+    {
+        Wishlist.Changed += Redraw;
+        Events.Received += OnEvent;
+        _sort = await Prefs.GetAsync(SortKey, "newest");
+        _descending = await Prefs.GetAsync(DescendingKey, true);
+        // Afresh each time, so what's arrived in the library since has gone.
+        await Wishlist.RefreshAsync();
+    }
+
+    private async Task SortAsync(string key, bool descending)
+    {
+        (_sort, _descending) = (key, descending);
+        await Prefs.SetAsync(SortKey, key);
+        await Prefs.SetAsync(DescendingKey, descending);
+    }
+
+    private Task ListenAsync(WishlistItem item) =>
+        item.Kind == RequestKind.Album ? Player.PlayAlbumAsync(item.TargetId) : Player.ListenAsync(item.TargetId, item.EditionId);
+
+    private async Task RemoveAsync(WishlistItem item)
+    {
+        _error = null;
+        try
+        {
+            await Wishlist.RemoveAsync(item.TargetId);
+        }
+        catch (Exception e) when (e is HttpRequestException or MelodexApiException)
+        {
+            _error = e.Message;
+        }
+    }
+
+    // A request landing in the library may take something off it.
+    private void OnEvent(string type)
+    {
+        if (type is "requests")
+            _ = InvokeAsync(Wishlist.RefreshAsync);
+    }
+
+    private void Redraw() => InvokeAsync(StateHasChanged);
+
+    public void Dispose()
+    {
+        Wishlist.Changed -= Redraw;
+        Events.Received -= OnEvent;
+    }
+}

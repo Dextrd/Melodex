@@ -35,9 +35,18 @@
                             // Getting it and ignoring it are in the menu, while it can be got and isn't ignored.
                             var gettable = !album.Ignored && album.Status is AlbumStatus.Partial or AlbumStatus.Missing;
                             RenderFragment play = @<text>
-                                <IconButton Icon="@(missing ? "listen" : "play")" Requires="@UserPermissions.Listen" Title="@(missing ? "Listen: fetch it to play now, without adding it to your library" : album.Status == AlbumStatus.Partial ? "Play, fetching the tracks you don't have to listen to" : "Play")"
-                                            OnClick="() => Player.PlayAlbumAsync(album.Id)" />
-                                <ItemMenu What="album" AlbumId="album.Id" AlbumStatus="album.Status" Name="@album.Title"
+                                @if (missing)
+                                {
+                                    <WishButton Kind="RequestKind.Album" Id="album.Id">
+                                        <IconButton Icon="listen" Requires="@UserPermissions.Listen" Title="Listen: fetch it to play now, without adding it to your library" OnClick="() => Player.PlayAlbumAsync(album.Id)" />
+                                    </WishButton>
+                                }
+                                else
+                                {
+                                    <IconButton Icon="play" Requires="@UserPermissions.Listen" Title="@(album.Status == AlbumStatus.Partial ? "Play, fetching the tracks you don't have to listen to" : "Play")"
+                                                OnClick="() => Player.PlayAlbumAsync(album.Id)" />
+                                }
+                                <ItemMenu What="album" AlbumId="album.Id" AlbumStatus="album.Status" Name="@album.Title" Wish="@(missing || album.Status == AlbumStatus.Partial ? (RequestKind.Album, album.Id) : null)"
                                           Upgrade="@(album.Status is AlbumStatus.Complete or AlbumStatus.Partial ? new FormatScope(FormatScopeKind.Album, album.Id) : null)"
                                           Get="@(gettable ? (RequestKind.Album, album.Id) : null)"
                                           GetLabel="@(album.Status == AlbumStatus.Partial ? "Get the tracks you're missing" : "Get it into your library")"

@@ -79,6 +79,7 @@ builder.Services.AddScoped<LibraryFormatter>();
 builder.Services.AddScoped<CoverChooser>();
 builder.Services.AddScoped<LyricsFinder>();
 builder.Services.AddScoped<PlaylistService>();
+builder.Services.AddScoped<Melodex.Core.Wishlists.WishlistService>();
 builder.Services.AddScoped<ImportService>();
 builder.Services.AddScoped<ExportService>();
 builder.Services.AddSingleton<VideoLookup>();
@@ -211,6 +212,7 @@ api.MapPluginEndpoints();
 api.MapAccessEndpoints();
 api.MapWebhookEndpoints();
 api.MapPlaylistEndpoints();
+api.MapWishlistEndpoints();
 api.MapUpgradeEndpoints();
 api.MapToolEndpoints();
 

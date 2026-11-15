@@ -871,6 +871,7 @@ tr.playing td:nth-child(2) { color: var(--accent); font-weight: 600; }
 /* Library → Listen now: songs in a track table, an album's under it (#121). */
 .track-list col.left-col { width: 9.5rem; }
 .listen-table td:nth-child(5) { white-space: nowrap; }
+.wishlist-table td:nth-child(4) { white-space: nowrap; }
 /* The fold column comes first, so a playing song's title is the third cell. */
 .listen-table tr.playing td:nth-child(2) { color: inherit; font-weight: inherit; }
 .listen-table tr.playing td:nth-child(3) { color: var(--accent); font-weight: 600; }

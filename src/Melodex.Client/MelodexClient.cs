@@ -829,6 +829,23 @@ public sealed class MelodexClient(HttpClient http)
 
     // ---- Playlists ----
 
+    /// <summary>Your wishlist, less what the library has now.</summary>
+    public async Task<Wishlist> GetWishlistAsync(CancellationToken ct = default) =>
+        (await http.GetFromJsonAsync<Wishlist>($"{Api}/wishlist", MelodexJson.Options, ct))!;
+
+    public async Task AddToWishlistAsync(AddToWishlist add, CancellationToken ct = default)
+    {
+        using var response = await http.PostAsJsonAsync($"{Api}/wishlist", add, MelodexJson.Options, ct);
+        await EnsureAsync(response, ct);
+    }
+
+    /// <summary>Takes a song or album off your wishlist, by its track or album ID.</summary>
+    public async Task RemoveFromWishlistAsync(Guid targetId, CancellationToken ct = default)
+    {
+        using var response = await http.DeleteAsync($"{Api}/wishlist/{targetId}", ct);
+        await EnsureAsync(response, ct);
+    }
+
     public async Task<IReadOnlyList<PlaylistSummary>> ListPlaylistsAsync(CancellationToken ct = default) =>
         await http.GetFromJsonAsync<List<PlaylistSummary>>($"{Api}/playlists", MelodexJson.Options, ct) ?? [];
 
