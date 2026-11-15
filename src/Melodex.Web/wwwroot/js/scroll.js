@@ -115,6 +115,12 @@ window.melodexScanList = {
     let here = location.href;
     const leave = () => positions.set(here, window.melodexScroll.get());
     history.scrollRestoration = 'manual';
+    // Where this page was scrolled to when it was last left, by a link too: for pages that come back as they were.
+    window.melodexScroll.toLeft = () => {
+        const y = positions.get(location.href);
+        if (y)
+            window.melodexScroll.to(y);
+    };
 
     const push = history.pushState.bind(history);
     history.pushState = (...args) => {

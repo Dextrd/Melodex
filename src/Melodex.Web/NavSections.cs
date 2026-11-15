@@ -4,10 +4,10 @@ using Microsoft.AspNetCore.Components.Routing;
 namespace Melodex.Web;
 
 /// <summary>The parts of the app that remember where you were in them.</summary>
-public enum NavSection { Library, Search }
+public enum NavSection { Library, Search, Tools }
 
 /// <summary>
-/// Where you were in the Library and in Search, this session. The artist, album and song pages you open from one belong
+/// Where you were in the Library, in Search and in Tools, this session. The artist, album and song pages you open from one belong
 /// to it. Its link in the top bar goes back to the page you were last on there; from there, back to its own page as you
 /// left it; and from that, to its own page afresh.
 /// </summary>
@@ -58,7 +58,7 @@ public sealed class NavSections : IDisposable
 
     private string Here => _nav.ToBaseRelativePath(_nav.Uri);
 
-    private static string Root(NavSection section) => section == NavSection.Search ? "search" : "";
+    private static string Root(NavSection section) => section switch { NavSection.Search => "search", NavSection.Tools => "tools", _ => "" };
 
     private static string Bare(string path) => path.Split('?', '#')[0].TrimEnd('/');
 
@@ -71,6 +71,7 @@ public sealed class NavSections : IDisposable
     {
         "" or "playlists" or "listen-now" => NavSection.Library,
         "search" => NavSection.Search,
+        var bare when bare == "tools" || bare.StartsWith("tools/") => NavSection.Tools,
         _ => null,
     };
 

@@ -1,10 +1,13 @@
 @page "/tools/export"
 @inject MelodexClient Api
 @inject AuthState Auth
+@inject ToolsMemory Memory
+@implements IDisposable
 
 <PageTitle>Export · Melodex</PageTitle>
 
 @* Your playlists or the library, as files to save: made on the server, so a download link is all it takes. *@
+<ToolsPlace />
 <p class="small"><a href="tools">← Tools</a></p>
 <h1>Export</h1>
 <p class="muted">Your playlists, for other players or other services' importers, or the library, for keeping or a spreadsheet.</p>
@@ -144,16 +147,27 @@ else
 
     private string LibraryLink => MelodexClient.LibraryExportUrl(_rows, LibraryExportColumns.For(_rows).Where(_columns.Contains).ToList());
 
+    // What was chosen, kept for the session; from a playlist's page, it's that playlist afresh.
+    private sealed record Choices(bool Library, bool KeepMissing, HashSet<Guid> Chosen, PlaylistExportFormat Format, string Prefix, LibraryExportRows Rows,
+        HashSet<LibraryExportColumn> Columns);
+
     protected override async Task OnInitializedAsync()
     {
-        _library = !Auth.May(UserPermissions.Listen);
-        if (_library)
+        var kept = Playlist is null ? Memory.Recall<Choices>("tools/export") : null;
+        if (kept is not null)
+            (_library, _keepMissing, _format, _prefix, _rows, _columns) = (kept.Library, kept.KeepMissing, kept.Format, kept.Prefix, kept.Rows, kept.Columns);
+        if (!Auth.May(UserPermissions.Listen))
+        {
+            _library = true;
             return;
+        }
         try
         {
             _playlists = (await Api.ListPlaylistsAsync()).OrderBy(p => p.Name, StringComparer.CurrentCultureIgnoreCase).ToList();
-            // From a playlist's page, that one's chosen; otherwise all of them.
-            _chosen = Playlist is { } one && _playlists.Any(p => p.Id == one) ? [one] : _playlists.Select(p => p.Id).ToHashSet();
+            // From a playlist's page, that one's chosen; otherwise those chosen before, or all of them.
+            _chosen = Playlist is { } one && _playlists.Any(p => p.Id == one) ? [one]
+                : kept is not null ? kept.Chosen.Where(id => _playlists.Any(p => p.Id == id)).ToHashSet()
+                : _playlists.Select(p => p.Id).ToHashSet();
         }
         catch (Exception e)
         {
@@ -183,5 +197,11 @@ else
             _columns.Add(column);
         else
             _columns.Remove(column);
+    }
+
+    public void Dispose()
+    {
+        if (Playlist is null)
+            Memory.Keep("tools/export", new Choices(_library, _keepMissing, _chosen, _format, _prefix, _rows, _columns));
     }
 }
