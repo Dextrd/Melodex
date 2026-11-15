@@ -3,11 +3,11 @@
 @inject AuthState Auth
 @inject NavigationManager Nav
 
-<PageTitle>Import from Spotify · Melodex</PageTitle>
+<PageTitle>Import from a music service · Melodex</PageTitle>
 
 @* A music service's export of your data: what's in it, then which lists to import, each matched as a list import is. *@
 <p class="small"><a href="tools">← Tools</a></p>
-<h1>Import from Spotify</h1>
+<h1>Import from a music service</h1>
 
 @if (!Auth.May(UserPermissions.Request))
 {
@@ -16,13 +16,24 @@
 else
 {
     <p class="muted">
-        Spotify gives anyone a copy of their data: on Spotify's website, open <strong>Account → Privacy settings</strong>, tick
-        <strong>Account data</strong> and ask for it. An email brings a zip within a few days. Choose that zip here, or the JSON
-        files from it, and then which playlists, liked songs and saved albums to import. <a href="settings/help/tools#importing-from-spotify">More in the guide</a>.
+        Music services give you a copy of your data. Choose the zip one sent you, or the files from it, and then which of its
+        playlists, liked songs and saved albums to import.
     </p>
+    <ul class="muted small service-steps">
+        <li>
+            <strong>Spotify</strong>: on Spotify's website, open <strong>Account → Privacy settings</strong>, tick <strong>Account
+            data</strong> and ask for it. An email brings a zip within a few days.
+        </li>
+        <li>
+            <strong>YouTube Music</strong>: at <a href="https://takeout.google.com" target="_blank" rel="noopener">Google Takeout</a>,
+            choose <strong>Deselect all</strong>, tick <strong>YouTube and YouTube Music</strong>, and under its data keep
+            <strong>music library songs</strong> and <strong>playlists</strong>. It usually comes within the hour.
+        </li>
+    </ul>
+    <p class="muted small"><a href="settings/help/tools#importing-from-a-music-service">More in the guide</a>.</p>
     <div class="field">
         <label class="field-label" for="service-files">The export's zip, or its files</label>
-        <InputFile id="service-files" OnChange="ReadAsync" multiple accept=".zip,.json,application/zip,application/json" />
+        <InputFile id="service-files" OnChange="ReadAsync" multiple accept=".zip,.json,.csv,application/zip,application/json,text/csv" />
     </div>
     @if (_busy && _peek is null) { <Loading /> }
     @if (_error is not null) { <p class="error">@_error</p> }
@@ -56,7 +67,7 @@ else
             </div>
             <div class="field">
                 <label class="field-label" for="service-folder">Put the playlists in a folder</label>
-                <input id="service-folder" type="text" @bind="_folder" @bind:event="oninput" placeholder="No folder" />
+                <input id="service-folder" type="text" value="@_folder" @oninput="SetFolder" placeholder="No folder" />
             </div>
             @if (_peek.Lists.Any(l => l.Kind == ServiceListKind.Liked))
             {
@@ -78,7 +89,7 @@ else
 @code {
     private const long MaxExport = 30 * 1024 * 1024;
 
-    private bool _busy;
+    private bool _busy, _folderEdited;
     private string? _error;
     private List<(string Name, byte[] Bytes)> _files = [];
     private ServicePeek? _peek;
@@ -86,8 +97,6 @@ else
     private string _folder = "", _likedName = "Liked Songs";
 
     private List<ServiceList> Choosable => _peek?.Lists.Where(l => l.New > 0).ToList() ?? [];
-
-    protected override void OnInitialized() => _folder = $"Spotify{PlaylistNames.Delimiter(Auth)}";
 
     private async Task ReadAsync(InputFileChangeEventArgs e)
     {
@@ -97,7 +106,7 @@ else
         var chosen = e.GetMultipleFiles(500);
         if (chosen.Sum(f => f.Size) > MaxExport)
         {
-            _error = "That's more than 30 MB. Choose only the files with your library and playlists in: YourLibrary.json and the Playlist files.";
+            _error = "That's more than 30 MB. Choose only the files with your library and playlists in, such as Spotify's YourLibrary.json and Playlist files, or Takeout's playlists folder.";
             return;
         }
         _busy = true;
@@ -111,6 +120,8 @@ else
                 _files.Add((file.Name, copy.ToArray()));
             }
             _peek = await Api.PeekServiceImportAsync(Streams());
+            if (!_folderEdited)
+                _folder = $"{ServiceNames.Of(_peek.Service)}{PlaylistNames.Delimiter(Auth)}";
             _chosen = Choosable.Select(l => l.Key).ToHashSet();
         }
         catch (MelodexApiException ex)
@@ -129,6 +140,12 @@ else
         { Kind: ServiceListKind.Albums } => "· to ask for those you don't have",
         _ => "",
     };
+
+    private void SetFolder(ChangeEventArgs e)
+    {
+        _folder = e.Value as string ?? "";
+        _folderEdited = true;
+    }
 
     private void ChooseAll(bool all) => _chosen = all ? Choosable.Select(l => l.Key).ToHashSet() : [];
 

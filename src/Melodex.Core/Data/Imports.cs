@@ -14,6 +14,9 @@ public enum ImportSource
 
     /// <summary>A playlist, liked songs or saved albums from Spotify's export of your data.</summary>
     Spotify,
+
+    /// <summary>A playlist or library songs from Google Takeout's YouTube Music export.</summary>
+    YouTubeMusic,
 }
 
 /// <summary>How far an import has got.</summary>

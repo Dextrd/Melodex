@@ -14,6 +14,9 @@ public enum ImportFormat
 
     /// <summary>Spotify's export of your data: a playlist, liked songs or saved albums.</summary>
     Spotify,
+
+    /// <summary>Google Takeout's YouTube and YouTube Music export: a playlist, or the songs in your library.</summary>
+    YouTubeMusic,
 }
 
 /// <summary>What a CSV column holds.</summary>

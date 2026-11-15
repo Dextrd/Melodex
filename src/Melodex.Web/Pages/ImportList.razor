@@ -9,7 +9,7 @@
 
 @* Importing a list: choosing it and, for a CSV, its columns; then its songs as they're matched, to check and change;
    then where they go. *@
-<p class="small">@if (_import?.Import.BatchId is { } batch) { <a href="tools/import/batch/@batch">← Import from Spotify</a> } else { <a href="tools">← Tools</a> }</p>
+<p class="small">@if (_import?.Import.BatchId is { } batch) { <a href="tools/import/batch/@batch">← Import from @ServiceNames.Of(_import.Import.Format)</a> } else { <a href="tools">← Tools</a> }</p>
 <h1>@(_import?.Import.Name ?? "Import from a list")</h1>
 
 @if (!Auth.May(UserPermissions.Request))
@@ -156,7 +156,7 @@ else
                     <tr @key="line.Id" class="@(line.Outcome == ImportOutcome.Dropped ? "dim" : "")">
                         <td class="num muted">@(line.Position + 1)</td>
                         <td class="hide-narrow">
-                            <div class="ellipsis" title="@line.Song.Title">@line.Song.Title</div>
+                            <div class="ellipsis" title="@line.Song.Title">@(line.Song.Title.Length > 0 ? line.Song.Title : "A YouTube video, to look up")</div>
                             <div class="muted small ellipsis">@Given(line.Song)</div>
                         </td>
                         <td class="cover-col">
@@ -176,7 +176,7 @@ else
                             else
                             {
                                 <div class="ellipsis muted">@(line.Outcome == ImportOutcome.Pending ? "Matching…" : "Nothing found")</div>
-                                <div class="muted small ellipsis show-narrow">@line.Song.Title · @Given(line.Song)</div>
+                                <div class="muted small ellipsis show-narrow">@(line.Song.Title.Length > 0 ? line.Song.Title : "A YouTube video") · @Given(line.Song)</div>
                             }
                         </td>
                         <td class="hide-narrow"><span class="badge @BadgeClass(line)" title="@(line.Confidence is { } c && line.Outcome == ImportOutcome.Unsure ? $"{c:P0} alike" : null)">@Label(line)</span></td>
@@ -207,7 +207,7 @@ else
 
     @if (summary.State == ImportState.Ready && summary.BatchId is { } batchId)
     {
-        <p class="muted">It's applied with the rest of its export, from <a href="tools/import/batch/@batchId">Import from Spotify</a>.</p>
+        <p class="muted">It's applied with the rest of its export, from <a href="tools/import/batch/@batchId">Import from @ServiceNames.Of(summary.Format)</a>.</p>
     }
     else if (summary.State == ImportState.Ready)
     {

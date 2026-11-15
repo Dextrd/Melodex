@@ -12,7 +12,7 @@ namespace Melodex.Core.Tools;
 /// Matches an import's songs, one by one, showing each in Activity as it goes. Paused and resumed, it carries on with
 /// the songs not matched yet. Once done, the import waits to be checked and applied.
 /// </summary>
-public sealed class ImportTask(ImportMatcher matcher, MelodexDbContext db, TaskFeed feed) : ITaskHandler
+public sealed class ImportTask(ImportMatcher matcher, VideoLookup videos, MelodexDbContext db, TaskFeed feed) : ITaskHandler
 {
     public const string TaskKind = "tools-import";
     private const int BatchSize = 25;
@@ -33,7 +33,7 @@ public sealed class ImportTask(ImportMatcher matcher, MelodexDbContext db, TaskF
         var all = await db.ImportLines.Where(l => l.ImportId == importId).OrderBy(l => l.Position)
             .Select(l => new { l.Id, l.Outcome, l.Title, l.Artist }).ToListAsync(ct);
         foreach (var line in all.Where(l => l.Outcome == ImportOutcome.Pending))
-            rows.Put(line.Id.ToString(), TaskRowState.Waiting, line.Title, line.Artist);
+            rows.Put(line.Id.ToString(), TaskRowState.Waiting, Named(line.Title), line.Artist);
 
         var todo = all.Where(l => l.Outcome == ImportOutcome.Pending).Select(l => l.Id).ToList();
         var done = all.Count - todo.Count;
@@ -45,7 +45,23 @@ public sealed class ImportTask(ImportMatcher matcher, MelodexDbContext db, TaskF
             var lines = await db.ImportLines.Where(l => batch.Contains(l.Id)).OrderBy(l => l.Position).ToListAsync(ct);
             foreach (var line in lines)
             {
-                rows.Put(line.Id.ToString(), TaskRowState.Working, line.Title, line.Artist);
+                rows.Put(line.Id.ToString(), TaskRowState.Working, Named(line.Title), line.Artist);
+                // A YouTube video known only by its ID is looked up first.
+                if (line.Title.Length == 0 && line.ExternalId is { } external && external.StartsWith(ServiceExports.YouTubePrefix, StringComparison.Ordinal))
+                {
+                    if (await videos.LookupAsync(external[ServiceExports.YouTubePrefix.Length..], ct) is { } video)
+                        (line.Title, line.Artist) = (video.Title, video.Artist);
+                    else
+                    {
+                        line.Title = $"Unavailable video {external[ServiceExports.YouTubePrefix.Length..]}";
+                        line.Outcome = ImportOutcome.NotFound;
+                        await db.SaveChangesAsync(ct);
+                        await RowAsync(rows, line, ct);
+                        done++;
+                        Report();
+                        continue;
+                    }
+                }
                 if (import.Albums)
                     await matcher.MatchAlbumAsync(line, ct);
                 else
@@ -78,6 +94,8 @@ public sealed class ImportTask(ImportMatcher matcher, MelodexDbContext db, TaskF
         string Things(int count) => import.Albums ? LibraryMatcher.Plural(count, "album", "albums") : LibraryMatcher.Plural(count, "song", "songs");
     }
 
+    private static string Named(string title) => title.Length == 0 ? "A YouTube video, to look up" : title;
+
     // The song as it came out: what it was matched to, and how sure.
     private async Task RowAsync(TaskRows rows, ImportLine line, CancellationToken ct)
     {
@@ -92,6 +110,7 @@ public sealed class ImportTask(ImportMatcher matcher, MelodexDbContext db, TaskF
             ImportOutcome.Owned => (TaskRowState.Done, what is null ? "In your library" : $"In your library: {what}"),
             ImportOutcome.Found => (TaskRowState.Done, $"Found: {what}"),
             ImportOutcome.Unsure => (TaskRowState.Skipped, $"Not sure: {what}, {line.Confidence:P0} alike"),
+            _ when line.Title.StartsWith("Unavailable video ", StringComparison.Ordinal) => (TaskRowState.Failed, "YouTube doesn't have it any more, or it's private"),
             _ => (TaskRowState.Failed, "Nothing like it in the library or the catalogue"),
         };
         rows.Put(line.Id.ToString(), state, line.Title, line.Artist, detail, line.TrackId is { } trackId ? $"tracks/{trackId}" : line.AlbumId is { } albumId ? $"albums/{albumId}" : null);
