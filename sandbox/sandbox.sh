@@ -292,14 +292,13 @@ up() {
 
   # Stand-ins for Qobuz, Tidal, Bandcamp and slskd, run with the Tidal plugin's image, which has ffmpeg to make their
   # tones. slskd's downloads folder is shared with the Soulseek plugin, which moves them into staging.
-  # The folder starts out root's, and both run as other users.
-  "$ENGINE" run --rm --user 0 --entrypoint chmod -v melodex-sandbox-slskd:/slskd-downloads localhost/melodex/retriever-tidal:dev \
-    1777 /slskd-downloads
   "$ENGINE" run -d --name melodex-sandbox-standin "${SHARED[@]}" --network-alias streaming-standin \
     -p "127.0.0.1:$STANDIN_PORT:8080" -e PUBLIC_URL="http://localhost:$STANDIN_PORT" \
     -e INTERNAL_URL=http://streaming-standin:8080 -v "$SANDBOX/standins:/standin:ro,z" \
     -v melodex-sandbox-slskd:/slskd-downloads \
     localhost/melodex/retriever-tidal:dev uvicorn streaming:app --app-dir /standin --host 0.0.0.0 --port 8080 >/dev/null
+  # slskd's downloads folder starts out root's, and the stand-in and the Soulseek plugin run as other users.
+  "$ENGINE" exec --user 0 melodex-sandbox-standin chmod 1777 /slskd-downloads
   "$ENGINE" run -d --name melodex-sandbox-qobuz "${SHARED[@]}" --network-alias retriever-qobuz "${AS_YOU[@]}" \
     -v melodex-sandbox-staging:/staging -e QOBUZ_API=http://streaming-standin:8080/qobuz/api.json/0.2 \
     localhost/melodex/retriever-qobuz:dev >/dev/null
