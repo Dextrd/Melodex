@@ -172,6 +172,77 @@ public sealed class ListenNowTests(RequestFixture fixture, ITestOutputHelper out
         await WaitAsync(started, ListenNowState.Playable);
     }
 
+    [TestLibraryFact]
+    public async Task Lyrics_are_found_once_a_song_plays_and_go_with_it_to_the_library_or_away()
+    {
+        await fixture.AddSourceAsync(new FakeSource("lyrics"));
+        // An album past the other tests' with two songs still missing: other tests may have got some since the scan.
+        var tracks = new List<TrackRow>();
+        for (var index = 4; tracks.Count < 2; index++)
+            tracks = (await Api.GetAlbumAsync((await MissingAlbumAsync(index)).Id))!.Tracks.Where(t => t.Status == TrackStatus.Missing).Take(2).ToList();
+        // Looked for by the recording's own title, which an album can call otherwise.
+        List<string> titles;
+        using (var scope = fixture.Factory.Services.CreateScope())
+        {
+            var ids = tracks.Select(t => t.TrackId).ToList();
+            titles = await scope.ServiceProvider.GetRequiredService<MelodexDbContext>().Tracks.Where(t => ids.Contains(t.Id)).Select(t => t.Title).ToListAsync();
+        }
+        foreach (var title in titles)
+            fixture.Lyrics[title] = $"[00:01.00] {title} sung";
+        await SaveLyricsSettingAsync(true);
+        try
+        {
+            var items = new List<ListenNowInfo>();
+            foreach (var track in tracks)
+                items.AddRange(await Api.StartListeningAsync(new StartListen(RequestKind.Track, track.TrackId)));
+            var (kept, left) = ((await WaitAsync(items, ListenNowState.Playable))[0], items[1]);
+
+            // Looked for once it's ready: the player waits on them, then has them.
+            foreach (var item in items)
+            {
+                var lyrics = await LyricsOfAsync(item.Id);
+                Assert.Equal(LyricsKind.Synced, lyrics.Kind);
+                Assert.EndsWith(" sung", Assert.Single(lyrics.Lines).Text);
+                Assert.True(File.Exists(Path.Combine(fixture.ListenNow, item.Id.ToString("N") + ".lrc")));
+            }
+
+            // Added, the song brings its lyrics into the library, without looking for them again.
+            foreach (var title in titles)
+                fixture.Lyrics.TryRemove(title, out _);
+            await WaitAsync([await Api.AddListeningAsync(kept.Id)], ListenNowState.InLibrary);
+            Assert.Equal(LyricsKind.Synced, (await Api.GetTrackLyricsAsync(kept.TrackId)).Kind);
+            Assert.False(File.Exists(Path.Combine(fixture.ListenNow, kept.Id.ToString("N") + ".lrc")));
+
+            // Discarded, they go with it.
+            await Api.DiscardListeningAsync(left.Id);
+            Assert.Empty(Directory.GetFiles(fixture.ListenNow, left.Id.ToString("N") + ".*"));
+        }
+        finally
+        {
+            foreach (var title in titles)
+                fixture.Lyrics.TryRemove(title, out _);
+            await SaveLyricsSettingAsync(false);
+        }
+    }
+
+    private async Task<TrackLyrics> LyricsOfAsync(Guid item)
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(30);
+        while (DateTime.UtcNow < deadline)
+        {
+            if (await Api.GetListeningLyricsAsync(item) is { } lyrics)
+                return lyrics;
+            await Task.Delay(50);
+        }
+        throw new TimeoutException();
+    }
+
+    private async Task SaveLyricsSettingAsync(bool fetch)
+    {
+        using var scope = fixture.Factory.Services.CreateScope();
+        await scope.ServiceProvider.GetRequiredService<Melodex.Core.Library.SettingsService>().SaveLibraryAsync(new LibrarySettings { FetchLyrics = fetch }, default);
+    }
+
     /// <summary>
     /// A missing album of a library artist that no other test fetches, with a few tracks to play; <paramref name="index"/>
     /// picks another for each test. They're listed as they were after the fixture's scan, so what other tests add since

@@ -138,6 +138,10 @@
                 else if (_lyrics is null)
                 {
                     <Loading Inline="true" />
+                    @if (now.ListenId is not null)
+                    {
+                        <p class="muted small np-note">Looking for its lyrics…</p>
+                    }
                 }
                 else if (_lyrics.Kind == LyricsKind.Synced)
                 {
@@ -158,11 +162,7 @@
                 {
                     <div class="np-note">
                         <p>No lyrics for this song.</p>
-                        @if (now.ListenId is not null && now.ListenState is not ListenNowState.InLibrary)
-                        {
-                            <p class="muted small">Songs fetched just to listen to get lyrics once they're added to your library.</p>
-                        }
-                        else if (now.FileId is null && Auth.May(UserPermissions.Format))
+                        @if (now.ListenId is null && now.FileId is null && Auth.May(UserPermissions.Format))
                         {
                             <button @onclick="FindLyricsAsync" disabled="@_finding">
                                 @if (_finding) { <span class="spinner"></span> }
@@ -200,6 +200,7 @@
 
     private bool Visualiser => _visualiser && !_barsOff;
     private TrackLyrics? _lyrics;
+    private Timer? _lyricsRetry;
     private PlayerEntry? _lyricsOf;
     private bool _following, _finding;
     private string? _findError;
@@ -242,6 +243,16 @@
             var lyrics = await Player.LyricsAsync(now);
             if (ReferenceEquals(Player.Now, now))
                 _lyrics = lyrics;
+            // Still on their way, for a song fetched to listen to: asked again in a moment.
+            _lyricsRetry?.Dispose();
+            if (lyrics is null && ReferenceEquals(Player.Now, now))
+                _lyricsRetry = new Timer(_ => InvokeAsync(async () =>
+                {
+                    if (!ReferenceEquals(Player.Now, now) || !ReferenceEquals(_lyricsOf, now))
+                        return;
+                    _lyricsOf = null;
+                    await LoadLyricsAsync();
+                }), null, TimeSpan.FromSeconds(2), Timeout.InfiniteTimeSpan);
         }
         catch (Exception e) when (e is HttpRequestException or MelodexApiException)
         {
@@ -344,6 +355,7 @@
 
     public async ValueTask DisposeAsync()
     {
+        _lyricsRetry?.Dispose();
         Player.Changed -= Redraw;
         Player.TimeChanged -= Redraw;
         Player.Visualising = false;
