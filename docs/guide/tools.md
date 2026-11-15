@@ -1,7 +1,7 @@
 # Tools
 
-The **Tools** page holds things you run now and then to build your library. You need the **Request** permission to use
-them. What each does shows in **Activity** as it goes.
+The **Tools** page holds things you run now and then: importing lists of songs, and exporting your playlists and
+library. Importing needs the **Request** permission; what it does shows in **Activity** as it goes.
 
 ## Importing from a list
 
@@ -43,3 +43,24 @@ Then say what to do with them:
   takes one off the list.
 
 Your imports are listed on the Tools page, newest first. Deleting one leaves its playlist and requests as they are.
+
+## Exporting
+
+**Export** gets your playlists and library out of Melodex, as files to save.
+
+**Playlists**, for other players, other services' importers, or keeping (this needs the **Listen** permission). Choose
+which; all are chosen to start with, or only the one whose page you came from (by the export button on a playlist's
+page). One downloads as a file, and several as a zip of them, in their folders. Each can be:
+
+- **M3U8**, for other players and media servers, with each song's length, artist, title and album, and its file. Its
+  path is in the music folder (such as `Artist/Album/01 Song.flac`), so the playlist works from there; or say where
+  the music folder is on the machine that will open it (such as `/mnt/music`), and paths start there.
+- **CSV**, for other services' importers and spreadsheets: each song's artist, title, album, length, ISRC and
+  MusicBrainz ID. It's the shape **Import from a list** reads back.
+
+Songs you don't have are left out, unless you keep them by name only: an M3U8 then lists them with no file, for
+importers that match by name.
+
+**The library**, as a CSV, with a row for each song you have (matched, or your own), or each album you have some of,
+and the columns you choose: artist, album, title, year, disc and track number, length, path, format, quality, ISRC and
+MusicBrainz ID for songs; artist, album, year, how much of it you have, format, quality and MusicBrainz ID for albums.

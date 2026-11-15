@@ -1710,3 +1710,17 @@ label.check { cursor: pointer; }
 /* A greyed row in a table of slots greys what's in its cells, not the cells, so the slots behind don't show through. */
 table.slots > tbody > tr.dim > td { opacity: 1; color: color-mix(in srgb, var(--text) 60%, transparent); }
 table.slots > tbody > tr.dim > td > * { opacity: .6; }
+
+/* Export: which playlists, as what; the library's columns. */
+a.button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+a.button.primary:hover { filter: brightness(1.1); }
+.export-playlists { display: flex; flex-direction: column; gap: .15rem; padding: .5rem 1rem; max-height: 22rem; overflow-y: auto; max-width: 40rem; }
+.export-playlists label.check { display: flex; align-items: center; gap: .5rem; padding: .2rem 0; min-width: 0; }
+.export-playlists label.check .ellipsis { flex: 1; min-width: 0; }
+.export-playlists .export-all { border-bottom: 1px solid var(--border); padding-bottom: .4rem; margin-bottom: .2rem; }
+.export-options { display: flex; flex-direction: column; gap: .5rem; max-width: 40rem; }
+.export-options label.check { display: flex; align-items: flex-start; gap: .45rem; }
+.export-options label.check input { margin-top: .25rem; }
+.export-columns { display: flex; flex-wrap: wrap; gap: .4rem; margin: .5rem 0; }
+.export-columns .toggle { display: inline-flex; align-items: center; gap: .35rem; }
+.export-columns .toggle:has(input:checked) { border-color: var(--accent); color: var(--text); background: color-mix(in srgb, var(--accent) 14%, var(--surface)); }

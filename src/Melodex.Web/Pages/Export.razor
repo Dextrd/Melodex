@@ -1,0 +1,187 @@
+@page "/tools/export"
+@inject MelodexClient Api
+@inject AuthState Auth
+
+<PageTitle>Export · Melodex</PageTitle>
+
+@* Your playlists or the library, as files to save: made on the server, so a download link is all it takes. *@
+<p class="small"><a href="tools">← Tools</a></p>
+<h1>Export</h1>
+<p class="muted">Your playlists, for other players or other services' importers, or the library, for keeping or a spreadsheet.</p>
+
+<div class="toolbar">
+    <Segmented T="bool" Value="_library" Options="Kinds" OnChange="v => _library = v" Label="Export" />
+</div>
+
+@if (!_library)
+{
+    @if (!Auth.May(UserPermissions.Listen))
+    {
+        <div class="empty card">Playlists need the Listen permission.</div>
+    }
+    else if (_error is not null)
+    {
+        <div class="empty card error">@_error</div>
+    }
+    else if (_playlists is null)
+    {
+        <Loading />
+    }
+    else if (_playlists.Count == 0)
+    {
+        <div class="empty card">You have no playlists yet.</div>
+    }
+    else
+    {
+        <h2 class="section">Which playlists</h2>
+        <div class="card export-playlists">
+            <label class="check export-all">
+                <input type="checkbox" checked="@(_chosen.Count == _playlists.Count)" @onchange="e => ChooseAll((bool)e.Value!)" />
+                <strong>All @_playlists.Count</strong>
+            </label>
+            @foreach (var playlist in _playlists)
+            {
+                <label class="check" @key="playlist.Id">
+                    <input type="checkbox" checked="@_chosen.Contains(playlist.Id)" @onchange="e => Choose(playlist.Id, (bool)e.Value!)" />
+                    <span class="ellipsis">@playlist.Name</span>
+                    <span class="muted small">@Format.Count(playlist.Count, "song", "songs")</span>
+                </label>
+            }
+        </div>
+
+        <h2 class="section">As</h2>
+        <div class="export-options">
+            <label class="dialog-choice">
+                <input type="radio" name="export-format" checked="@(_format == PlaylistExportFormat.M3u8)" @onchange="() => _format = PlaylistExportFormat.M3u8" />
+                <span>
+                    <strong>M3U8 playlists</strong>
+                    <span class="muted small">For other players and media servers: each song's file, with its length, artist and title.</span>
+                </span>
+            </label>
+            <label class="dialog-choice">
+                <input type="radio" name="export-format" checked="@(_format == PlaylistExportFormat.Csv)" @onchange="() => _format = PlaylistExportFormat.Csv" />
+                <span>
+                    <strong>CSV</strong>
+                    <span class="muted small">For other services' importers and spreadsheets: each song's artist, title, album, length, ISRC and MusicBrainz ID.</span>
+                </span>
+            </label>
+            @if (_format == PlaylistExportFormat.M3u8)
+            {
+                <div class="field">
+                    <label class="field-label" for="export-prefix">Where the music folder is, where the playlists will be opened</label>
+                    <input id="export-prefix" type="text" placeholder="Leave empty for paths in the music folder, such as Artist/Album/01 Song.flac" @bind="_prefix" @bind:event="oninput" />
+                    <div class="muted small">Such as <code>/mnt/music</code> or <code>D:\Music</code>. Left empty, a playlist works from the music folder itself.</div>
+                </div>
+            }
+            <label class="check">
+                <input type="checkbox" checked="@_keepMissing" @onchange="e => _keepMissing = (bool)e.Value!" />
+                Keep songs you don't have, by name only@(_format == PlaylistExportFormat.M3u8 ? ", for importers that match by name" : "")
+            </label>
+            <div class="toolbar">
+                @if (_chosen.Count == 0)
+                {
+                    <button class="primary" disabled>Download</button>
+                }
+                else
+                {
+                    <a class="button primary" href="@PlaylistLink" download>Download @(_chosen.Count == 1 ? "it" : $"{_chosen.Count} as a zip")</a>
+                }
+            </div>
+        </div>
+    }
+}
+else
+{
+    <h2 class="section">A row for each</h2>
+    <div class="toolbar">
+        <Segmented T="LibraryExportRows" Value="_rows" Options="Rows" OnChange="SetRows" Label="A row for each" />
+    </div>
+    <h2 class="section">Columns</h2>
+    <div class="export-columns">
+        @foreach (var column in LibraryExportColumns.For(_rows))
+        {
+            <label class="toggle" @key="column">
+                <input type="checkbox" checked="@_columns.Contains(column)" @onchange="e => ToggleColumn(column, (bool)e.Value!)" />
+                @LibraryExportColumns.Name(column)
+            </label>
+        }
+    </div>
+    <p class="muted small">@(_rows == LibraryExportRows.Songs
+        ? "Every song you have, matched or your own. Paths are in the music folder."
+        : "Every album you have some of, with how much of it you have.")</p>
+    <div class="toolbar">
+        @if (_columns.Count == 0)
+        {
+            <button class="primary" disabled>Download</button>
+        }
+        else
+        {
+            <a class="button primary" href="@LibraryLink" download>Download the CSV</a>
+        }
+    </div>
+}
+
+@code {
+    private static readonly IReadOnlyList<(bool Value, string Label, string? Hint)> Kinds =
+        [(false, "Playlists", "Your playlists, as M3U8 or CSV"), (true, "Library", "The library, as CSV")];
+
+    private static readonly IReadOnlyList<(LibraryExportRows Value, string Label, string? Hint)> Rows =
+        [(LibraryExportRows.Songs, "Song", null), (LibraryExportRows.Albums, "Album", null)];
+
+    [SupplyParameterFromQuery(Name = "playlist")] public Guid? Playlist { get; set; }
+
+    private bool _library, _keepMissing;
+    private IReadOnlyList<PlaylistSummary>? _playlists;
+    private HashSet<Guid> _chosen = [];
+    private PlaylistExportFormat _format = PlaylistExportFormat.M3u8;
+    private string _prefix = "";
+    private string? _error;
+    private LibraryExportRows _rows = LibraryExportRows.Songs;
+    private HashSet<LibraryExportColumn> _columns = LibraryExportColumns.For(LibraryExportRows.Songs).ToHashSet();
+
+    private string PlaylistLink => MelodexClient.PlaylistExportUrl(_playlists!.Where(p => _chosen.Contains(p.Id)).Select(p => p.Id).ToList(), _format, _keepMissing,
+        _format == PlaylistExportFormat.M3u8 ? _prefix : null);
+
+    private string LibraryLink => MelodexClient.LibraryExportUrl(_rows, LibraryExportColumns.For(_rows).Where(_columns.Contains).ToList());
+
+    protected override async Task OnInitializedAsync()
+    {
+        _library = !Auth.May(UserPermissions.Listen);
+        if (_library)
+            return;
+        try
+        {
+            _playlists = (await Api.ListPlaylistsAsync()).OrderBy(p => p.Name, StringComparer.CurrentCultureIgnoreCase).ToList();
+            // From a playlist's page, that one's chosen; otherwise all of them.
+            _chosen = Playlist is { } one && _playlists.Any(p => p.Id == one) ? [one] : _playlists.Select(p => p.Id).ToHashSet();
+        }
+        catch (Exception e)
+        {
+            _error = $"Couldn't load your playlists: {e.Message}";
+        }
+    }
+
+    private void ChooseAll(bool all) => _chosen = all ? _playlists!.Select(p => p.Id).ToHashSet() : [];
+
+    private void Choose(Guid id, bool chosen)
+    {
+        if (chosen)
+            _chosen.Add(id);
+        else
+            _chosen.Remove(id);
+    }
+
+    private void SetRows(LibraryExportRows rows)
+    {
+        _rows = rows;
+        _columns = LibraryExportColumns.For(rows).ToHashSet();
+    }
+
+    private void ToggleColumn(LibraryExportColumn column, bool on)
+    {
+        if (on)
+            _columns.Add(column);
+        else
+            _columns.Remove(column);
+    }
+}

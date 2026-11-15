@@ -165,6 +165,72 @@ public sealed class ImportTests : IDisposable
         Assert.Equal("Pasted list", (await _api.GetPlaylistAsync(applied.PlaylistId.Value))!.Playlist.Name);
     }
 
+    // ---- Exporting ----
+
+    [Fact]
+    public void An_m3u_line_with_no_path_is_a_song_by_name()
+    {
+        const string m3u = "#EXTM3U\n#EXTINF:305,Portishead - Glory Box\n#EXTALB:Dummy\n#EXTINF:-1,Portishead - Hunter\n#EXTINF:240,Daft Punk - Digital Love\nDaft Punk/Discovery/03 Digital Love.flac\n";
+        Assert.Equal(
+            [new ImportSong("Glory Box", "Portishead", "Dummy", 305), new ImportSong("Hunter", "Portishead", null, null),
+             new ImportSong("Digital Love", "Daft Punk", "Discovery", 240, Path: "Daft Punk/Discovery/03 Digital Love.flac")],
+            ListParser.Read(m3u, ImportFormat.M3u, null, null));
+    }
+
+    [TestLibraryFact]
+    public async Task Playlists_export_as_m3u8_or_csv_and_read_back_as_imports()
+    {
+        await ScanAsync();
+        var import = await _api.CreateImportAsync(new CreateImport("Portishead - Glory Box\nPortishead - Hunter\n", Name: "Evening"));
+        var detail = await MatchedAsync(import.Id);
+        Assert.Equal([ImportOutcome.Owned, ImportOutcome.Found], detail.Lines.Select(l => l.Outcome));
+        var playlist = (await _api.ApplyImportAsync(import.Id, new ApplyImport(Name: "Evening", RequestMissing: false))).PlaylistId!.Value;
+
+        // Only what you have, by its path in the music folder, or under another machine's.
+        var m3u = Text(await _api.ExportPlaylistsAsync([playlist]));
+        var path = Assert.Single(m3u.Split('\n'), l => l.Length > 0 && !l.StartsWith('#'));
+        Assert.Matches(@"^Portishead/.*Glory Box.*\.\w+$", path);
+        Assert.Contains("#EXTINF:", m3u);
+        Assert.Contains("Portishead - Glory Box", m3u);
+        Assert.DoesNotContain("Hunter", m3u);
+        Assert.Contains($"/mnt/music/{path}", Text(await _api.ExportPlaylistsAsync([playlist], prefix: "/mnt/music/")));
+
+        // Songs not had kept by name, which reads back.
+        var kept = ListParser.Read(Text(await _api.ExportPlaylistsAsync([playlist], keepMissing: true)), ImportFormat.M3u, null, null);
+        Assert.Equal([("Glory Box", true), ("Hunter", false)], kept.Select(s => (s.Title, s.Path is not null)));
+
+        // A CSV's columns are the ones the import knows.
+        var csv = Text(await _api.ExportPlaylistsAsync([playlist], PlaylistExportFormat.Csv, keepMissing: true));
+        var peek = ListParser.Peek(csv, "Evening.csv");
+        Assert.Equal([ImportColumn.Artist, ImportColumn.Title, ImportColumn.Album, ImportColumn.Length, ImportColumn.Isrc, ImportColumn.MusicBrainzId], peek.Guess);
+        Assert.Equal(["Glory Box", "Hunter"], peek.Sample.Select(s => s.Title));
+        Assert.Equal("Dummy", peek.Sample[0].Album);
+        Assert.NotNull(peek.Sample[0].DurationSeconds);
+
+        // Several make a zip.
+        var other = (await _api.CreatePlaylistAsync(new CreatePlaylist("Folder/Morning"))).Playlist.Id;
+        using var zip = new System.IO.Compression.ZipArchive(new MemoryStream(await _api.ExportPlaylistsAsync([playlist, other])));
+        Assert.Equal(["Evening.m3u8", "Folder/Morning.m3u8"], zip.Entries.Select(e => e.FullName).Order());
+    }
+
+    [TestLibraryFact]
+    public async Task The_library_exports_as_a_csv_of_songs_or_albums()
+    {
+        await ScanAsync();
+        var tracks = await _api.GetLibraryTracksAsync();
+        var songs = Text(await _api.ExportLibraryAsync(LibraryExportRows.Songs)).TrimEnd().Split("\r\n");
+        Assert.Equal("Artist,Album,Title,Year,Disc,Track number,Length,Path,Format,Quality,ISRC,MusicBrainz ID", songs[0]);
+        Assert.Equal(tracks.Count, songs.Length - 1);
+
+        var albums = Text(await _api.ExportLibraryAsync(LibraryExportRows.Albums, [LibraryExportColumn.Album, LibraryExportColumn.Owned, LibraryExportColumn.Title]))
+            .TrimEnd().Split("\r\n");
+        Assert.Equal("Album,Owned", albums[0]);
+        Assert.Contains("Dummy,All", albums);
+        Assert.Contains(albums, a => a.StartsWith("Portishead,") && a.Contains(" of "));
+    }
+
+    private static string Text(byte[] bytes) => System.Text.Encoding.UTF8.GetString(bytes);
+
     private async Task<ImportDetail> MatchedAsync(Guid id)
     {
         var deadline = DateTime.UtcNow + TimeSpan.FromMinutes(2);
