@@ -121,6 +121,16 @@ again.
 them, or add them to your library or delete them now from their ⋯ menus. Every fetch, and any that couldn't be found,
 is under **Activity → Downloads**.
 
+## Wishlist
+
+**Library → Wishlist** keeps songs and albums you'd like but don't have, each user their own. Add one from its ⋯ menu,
+**Add to your wishlist**. While no retriever is turned on, nothing can fetch, so the **Listen** buttons become a star
+that adds it to your wishlist or takes it off.
+
+The wishlist can be filtered and sorted, newest first by default. Once a retriever is on, each has **Listen** and
+**Get** beside it. A song leaves the wishlist by itself once your library has it, and an album once you have all of it.
+An album goes on as one entry, so getting it from there gets the whole album.
+
 ## The player
 
 Play, queue and skip from any album, artist or track. While something's playing, the queue button asks where: **Play

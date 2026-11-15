@@ -1,0 +1,65 @@
+@implements IDisposable
+@inject WishlistStore Wishlist
+@inject AuthState Auth
+
+@*
+    A song or album's Listen now button while something can fetch it; while nothing can, a button that puts it on your
+    wishlist instead, or takes it off.
+*@
+@if (Wishlist.CanFetch)
+{
+    @ChildContent
+}
+else if (Auth.May(UserPermissions.Listen))
+{
+    var wished = Wishlist.Contains(Id);
+    <IconButton Icon="@(wished ? "wished" : "wish")" On="wished" Large="Large" Disabled="_busy"
+                Label="@(Labelled ? wished ? "On your wishlist" : "Add to wishlist" : null)"
+                Title="@(wished ? "On your wishlist: take it off" : "Add to your wishlist, to get when something can fetch it")" OnClick="ToggleAsync" />
+}
+
+@code {
+    [Parameter, EditorRequired] public RequestKind Kind { get; set; }
+
+    /// <summary>The track or album.</summary>
+    [Parameter, EditorRequired] public Guid Id { get; set; }
+
+    [Parameter] public Guid? EditionId { get; set; }
+
+    [Parameter] public bool Large { get; set; }
+
+    /// <summary>Says what it does beside its star, as a large button with a label does.</summary>
+    [Parameter] public bool Labelled { get; set; }
+
+    /// <summary>The Listen now button, shown while something can fetch.</summary>
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    private bool _busy;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Wishlist.Changed += OnChanged;
+        await Wishlist.EnsureLoadedAsync();
+    }
+
+    private void OnChanged() => InvokeAsync(StateHasChanged);
+
+    private async Task ToggleAsync()
+    {
+        _busy = true;
+        try
+        {
+            if (Wishlist.Contains(Id))
+                await Wishlist.RemoveAsync(Id);
+            else
+                await Wishlist.AddAsync(Kind, Id, EditionId);
+        }
+        catch (Exception e) when (e is HttpRequestException or MelodexApiException)
+        {
+            // It stays as it was, which the button shows.
+        }
+        _busy = false;
+    }
+
+    public void Dispose() => Wishlist.Changed -= OnChanged;
+}

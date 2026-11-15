@@ -97,8 +97,10 @@ else
                 else if (!track.Ignored)
                 {
                     <FetchButton Kind="RequestKind.Track" Id="track.Id" EditionId="edition?.EditionId" Large="true" Label="Get track" Hint="Get it into your library">
-                        <IconButton Icon="listen" Requires="@UserPermissions.Listen" Large="true" Label="Listen now" Title="Fetch it to play now, without adding it to your library"
-                                    OnClick="() => Player.ListenAsync(track.Id, edition?.EditionId)" />
+                        <WishButton Kind="RequestKind.Track" Id="track.Id" EditionId="edition?.EditionId" Large="true" Labelled="true">
+                            <IconButton Icon="listen" Requires="@UserPermissions.Listen" Large="true" Label="Listen now" Title="Fetch it to play now, without adding it to your library"
+                                        OnClick="() => Player.ListenAsync(track.Id, edition?.EditionId)" />
+                        </WishButton>
                     </FetchButton>
                 }
             </div>

@@ -1267,6 +1267,36 @@ namespace Melodex.Core.Data.Migrations
                     b.ToTable("WebhookDeliveries");
                 });
 
+            modelBuilder.Entity("Melodex.Core.Data.WishlistEntry", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("AddedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("EditionId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("TargetId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "TargetId")
+                        .IsUnique();
+
+                    b.ToTable("WishlistEntries");
+                });
+
             modelBuilder.Entity("Melodex.Core.Data.Album", b =>
                 {
                     b.HasOne("Melodex.Core.Data.Artist", "Artist")
@@ -1468,6 +1498,15 @@ namespace Melodex.Core.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("Webhook");
+                });
+
+            modelBuilder.Entity("Melodex.Core.Data.WishlistEntry", b =>
+                {
+                    b.HasOne("Melodex.Core.Data.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Melodex.Core.Data.Album", b =>

@@ -91,6 +91,7 @@ public partial class MelodexDbContext(DbContextOptions<MelodexDbContext> options
     public DbSet<Playlist> Playlists => Set<Playlist>();
     public DbSet<PlaylistEntry> PlaylistEntries => Set<PlaylistEntry>();
     public DbSet<PlaylistFolder> PlaylistFolders => Set<PlaylistFolder>();
+    public DbSet<WishlistEntry> WishlistEntries => Set<WishlistEntry>();
     public DbSet<ListImport> Imports => Set<ListImport>();
     public DbSet<ImportLine> ImportLines => Set<ImportLine>();
 
@@ -212,6 +213,12 @@ public partial class MelodexDbContext(DbContextOptions<MelodexDbContext> options
         {
             e.HasOne<User>().WithMany().HasForeignKey(f => f.UserId).OnDelete(DeleteBehavior.Cascade);
             e.HasIndex(f => new { f.UserId, f.Path }).IsUnique();
+        });
+
+        modelBuilder.Entity<WishlistEntry>(e =>
+        {
+            e.HasOne<User>().WithMany().HasForeignKey(w => w.UserId).OnDelete(DeleteBehavior.Cascade);
+            e.HasIndex(w => new { w.UserId, w.TargetId }).IsUnique();
         });
 
         modelBuilder.Entity<PlaylistEntry>(e =>
