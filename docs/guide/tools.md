@@ -44,6 +44,28 @@ Then say what to do with them:
 
 Your imports are listed on the Tools page, newest first. Deleting one leaves its playlist and requests as they are.
 
+## Importing from Spotify
+
+**Import from Spotify** reads the copy of your data Spotify gives you, so your playlists, liked songs and saved albums
+come across. It needs no Spotify account linked to Melodex.
+
+To get the copy, sign in on Spotify's website, open **Account → Privacy settings**, tick **Account data** (the extended
+streaming history isn't needed) and ask for it. Spotify emails a link to a zip, usually within a few days.
+
+Choose the zip, or the JSON files from it (`YourLibrary.json` and the `Playlist` files), and Melodex lists what's in it:
+your liked songs, saved albums and each playlist, with how many songs each has. Untick any you don't want, choose the
+folder the playlists go in (`Spotify/` to start with), and what liked songs' playlist is called.
+
+Each list is then matched as a list import is, by its songs' titles, artists and albums (Spotify's export has no lengths
+or ISRCs, so it's worth checking the matches). Open any of them to check it, choose another song or leave one out, then
+**Apply** them all: each playlist and your liked songs become playlists, and saved albums you don't have can be asked
+for. Songs you don't have hold their places in the playlists, and songs not found can wait in Review, as with a list
+import. Followed artists aren't imported.
+
+**Importing again updates.** Melodex knows each playlist by its name on Spotify, and each song by Spotify's ID for it,
+so a later export brings only what's new since: new songs go on the end of the playlist made the first time, and a list
+with nothing new is shown as such and left out. Songs taken off a playlist on Spotify stay in Melodex's.
+
 ## Exporting
 
 **Export** gets your playlists and library out of Melodex, as files to save.

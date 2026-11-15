@@ -44,20 +44,7 @@ public sealed class ImportService(MelodexDbContext db, TaskQueue queue, Playlist
 
         var import = new ListImport { UserId = userId, Name = name, Source = (Data.ImportSource)(int)format };
         for (var i = 0; i < songs.Count; i++)
-        {
-            var song = songs[i];
-            import.Lines.Add(new ImportLine
-            {
-                Position = i,
-                Title = Clip(song.Title, 500)!,
-                Artist = Clip(song.Artist, 500),
-                Album = Clip(song.Album, 500),
-                DurationSeconds = song.DurationSeconds,
-                Isrc = Clip(song.Isrc, 20),
-                MusicBrainzId = Clip(song.MusicBrainzId, 36),
-                Path = Clip(song.Path, 2000),
-            });
-        }
+            import.Lines.Add(Line(i, songs[i], null));
         db.Imports.Add(import);
         await db.SaveChangesAsync(ct);
         var task = await queue.EnqueueAsync(ImportTask.TaskKind, JsonSerializer.Serialize(import.Id), ct);
@@ -88,7 +75,11 @@ public sealed class ImportService(MelodexDbContext db, TaskQueue queue, Playlist
         if (line.Import.Status == ImportStatus.Applied)
             throw new ImportRefusedException("import", "It's been applied already.");
         if (body.TrackId is { } trackId)
+        {
+            if (line.Import.Albums)
+                throw new ImportRefusedException("trackId", "An album can only be left out or put back.");
             await ChooseAsync(line, trackId, ct);
+        }
         if (body.Dropped is true)
             line.Outcome = ImportOutcome.Dropped;
         else if (body.Dropped is false && line.Outcome == ImportOutcome.Dropped)
@@ -110,12 +101,25 @@ public sealed class ImportService(MelodexDbContext db, TaskQueue queue, Playlist
             throw new ImportRefusedException("import", "Its songs are still being matched.");
         if (import.Status == ImportStatus.Applied)
             throw new ImportRefusedException("import", "It's been applied already.");
-        if (body.Playlist != ImportPlaylistMode.None && !mayPlaylist)
+        if (body.Playlist != ImportPlaylistMode.None && !mayPlaylist && !import.Albums)
             throw new ImportRefusedException("playlist", "You need the Listen permission to make playlists.");
 
         var lines = import.Lines.OrderBy(l => l.Position).ToList();
-        var wanted = lines.Where(l => l.Outcome is ImportOutcome.Found or ImportOutcome.Unsure && l.TrackId is not null).ToList();
         var requested = 0;
+        if (import.Albums)
+        {
+            // Albums aren't put in a playlist: those found are requested, and the rest left as they are.
+            if (body.RequestMissing)
+                foreach (var albumId in lines.Where(l => l.Outcome is ImportOutcome.Found or ImportOutcome.Unsure).Select(l => l.AlbumId).OfType<Guid>().Distinct())
+                    if ((await requests.CreateAsync(new CreateRequest(RequestKind.Album, albumId), requester, ct)).Request is not null)
+                        requested++;
+            import.Status = ImportStatus.Applied;
+            import.AppliedAt = DateTime.UtcNow;
+            import.RequestMissing = body.RequestMissing;
+            await db.SaveChangesAsync(ct);
+            return new ImportApplied(null, 0, requested, 0);
+        }
+        var wanted = lines.Where(l => l.Outcome is ImportOutcome.Found or ImportOutcome.Unsure && l.TrackId is not null).ToList();
         if (body.RequestMissing)
             foreach (var trackId in wanted.Select(l => l.TrackId!.Value).Distinct())
                 if ((await requests.CreateAsync(new CreateRequest(RequestKind.Track, trackId), requester, ct)).Request is not null)
@@ -146,6 +150,147 @@ public sealed class ImportService(MelodexDbContext db, TaskQueue queue, Playlist
         import.RequestMissing = body.RequestMissing;
         await db.SaveChangesAsync(ct);
         return new ImportApplied(playlistId, placed.Count, requested, toReview);
+    }
+
+    // ---- Services' exports ----
+
+    /// <summary>The most a service's export may be: 30 MB.</summary>
+    public const int MaxExport = 30 * 1024 * 1024;
+
+    /// <summary>What a service's export holds, with what each list adds to an earlier import of it.</summary>
+    public async Task<ServicePeek> PeekServiceAsync(Guid userId, IReadOnlyList<(string Name, byte[] Bytes)> files, CancellationToken ct)
+    {
+        var export = ReadExport(files);
+        var lists = new List<ServiceList>();
+        foreach (var list in export.Lists)
+        {
+            var before = await EarlierAsync(userId, export.Service, list, ct);
+            lists.Add(new ServiceList(list.Key, list.Name, list.Kind, list.Items.Count, list.Items.Take(5).Select(i => i.Song).ToList(),
+                before.PlaylistId, before.PlaylistName, list.Items.Count(i => i.Id is null || !before.Known.Contains(i.Id))));
+        }
+        return new ServicePeek(export.Service, lists);
+    }
+
+    /// <summary>
+    /// Imports the chosen lists of a service's export, one import each, matched in the background. A list imported
+    /// before brings only what's new since, to add to the playlist it made; one with nothing new is left out.
+    /// </summary>
+    public async Task<ImportBatch> CreateServiceAsync(Guid userId, IReadOnlyList<(string Name, byte[] Bytes)> files, CreateServiceImport body, CancellationToken ct)
+    {
+        var export = ReadExport(files);
+        var chosen = export.Lists.Where(l => body.Lists.Contains(l.Key)).ToList();
+        if (chosen.Count == 0)
+            throw new ImportRefusedException("lists", "Choose something to import.");
+        var batch = Guid.CreateVersion7();
+        var made = new List<ListImport>();
+        var unchanged = 0;
+        foreach (var list in chosen)
+        {
+            var name = ImportName(list, body.Folder, body.LikedName);
+            var before = await EarlierAsync(userId, export.Service, list, ct);
+            var items = list.Items.Where(i => i.Id is null || !before.Known.Contains(i.Id)).ToList();
+            if (items.Count == 0)
+            {
+                unchanged++;
+                continue;
+            }
+            var import = new ListImport
+            {
+                UserId = userId, Name = name, Source = (Data.ImportSource)(int)export.Service, BatchId = batch,
+                ServiceList = list.Key, Albums = list.Kind == ServiceListKind.Albums, UpdatesPlaylistId = before.PlaylistId,
+            };
+            for (var i = 0; i < items.Count; i++)
+                import.Lines.Add(Line(i, items[i].Song, items[i].Id));
+            db.Imports.Add(import);
+            made.Add(import);
+        }
+        await db.SaveChangesAsync(ct);
+        foreach (var import in made)
+            import.TaskId = (await queue.EnqueueAsync(ImportTask.TaskKind, JsonSerializer.Serialize(import.Id), ct)).Id;
+        await db.SaveChangesAsync(ct);
+        return new ImportBatch(batch, await SummariesAsync(db.Imports.Where(i => i.BatchId == batch), ct), unchanged);
+    }
+
+    /// <summary>The imports made together from one export.</summary>
+    public async Task<ImportBatch?> BatchAsync(Guid userId, Guid batchId, CancellationToken ct)
+    {
+        var imports = await SummariesAsync(db.Imports.Where(i => i.BatchId == batchId && i.UserId == userId), ct);
+        return imports.Count == 0 ? null : new ImportBatch(batchId, imports.OrderBy(i => i.Albums).ThenBy(i => i.Name, StringComparer.CurrentCultureIgnoreCase).ToList());
+    }
+
+    /// <summary>
+    /// Applies every import of a batch that's ready: each list's songs make its playlist, or are added to the one an
+    /// earlier import of it made; albums are requested.
+    /// </summary>
+    public async Task<ImportBatchApplied?> ApplyBatchAsync(Guid userId, string requester, bool mayPlaylist, Guid batchId, ApplyImportBatch body, CancellationToken ct)
+    {
+        var imports = await db.Imports.AsNoTracking().Where(i => i.BatchId == batchId && i.UserId == userId).ToListAsync(ct);
+        if (imports.Count == 0)
+            return null;
+        if (imports.Any(i => i.Status == ImportStatus.Matching))
+            throw new ImportRefusedException("import", "Some are still being matched.");
+        var (applied, added, requested, toReview) = (0, 0, 0, 0);
+        foreach (var import in imports.Where(i => i.Status == ImportStatus.Ready))
+        {
+            var updates = import.UpdatesPlaylistId is { } existing && await db.Playlists.AnyAsync(p => p.Id == existing && p.UserId == userId && p.DeletedAt == null, ct);
+            var mode = import.Albums || !mayPlaylist ? ImportPlaylistMode.None : updates ? ImportPlaylistMode.Existing : ImportPlaylistMode.New;
+            if (await ApplyAsync(userId, requester, mayPlaylist, import.Id,
+                    new ApplyImport(mode, import.Name, updates ? import.UpdatesPlaylistId : null, body.RequestMissing, body.NotFoundToReview), ct) is not { } done)
+                continue;
+            applied++;
+            added += done.Added;
+            requested += done.Requested;
+            toReview += done.ToReview;
+        }
+        return new ImportBatchApplied(applied, added, requested, toReview);
+    }
+
+    private static ServiceExport ReadExport(IReadOnlyList<(string Name, byte[] Bytes)> files)
+    {
+        if (files.Count == 0)
+            throw new ImportRefusedException("files", "Choose the export's zip, or the files from it.");
+        if (files.Sum(f => (long)f.Bytes.Length) > MaxExport)
+            throw new ImportRefusedException("files", "Keep it to 30 MB. If it's bigger, choose only the files with your library and playlists in.");
+        try
+        {
+            return ServiceExports.Read(files)
+                ?? throw new ImportRefusedException("files", "That isn't an export Melodex can read. Choose the zip the service sent, or the files from it.");
+        }
+        catch (InvalidDataException)
+        {
+            throw new ImportRefusedException("files", "That zip couldn't be opened.");
+        }
+    }
+
+    // What an import of a list is called: its playlist's name, under the folder chosen.
+    private static string ImportName(ServiceListData list, string? folder, string? likedName)
+    {
+        var name = list.Kind switch
+        {
+            ServiceListKind.Liked => likedName?.Trim() is { Length: > 0 } liked ? liked : list.Name,
+            _ => list.Name,
+        };
+        var full = list.Kind == ServiceListKind.Albums ? name : $"{folder?.TrimStart() ?? ""}{name}";
+        return full.Length > PlaylistService.MaxName ? full[..PlaylistService.MaxName] : full;
+    }
+
+    // An earlier import of the same list (known by its name on the service), from the same service: the playlist it made, if it's still there, and the IDs of
+    // everything in it and those before it.
+    private async Task<(Guid? PlaylistId, string? PlaylistName, HashSet<string> Known)> EarlierAsync(Guid userId, ImportFormat service, ServiceListData list,
+        CancellationToken ct)
+    {
+        var source = (Data.ImportSource)(int)service;
+        var albums = list.Kind == ServiceListKind.Albums;
+        var earlier = db.Imports.Where(i => i.UserId == userId && i.Source == source && i.ServiceList == list.Key && (!albums || i.Status == ImportStatus.Applied));
+        var known = (await db.ImportLines.Where(l => earlier.Any(i => i.Id == l.ImportId) && l.ExternalId != null).Select(l => l.ExternalId!).ToListAsync(ct))
+            .ToHashSet(StringComparer.Ordinal);
+        if (albums)
+            return (null, null, known);
+        var playlist = await earlier.Where(i => i.PlaylistId != null).OrderByDescending(i => i.AppliedAt)
+            .Join(db.Playlists.Where(p => p.UserId == userId && p.DeletedAt == null), i => i.PlaylistId, p => p.Id, (i, p) => new { p.Id, p.Name })
+            .FirstOrDefaultAsync(ct);
+        // Only what made it into a playlist that's still there counts as imported.
+        return playlist is null ? (null, null, []) : (playlist.Id, playlist.Name, known);
     }
 
     public async Task<bool> DeleteAsync(Guid userId, Guid id, CancellationToken ct)
@@ -224,6 +369,9 @@ public sealed class ImportService(MelodexDbContext db, TaskQueue queue, Playlist
     // What a line is by its match: owned, found or not sure of, or not found.
     private async Task<ImportOutcome> OutcomeAsync(ImportLine line, CancellationToken ct) => line switch
     {
+        { AlbumId: { } album } when await db.LibraryFiles.AnyAsync(f => f.EditionId != null && f.Edition!.AlbumId == album && f.HiddenAt == null, ct) => ImportOutcome.Owned,
+        { AlbumId: not null, Confidence: >= ImportMatcher.Sure } => ImportOutcome.Found,
+        { AlbumId: not null } => ImportOutcome.Unsure,
         { FileId: not null } => ImportOutcome.Owned,
         { TrackId: { } track } when await db.LibraryFiles.AnyAsync(f => f.TrackId == track && f.HiddenAt == null, ct) => ImportOutcome.Owned,
         { TrackId: not null, Confidence: >= ImportMatcher.Sure } => ImportOutcome.Found,
@@ -255,13 +403,19 @@ public sealed class ImportService(MelodexDbContext db, TaskQueue queue, Playlist
         var listed = trackIds.Count == 0 ? [] : (await db.EditionTracks.AsNoTracking().Where(et => trackIds.Contains(et.TrackId))
                 .Select(et => new { et.TrackId, et.EditionId, et.Edition.AlbumId, et.Edition.Album.Title, et.Edition.Album.FirstReleaseDate }).ToListAsync(ct))
             .GroupBy(x => x.TrackId).ToDictionary(g => g.Key, g => g.OrderBy(x => x.FirstReleaseDate ?? "9999").First());
+        var albumIds = lines.Select(l => l.AlbumId).OfType<Guid>().Distinct().ToList();
+        var albums = albumIds.Count == 0 ? [] : await db.Albums.AsNoTracking().Where(a => albumIds.Contains(a.Id))
+            .Select(a => new { a.Id, a.Title, a.ArtistCredit, a.ArtistId }).ToDictionaryAsync(a => a.Id, ct);
         var files = fileIds.Count == 0 ? [] : await db.LibraryFiles.AsNoTracking().Where(f => fileIds.Contains(f.Id))
             .Select(f => new { f.Id, f.TagsJson, f.Path, f.Duration }).ToDictionaryAsync(f => f.Id, ct);
 
         var matches = new Dictionary<Guid, ImportMatch>();
         foreach (var line in lines)
         {
-            if (line.TrackId is { } trackId && tracks.TryGetValue(trackId, out var track))
+            if (line.AlbumId is { } albumMatch && albums.TryGetValue(albumMatch, out var matchedAlbum))
+                matches[line.Id] = new ImportMatch(null, null, matchedAlbum.Title, matchedAlbum.ArtistCredit, matchedAlbum.ArtistId, matchedAlbum.Id, null,
+                    LibraryView.CoverUrl(matchedAlbum.Id, null), null);
+            else if (line.TrackId is { } trackId && tracks.TryGetValue(trackId, out var track))
             {
                 var (albumId, editionId, album) = owned.TryGetValue(trackId, out var mine) ? (mine.AlbumId, mine.EditionId, mine.Title)
                     : listed.TryGetValue(trackId, out var on) ? (on.AlbumId, (Guid?)on.EditionId, on.Title)
@@ -291,13 +445,14 @@ public sealed class ImportService(MelodexDbContext db, TaskQueue queue, Playlist
         var counts = (await db.ImportLines.Where(l => ids.Contains(l.ImportId)).GroupBy(l => new { l.ImportId, l.Outcome, l.InReview })
                 .Select(g => new { g.Key.ImportId, g.Key.Outcome, g.Key.InReview, Count = g.Count() }).ToListAsync(ct))
             .ToLookup(c => c.ImportId);
-        var playlistIds = rows.Select(i => i.PlaylistId).OfType<Guid>().Distinct().ToList();
+        var playlistIds = rows.Select(i => i.PlaylistId).Concat(rows.Select(i => i.UpdatesPlaylistId)).OfType<Guid>().Distinct().ToList();
         var names = await db.Playlists.Where(p => playlistIds.Contains(p.Id) && p.DeletedAt == null).ToDictionaryAsync(p => p.Id, p => p.Name, ct);
         return rows.Select(i => new ImportSummary(i.Id, i.Name, (ImportFormat)(int)i.Source, (ImportState)(int)i.Status,
                 i.CreatedAt, i.AppliedAt, counts[i.Id].Sum(c => c.Count),
                 counts[i.Id].GroupBy(c => c.Outcome).ToDictionary(g => (Client.ImportOutcome)(int)g.Key, g => g.Sum(c => c.Count)),
                 i.PlaylistId is { } p && names.ContainsKey(p) ? p : null, i.PlaylistId is { } q ? names.GetValueOrDefault(q) : null,
-                i.TaskId, counts[i.Id].Where(c => c.InReview).Sum(c => c.Count)))
+                i.TaskId, counts[i.Id].Where(c => c.InReview).Sum(c => c.Count), i.BatchId, i.Albums,
+                i.UpdatesPlaylistId is { } u && names.ContainsKey(u) ? u : null, i.UpdatesPlaylistId is { } v ? names.GetValueOrDefault(v) : null))
             .ToList();
     }
 
@@ -309,6 +464,19 @@ public sealed class ImportService(MelodexDbContext db, TaskQueue queue, Playlist
             throw new ImportRefusedException("text", "Keep a list to 10 MB.");
         return text;
     }
+
+    private static ImportLine Line(int position, ImportSong song, string? externalId) => new()
+    {
+        Position = position,
+        Title = Clip(song.Title, 500)!,
+        Artist = Clip(song.Artist, 500),
+        Album = Clip(song.Album, 500),
+        DurationSeconds = song.DurationSeconds,
+        Isrc = Clip(song.Isrc, 20),
+        MusicBrainzId = Clip(song.MusicBrainzId, 36),
+        Path = Clip(song.Path, 2000),
+        ExternalId = Clip(externalId, 500),
+    };
 
     private static string? Clip(string? text, int length) => text is null ? null : text.Length > length ? text[..length] : text;
 }

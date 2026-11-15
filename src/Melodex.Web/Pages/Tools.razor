@@ -21,6 +21,16 @@
                 </span>
             </span>
         </a>
+        <a class="card tool-card" href="tools/import/service">
+            <Icon Name="import" />
+            <span>
+                <strong>Import from Spotify</strong>
+                <span class="muted small">
+                    The copy of your data Spotify sends you: your playlists and liked songs become playlists here, and saved albums can be
+                    asked for. Importing it again later brings only what's new.
+                </span>
+            </span>
+        </a>
     }
     <a class="card tool-card" href="tools/export">
         <Icon Name="export" />
@@ -61,7 +71,7 @@
                             <td>
                                 <div class="ellipsis"><a href="tools/import/@import.Id">@import.Name</a></div>
                                 <div class="muted small ellipsis">
-                                    @Format.Count(import.Total, "song", "songs") · @FormatName(import.Format) · @Format.Ago(import.CreatedAt)
+                                    @Format.Count(import.Total, import.Albums ? "album" : "song", import.Albums ? "albums" : "songs") · @FormatName(import.Format) · @Format.Ago(import.CreatedAt)
                                     @if (import.PlaylistId is { } playlist) { <span> · made <a class="muted" href="playlists/@playlist">@import.PlaylistName</a></span> }
                                 </div>
                             </td>
@@ -114,6 +124,7 @@
     {
         ImportFormat.M3u => "M3U",
         ImportFormat.Csv => "CSV",
+        ImportFormat.Spotify => "Spotify",
         _ => "pasted",
     };
 

@@ -95,6 +95,73 @@ public sealed class ImportMatcher(MelodexDbContext db, CatalogueService catalogu
     }
 
     /// <summary>
+    /// Matches a saved album: one you have some of, by its title and artist, or else the closest the catalogues have.
+    /// </summary>
+    public async Task MatchAlbumAsync(ImportLine line, CancellationToken ct)
+    {
+        if (line.Outcome == ImportOutcome.Dropped)
+            return;
+        (line.AlbumId, line.Confidence) = (null, null);
+        var owned = _albums ??= await db.LibraryFiles.AsNoTracking().Where(f => f.EditionId != null && f.HiddenAt == null)
+            .Select(f => new OwnedAlbum(f.Edition!.AlbumId, f.Edition.Album.Title, f.Edition.Album.ArtistCredit)).Distinct().ToListAsync(ct);
+        var mine = owned.Select(a => (Album: a, Score: AlbumScore(line, a.Title, a.ArtistCredit))).MaxBy(a => a.Score);
+        if (mine.Score >= Sure)
+        {
+            (line.AlbumId, line.Confidence, line.Outcome) = (mine.Album.Id, mine.Score, ImportOutcome.Owned);
+            return;
+        }
+        if (!await catalogue.HasCatalogueAsync(ct))
+        {
+            line.Outcome = ImportOutcome.NotFound;
+            return;
+        }
+
+        (IndexAlbum Album, double Score)? best = null;
+        var indexes = await catalogue.IndexesAsync(ct);
+        for (var i = 0; i < indexes.Count && best is not { Score: >= Sure }; i++)
+        {
+            IndexSearchResults results;
+            try
+            {
+                results = await indexes[i].Plugin.SearchAsync(new IndexSearchQuery($"{line.Title} {line.Artist}".Trim(), new HashSet<SearchKind> { SearchKind.Album }, SearchSize), ct);
+            }
+            catch (Exception e) when (i > 0 && LibraryMatcher.IsUnavailable(e, ct))
+            {
+                logger.LogDebug(e, "{Catalogue} didn't answer for {Title}", indexes[i].Instance.Name, line.Title);
+                continue;
+            }
+            foreach (var hit in results.Albums)
+                if (AlbumScore(line, hit.Title, hit.ArtistCredit) is var score && (best is null || score > best.Value.Score))
+                    best = (hit, score);
+        }
+        if (best is not { Score: >= Close } found)
+        {
+            line.Outcome = ImportOutcome.NotFound;
+            return;
+        }
+        var album = await catalogue.ImportAlbumUnlessKnownAsync(found.Album, ct);
+        await db.SaveChangesAsync(ct);
+        line.AlbumId = album.Id;
+        line.Confidence = Math.Round(found.Score, 3);
+        line.Outcome = owned.Any(a => a.Id == album.Id) ? ImportOutcome.Owned : found.Score >= Sure ? ImportOutcome.Found : ImportOutcome.Unsure;
+    }
+
+    private sealed record OwnedAlbum(Guid Id, string Title, string ArtistCredit);
+
+    private List<OwnedAlbum>? _albums;
+
+    /// <summary>How alike an album and one named are: its title most, then its artist; another artist keeps it below sure.</summary>
+    public static double AlbumScore(ImportLine line, string title, string artistCredit)
+    {
+        var titles = TextMatch.Similarity(TextMatch.NormaliseAlbum(line.Title), TextMatch.NormaliseAlbum(title));
+        var artist = line.Artist is null ? 0.5 : TextMatch.ArtistSimilarity(line.Artist, artistCredit);
+        var score = 0.65 * titles + 0.35 * artist;
+        if (titles < 0.8 || artist < 0.5)
+            score = Math.Min(score, 0.6);
+        return Math.Round(score, 3);
+    }
+
+    /// <summary>
     /// How alike a song and a search hit are, from 0 to 1: the title counts most, then the artist, then the album. A
     /// length well out, a title that isn't close, or another artist keeps it below sure.
     /// </summary>

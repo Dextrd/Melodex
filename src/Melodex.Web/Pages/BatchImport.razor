@@ -1,0 +1,162 @@
+@page "/tools/import/batch/{Id:guid}"
+@implements IDisposable
+@inject MelodexClient Api
+@inject AuthState Auth
+
+<PageTitle>Import from Spotify · Melodex</PageTitle>
+
+@* The lists imported from one export, each matched as a list import is: open one to check its matches, then apply them all. *@
+<p class="small"><a href="tools">← Tools</a></p>
+<h1>Import from Spotify</h1>
+
+@if (_error is not null && _batch is null)
+{
+    <div class="empty card error">@_error</div>
+}
+else if (_batch is null)
+{
+    <Loading />
+}
+else
+{
+    var matching = _batch.Imports.Count(i => i.State == ImportState.Matching);
+    var ready = _batch.Imports.Where(i => i.State == ImportState.Ready).ToList();
+    @if (matching > 0)
+    {
+        var total = _batch.Imports.Sum(i => i.Total);
+        var done = _batch.Imports.Sum(i => i.Total - i.Counts.GetValueOrDefault(ImportOutcome.Pending));
+        <div class="notice">
+            Matching: @done of @total. <a href="activity/tasks">Watch it in Activity</a>
+            <div class="progress"><span style="width: @(total == 0 ? 0 : 100 * done / total)%"></span></div>
+        </div>
+    }
+    else if (_applied is { } applied)
+    {
+        <div class="notice">
+            Applied @Format.Count(applied.Imports, "list", "lists"): @Format.Count(applied.Added, "song", "songs") in playlists@(applied.Requested > 0 ? $", {applied.Requested} asked for" : "").
+            @if (applied.ToReview > 0) { <text> @Format.Count(applied.ToReview, "song waits", "songs wait") in </text><a href="review/couldnt-match">Review</a><text> to be matched.</text> }
+        </div>
+    }
+    else
+    {
+        <p class="muted">Open a list to check its matches, choosing another song or leaving one out, then apply them all.</p>
+    }
+
+    <div class="card">
+        <table class="table imports-table">
+            <colgroup><col /><col class="hide-narrow" /><col class="import-state-col" /></colgroup>
+            <tbody>
+                @foreach (var import in _batch.Imports)
+                {
+                    <tr @key="import.Id">
+                        <td>
+                            <div class="ellipsis"><a href="tools/import/@import.Id">@import.Name</a></div>
+                            <div class="muted small ellipsis">
+                                @Format.Count(import.Total, import.Albums ? "album" : "song", import.Albums ? "albums" : "songs") ·
+                                @if (import.PlaylistId is { } made) { <span>in <a class="muted" href="playlists/@made">@import.PlaylistName</a></span> }
+                                else if (import.Albums) { <span>@(import.State == ImportState.Applied ? "you don't have asked for, if chosen" : "to ask for those you don't have")</span> }
+                                else if (import.UpdatesPlaylistId is { } updates) { <span>new, to add to <a class="muted" href="playlists/@updates">@import.UpdatesPlaylistName</a></span> }
+                                else { <span>a new playlist</span> }
+                            </div>
+                        </td>
+                        <td class="hide-narrow muted small">@ImportCounts.Summary(import)</td>
+                        <td><span class="badge @(import.State switch { ImportState.Matching => "neutral", ImportState.Ready => "partial", _ => "owned" })">
+                            @(import.State switch { ImportState.Matching => "Matching", ImportState.Ready => "Ready to check", _ => "Done" })</span></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    @if (matching == 0 && ready.Count > 0)
+    {
+        var missing = ready.Sum(i => i.Counts.GetValueOrDefault(ImportOutcome.Found) + i.Counts.GetValueOrDefault(ImportOutcome.Unsure));
+        var notFound = ready.Where(i => !i.Albums).Sum(i => i.Counts.GetValueOrDefault(ImportOutcome.NotFound));
+        <h2 class="section">Apply them</h2>
+        <div class="import-apply">
+            @if (!Auth.May(UserPermissions.Listen))
+            {
+                <p class="muted small">Making playlists needs the Listen permission, so only what you don't have can be asked for.</p>
+            }
+            @if (missing > 0)
+            {
+                <label class="check">
+                    <input type="checkbox" checked="@_request" @onchange="e => _request = (bool)e.Value!" />
+                    Ask for the @Format.Count(missing, "song or album", "songs and albums") you don't have, to add to your library
+                </label>
+                <p class="muted small indent">In the playlists, songs hold their places until they arrive@(_request ? "" : "; a Get button on each asks for them later").</p>
+            }
+            @if (notFound > 0)
+            {
+                <label class="check">
+                    <input type="checkbox" checked="@_toReview" @onchange="e => _toReview = (bool)e.Value!" />
+                    Send the @Format.Count(notFound, "song", "songs") not found to Review, to match there; otherwise they're left out
+                </label>
+            }
+            <div class="toolbar">
+                <button class="primary" disabled="@_busy" @onclick="ApplyAsync">@if (_busy) { <span class="spinner"></span> }Apply @Format.Count(ready.Count, "list", "lists")</button>
+                @if (_error is not null) { <span class="error small">@_error</span> }
+            </div>
+        </div>
+    }
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private ImportBatch? _batch;
+    private ImportBatchApplied? _applied;
+    private bool _busy, _request = true, _toReview = true;
+    private string? _error;
+    private Timer? _timer;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadAsync();
+        if (_batch?.Imports.Any(i => i.State == ImportState.Matching) == true)
+            _timer = new Timer(_ => InvokeAsync(PollAsync), null, 1500, 1500);
+    }
+
+    private async Task LoadAsync()
+    {
+        try
+        {
+            _batch = await Api.GetImportBatchAsync(Id);
+            if (_batch is null)
+                _error = "Those imports aren't there any more.";
+        }
+        catch (Exception e)
+        {
+            _error = $"Couldn't load the imports: {e.Message}";
+        }
+    }
+
+    private async Task PollAsync()
+    {
+        await LoadAsync();
+        if (_batch?.Imports.Any(i => i.State == ImportState.Matching) != true)
+        {
+            _timer?.Dispose();
+            _timer = null;
+        }
+        StateHasChanged();
+    }
+
+    private async Task ApplyAsync()
+    {
+        _busy = true;
+        _error = null;
+        try
+        {
+            _applied = await Api.ApplyImportBatchAsync(Id, new ApplyImportBatch(_request, _toReview));
+            await LoadAsync();
+        }
+        catch (MelodexApiException e)
+        {
+            _error = e.Message;
+        }
+        _busy = false;
+    }
+
+    public void Dispose() => _timer?.Dispose();
+}

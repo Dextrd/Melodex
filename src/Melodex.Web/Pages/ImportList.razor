@@ -5,11 +5,11 @@
 @inject AuthState Auth
 @inject NavigationManager Nav
 
-<PageTitle>Import from a list · Melodex</PageTitle>
+<PageTitle>@(_import?.Import.Name ?? "Import from a list") · Melodex</PageTitle>
 
 @* Importing a list: choosing it and, for a CSV, its columns; then its songs as they're matched, to check and change;
    then where they go. *@
-<p class="small"><a href="tools">← Tools</a></p>
+<p class="small">@if (_import?.Import.BatchId is { } batch) { <a href="tools/import/batch/@batch">← Import from Spotify</a> } else { <a href="tools">← Tools</a> }</p>
 <h1>@(_import?.Import.Name ?? "Import from a list")</h1>
 
 @if (!Auth.May(UserPermissions.Request))
@@ -119,7 +119,7 @@ else
     @if (summary.State == ImportState.Matching)
     {
         <div class="notice">
-            Matching: @matched of @Format.Count(summary.Total, "song", "songs").
+            Matching: @matched of @Format.Count(summary.Total, summary.Albums ? "album" : "song", summary.Albums ? "albums" : "songs").
             <a href="activity/tasks">Watch it in Activity</a>
             <div class="progress"><span style="width: @(summary.Total == 0 ? 0 : 100 * matched / summary.Total)%"></span></div>
         </div>
@@ -184,7 +184,10 @@ else
                             @if (summary.State == ImportState.Ready)
                             {
                                 <div class="row-actions">
-                                    <IconButton Icon="search" Class="small" Title="Choose the song it is" OnClick="() => Nav.NavigateTo(SearchLink(line))" />
+                                    @if (!summary.Albums)
+                                    {
+                                        <IconButton Icon="search" Class="small" Title="Choose the song it is" OnClick="() => Nav.NavigateTo(SearchLink(line))" />
+                                    }
                                     @if (line.Outcome == ImportOutcome.Dropped)
                                     {
                                         <IconButton Icon="putback" Class="small" Title="Put it back" OnClick="() => DropAsync(line, false)" />
@@ -202,7 +205,11 @@ else
         </table>
     </div>
 
-    @if (summary.State == ImportState.Ready)
+    @if (summary.State == ImportState.Ready && summary.BatchId is { } batchId)
+    {
+        <p class="muted">It's applied with the rest of its export, from <a href="tools/import/batch/@batchId">Import from Spotify</a>.</p>
+    }
+    else if (summary.State == ImportState.Ready)
     {
         var missing = _import.Lines.Count(l => l.Outcome is ImportOutcome.Found or ImportOutcome.Unsure);
         var notFound = _import.Lines.Count(l => l.Outcome == ImportOutcome.NotFound);

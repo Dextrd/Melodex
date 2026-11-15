@@ -12,6 +12,10 @@ What changed in each release of Melodex. Versions follow [semantic versioning](h
   Songs you don't have can be asked for; in the playlist they hold their places, greyed out, until they arrive, and a
   **Get** button asks for them later. Songs nothing was found for wait in Review, under **Couldn't match**, where
   matching one puts it in the playlist where it was in the list (#21).
+- **Import from Spotify** on the Tools page, from the copy of your data Spotify sends you (no Spotify account linked):
+  choose its playlists, liked songs and saved albums, check the matches, and apply them. Each playlist and your liked
+  songs become playlists, in a folder of your choice, and saved albums you don't have can be asked for. Importing a
+  later export adds only what's new to the playlists made the first time (#22).
 - **Export** on the Tools page: your playlists as M3U8 playlists, with paths in the music folder or under the folder
   another machine sees it as, or as a CSV of each song's artist, title, album, length, ISRC and MusicBrainz ID, which
   the list import reads back. Several come as a zip. Songs you don't have are left out, or kept by name only. The

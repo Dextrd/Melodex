@@ -51,6 +51,48 @@ public static class ToolEndpoints
             .WithSummary("Take an unmatched song out of Review without matching it.")
             .Produces(StatusCodes.Status204NoContent).Produces(StatusCodes.Status404NotFound);
 
+        imports.MapPost("/services/peek", async (HttpRequest request, HttpContext http, ImportService service, CancellationToken ct) =>
+                Owner(http) is { } user
+                    ? await Refusable(async () => Results.Ok(await service.PeekServiceAsync(user, await FilesAsync(request, ct), ct)))
+                    : NoOwner())
+            .WithName("PeekServiceImport")
+            .WithSummary("Read a music service's export of your data, sent as multipart form files (the zip, or the files from it): its playlists, liked songs and saved albums, and what's new since an earlier import of each.")
+            .Accepts<IFormFileCollection>("multipart/form-data")
+            .Produces<ServicePeek>().ProducesValidationProblem();
+
+        imports.MapPost("/services", async (HttpRequest request, HttpContext http, ImportService service, CancellationToken ct) =>
+                Owner(http) is { } user
+                    ? await Refusable(async () =>
+                    {
+                        var files = await FilesAsync(request, ct);
+                        var choice = request.Form["choice"].FirstOrDefault() is { Length: > 0 } json
+                            ? System.Text.Json.JsonSerializer.Deserialize<CreateServiceImport>(json, MelodexJson.Options)
+                            : null;
+                        if (choice is null)
+                            throw new ImportRefusedException("choice", "Say which lists to import.");
+                        return Results.Ok(await service.CreateServiceAsync(user, files, choice, ct));
+                    })
+                    : NoOwner())
+            .WithName("CreateServiceImport")
+            .WithSummary("Import lists from a music service's export: the export's files as multipart form files, and a \"choice\" field holding a CreateServiceImport as JSON. Each list becomes an import, matched in the background; a list imported before brings only what's new.")
+            .Accepts<IFormFileCollection>("multipart/form-data")
+            .Produces<ImportBatch>().ProducesValidationProblem();
+
+        imports.MapGet("/batches/{id:guid}", async (Guid id, HttpContext http, ImportService service, CancellationToken ct) =>
+                Owner(http) is { } user ? await service.BatchAsync(user, id, ct) is { } batch ? Results.Ok(batch) : Results.NotFound() : NoOwner())
+            .WithName("GetImportBatch")
+            .WithSummary("The imports made together from one service's export.")
+            .Produces<ImportBatch>().Produces(StatusCodes.Status404NotFound);
+
+        imports.MapPost("/batches/{id:guid}/apply", async (Guid id, ApplyImportBatch body, HttpContext http, ImportService service, CancellationToken ct) =>
+                Owner(http) is { } user
+                    ? await Refusable(async () =>
+                        await service.ApplyBatchAsync(user, Caller.Of(http).Requester, Caller.Of(http).May(Scopes.Listen), id, body, ct) is { } applied ? Results.Ok(applied) : Results.NotFound())
+                    : NoOwner())
+            .WithName("ApplyImportBatch")
+            .WithSummary("Apply every import of a batch that's ready: each list makes its playlist, or adds what's new to the one an earlier import made, and albums are requested.")
+            .Produces<ImportBatchApplied>().Produces(StatusCodes.Status404NotFound).ProducesValidationProblem().ProducesProblem(StatusCodes.Status409Conflict);
+
         imports.MapGet("/{id:guid}", async (Guid id, HttpContext http, ImportService service, CancellationToken ct) =>
                 Owner(http) is { } user ? await service.GetAsync(user, id, ct) is { } import ? Results.Ok(import) : Results.NotFound() : NoOwner())
             .WithName("GetImport")
@@ -105,6 +147,24 @@ public static class ToolEndpoints
             .Produces<byte[]>(contentType: "text/csv").ProducesValidationProblem();
 
         return api;
+    }
+
+    // The files of a multipart form, each read whole, up to the most an export may be.
+    private static async Task<IReadOnlyList<(string Name, byte[] Bytes)>> FilesAsync(HttpRequest request, CancellationToken ct)
+    {
+        if (!request.HasFormContentType)
+            throw new ImportRefusedException("files", "Send the export's files as a multipart form.");
+        var form = await request.ReadFormAsync(ct);
+        if (form.Files.Sum(f => f.Length) > ImportService.MaxExport)
+            throw new ImportRefusedException("files", "Keep it to 30 MB. If it's bigger, choose only the files with your library and playlists in.");
+        var files = new List<(string, byte[])>();
+        foreach (var file in form.Files)
+        {
+            using var copy = new MemoryStream();
+            await file.CopyToAsync(copy, ct);
+            files.Add((file.FileName, copy.ToArray()));
+        }
+        return files;
     }
 
     private static Guid? Owner(HttpContext http) => Caller.Of(http).UserId;
