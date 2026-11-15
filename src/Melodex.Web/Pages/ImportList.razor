@@ -1,0 +1,472 @@
+@page "/tools/import"
+@page "/tools/import/{Id:guid}"
+@implements IDisposable
+@inject MelodexClient Api
+@inject AuthState Auth
+@inject NavigationManager Nav
+
+<PageTitle>Import from a list · Melodex</PageTitle>
+
+@* Importing a list: choosing it and, for a CSV, its columns; then its songs as they're matched, to check and change;
+   then where they go. *@
+<p class="small"><a href="tools">← Tools</a></p>
+<h1>@(_import?.Import.Name ?? "Import from a list")</h1>
+
+@if (!Auth.May(UserPermissions.Request))
+{
+    <div class="empty card">Importing needs the Request permission.</div>
+}
+else if (Id is null)
+{
+    <p class="muted">
+        An M3U or M3U8 playlist, a CSV (from a spreadsheet, or another service's export), or lines of "Artist – Title". Each song is matched
+        to your library and the catalogue; then you can check the matches before anything happens.
+    </p>
+    <div class="toolbar">
+        <Segmented T="bool" Value="_pasting" Options="Sources" OnChange="v => { _pasting = v; _peek = null; _error = null; }" Label="Import" />
+    </div>
+    @if (_pasting)
+    {
+        <div class="field">
+            <label class="field-label" for="import-text">Songs, one to a line</label>
+            <textarea id="import-text" class="import-text" rows="10" placeholder="Portishead – Glory Box&#10;Daft Punk – Digital Love" @bind="_text" @bind:event="oninput"></textarea>
+        </div>
+        <div class="toolbar">
+            <button class="primary" disabled="@(_busy || _text.Trim().Length == 0)" @onclick="() => PeekAsync(null)">Read it</button>
+        </div>
+    }
+    else
+    {
+        <div class="field">
+            <label class="field-label" for="import-file">A playlist or CSV file</label>
+            <InputFile id="import-file" OnChange="ReadFileAsync" accept=".m3u,.m3u8,.csv,.tsv,.txt,audio/x-mpegurl,text/csv,text/plain" />
+        </div>
+    }
+    @if (_error is not null) { <p class="error">@_error</p> }
+
+    @if (_peek is not null)
+    {
+        <h2 class="section">@Format.Count(_peek.Count, "song", "songs") in @(_fileName ?? "the list")</h2>
+        @if (_peek.Format == ImportFormat.Csv)
+        {
+            <p class="muted small">Say what each column holds. A column with each song's title is needed; the rest help find the right one.</p>
+            <label class="check"><input type="checkbox" checked="@_hasHeader" @onchange="e => _hasHeader = (bool)e.Value!" /> The first row is the columns' names</label>
+            <div class="card import-columns">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            @for (var i = 0; i < _columns.Count; i++)
+                            {
+                                var column = i;
+                                <th>
+                                    <div class="muted small ellipsis" title="@_peek.Columns[column]">@_peek.Columns[column]</div>
+                                    <select aria-label="@($"What {_peek.Columns[column]} holds")" value="@_columns[column]" @onchange="e => _columns[column] = Enum.Parse<ImportColumn>((string)e.Value!)">
+                                        @foreach (var (value, label) in ColumnNames) { <option value="@value">@label</option> }
+                                    </select>
+                                </th>
+                            }
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var row in _peek.Rows)
+                        {
+                            <tr>@foreach (var cell in row) { <td class="small ellipsis" title="@cell">@cell</td> }</tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+        else
+        {
+            <div class="card">
+                <table class="table">
+                    <tbody>
+                        @foreach (var song in _peek.Sample)
+                        {
+                            <tr>
+                                <td>
+                                    <div class="ellipsis">@song.Title</div>
+                                    <div class="muted small ellipsis">@(song.Artist ?? "unknown artist")@(song.Album is { } album ? $" · {album}" : "")</div>
+                                </td>
+                                <td class="num muted">@Format.Duration(song.DurationSeconds)</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            @if (_peek.Count > _peek.Sample.Count) { <p class="muted small">…and @Format.Count(_peek.Count - _peek.Sample.Count, "more", "more").</p> }
+        }
+        <div class="field">
+            <label class="field-label" for="import-name">Call it</label>
+            <input id="import-name" type="text" @bind="_name" @bind:event="oninput" />
+        </div>
+        <div class="toolbar">
+            <button class="primary" disabled="@(_busy || (_peek.Format == ImportFormat.Csv && !_columns.Contains(ImportColumn.Title)))" @onclick="CreateAsync">
+                Match @Format.Count(_peek.Count, "song", "songs")
+            </button>
+            <span class="muted small">This can take a while for a long list: about a second a song not in your library. It goes on in Activity if you leave.</span>
+        </div>
+    }
+}
+else if (_import is null)
+{
+    @if (_error is not null) { <div class="empty card error">@_error</div> } else { <Loading /> }
+}
+else
+{
+    var summary = _import.Import;
+    var matched = _import.Lines.Count(l => l.Outcome != ImportOutcome.Pending);
+    @if (summary.State == ImportState.Matching)
+    {
+        <div class="notice">
+            Matching: @matched of @Format.Count(summary.Total, "song", "songs").
+            <a href="activity/tasks">Watch it in Activity</a>
+            <div class="progress"><span style="width: @(summary.Total == 0 ? 0 : 100 * matched / summary.Total)%"></span></div>
+        </div>
+    }
+    else if (summary.State == ImportState.Applied)
+    {
+        <div class="notice">
+            <text>Applied @Format.Ago(summary.AppliedAt ?? summary.CreatedAt)</text>@if (summary.PlaylistId is { } playlistId)
+            {<text>, into </text><a href="playlists/@playlistId">@summary.PlaylistName</a>}<text>.</text>
+            @if (summary.InReview > 0) { <text> @Format.Count(summary.InReview, "song waits", "songs wait") in </text><a href="review/couldnt-match">Review</a><text> to be matched.</text> }
+        </div>
+    }
+
+    <div class="toolbar one-line">
+        <div class="chips" role="group" aria-label="Show">
+            <button class="chip @(_show is null ? "on" : "")" @onclick="() => _show = null">All @summary.Total</button>
+            @foreach (var (outcome, label) in ImportCounts.Outcomes)
+            {
+                var count = _import.Lines.Count(l => l.Outcome == outcome);
+                if (count > 0)
+                {
+                    <button class="chip @(_show == outcome ? "on" : "")" @onclick="() => _show = outcome">@Capital(label) @count</button>
+                }
+            }
+        </div>
+    </div>
+
+    @if (_error is not null) { <p class="error">@_error</p> }
+    <div class="card">
+        <table class="table track-list import-lines">
+            <colgroup><col class="num-col" /><col class="import-given-col hide-narrow" /><col class="cover-col" /><col /><col class="import-state-col hide-narrow" /><col class="icons-2-col" /></colgroup>
+            <tbody>
+                <Virtualize Items="Shown" Context="line" ItemSize="56" OverscanCount="15" SpacerElement="tr">
+                    <tr @key="line.Id" class="@(line.Outcome == ImportOutcome.Dropped ? "dim" : "")">
+                        <td class="num muted">@(line.Position + 1)</td>
+                        <td class="hide-narrow">
+                            <div class="ellipsis" title="@line.Song.Title">@line.Song.Title</div>
+                            <div class="muted small ellipsis">@Given(line.Song)</div>
+                        </td>
+                        <td class="cover-col">
+                            @if (line.Match?.AlbumId is { } albumId) { <a href="albums/@albumId" tabindex="-1"><Cover Url="@line.Match.CoverUrl" /></a> }
+                            else { <Cover Url="@line.Match?.CoverUrl" /> }
+                        </td>
+                        <td class="track-main">
+                            @if (line.Match is { } match)
+                            {
+                                <div class="ellipsis">@if (match.TrackId is { } trackId) { <a class="plain" href="tracks/@trackId">@match.Title</a> } else { @match.Title }</div>
+                                <div class="muted small ellipsis">
+                                    @if (match.ArtistId is { } artistId) { <a class="muted" href="artists/@artistId">@match.Artist</a> } else { @match.Artist }
+                                    @if (match.Album is { } album) { <span> · @album</span> }
+                                    <span class="show-narrow"> · @Label(line)</span>
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="ellipsis muted">@(line.Outcome == ImportOutcome.Pending ? "Matching…" : "Nothing found")</div>
+                                <div class="muted small ellipsis show-narrow">@line.Song.Title · @Given(line.Song)</div>
+                            }
+                        </td>
+                        <td class="hide-narrow"><span class="badge @BadgeClass(line)" title="@(line.Confidence is { } c && line.Outcome == ImportOutcome.Unsure ? $"{c:P0} alike" : null)">@Label(line)</span></td>
+                        <td class="num actions">
+                            @if (summary.State == ImportState.Ready)
+                            {
+                                <div class="row-actions">
+                                    <IconButton Icon="search" Class="small" Title="Choose the song it is" OnClick="() => Nav.NavigateTo(SearchLink(line))" />
+                                    @if (line.Outcome == ImportOutcome.Dropped)
+                                    {
+                                        <IconButton Icon="putback" Class="small" Title="Put it back" OnClick="() => DropAsync(line, false)" />
+                                    }
+                                    else
+                                    {
+                                        <IconButton Icon="cancel" Class="small" Title="Leave it out" OnClick="() => DropAsync(line, true)" />
+                                    }
+                                </div>
+                            }
+                        </td>
+                    </tr>
+                </Virtualize>
+            </tbody>
+        </table>
+    </div>
+
+    @if (summary.State == ImportState.Ready)
+    {
+        var missing = _import.Lines.Count(l => l.Outcome is ImportOutcome.Found or ImportOutcome.Unsure);
+        var notFound = _import.Lines.Count(l => l.Outcome == ImportOutcome.NotFound);
+        var placed = _import.Lines.Count(l => l.Outcome is ImportOutcome.Owned or ImportOutcome.Found or ImportOutcome.Unsure);
+        <h2 class="section">What to do with them</h2>
+        <div class="import-apply">
+            @if (Auth.May(UserPermissions.Listen))
+            {
+                <label class="dialog-choice">
+                    <input type="radio" name="import-playlist" checked="@(_mode == ImportPlaylistMode.New)" @onchange="() => _mode = ImportPlaylistMode.New" />
+                    <span>
+                        <strong>Make a playlist of them</strong>
+                        <input type="text" aria-label="The playlist's name" placeholder="@($"Name, or Folder{Delimiter}Name")" @bind="_playlistName" @bind:event="oninput"
+                               @onfocus="() => _mode = ImportPlaylistMode.New" />
+                    </span>
+                </label>
+                <label class="dialog-choice @(_playlists is { Count: > 0 } ? "" : "disabled")">
+                    <input type="radio" name="import-playlist" checked="@(_mode == ImportPlaylistMode.Existing)" disabled="@(_playlists is not { Count: > 0 })"
+                           @onchange="() => _mode = ImportPlaylistMode.Existing" />
+                    <span>
+                        <strong>Add them to the end of a playlist</strong>
+                        <select aria-label="Which playlist" value="@_playlistId" @onchange="e => { _playlistId = Guid.TryParse((string?)e.Value, out var p) ? p : null; _mode = ImportPlaylistMode.Existing; }">
+                            <option value="">Choose one</option>
+                            @foreach (var playlist in _playlists ?? []) { <option value="@playlist.Id">@playlist.Name</option> }
+                        </select>
+                    </span>
+                </label>
+                <label class="dialog-choice">
+                    <input type="radio" name="import-playlist" checked="@(_mode == ImportPlaylistMode.None)" @onchange="() => _mode = ImportPlaylistMode.None" />
+                    <span><strong>No playlist</strong> <span class="muted small">Only ask for the songs you don't have.</span></span>
+                </label>
+            }
+            @if (missing > 0)
+            {
+                <label class="check">
+                    <input type="checkbox" checked="@_request" @onchange="e => _request = (bool)e.Value!" />
+                    Ask for the @Format.Count(missing, "song", "songs") you don't have, to add to your library
+                </label>
+                @if (_mode != ImportPlaylistMode.None)
+                {
+                    <p class="muted small indent">In the playlist, they hold their places until they arrive@(_request ? "" : "; a Get button there asks for them later").</p>
+                }
+            }
+            @if (notFound > 0)
+            {
+                <label class="check">
+                    <input type="checkbox" checked="@_toReview" @onchange="e => _toReview = (bool)e.Value!" />
+                    Send the @Format.Count(notFound, "song", "songs") not found to Review, to match there; otherwise they're left out
+                </label>
+            }
+            <div class="toolbar">
+                <button class="primary" disabled="@(_busy || !CanApply(placed, missing, notFound))" @onclick="ApplyAsync">Apply</button>
+                @if (_applyError is not null) { <span class="error small">@_applyError</span> }
+            </div>
+        </div>
+    }
+}
+
+@code {
+    [Parameter] public Guid? Id { get; set; }
+
+    private static readonly IReadOnlyList<(bool Value, string Label, string? Hint)> Sources =
+        [(false, "A file", "An M3U, M3U8 or CSV file"), (true, "Paste", "Lines of \"Artist – Title\"")];
+
+    private static readonly IReadOnlyList<(ImportColumn Value, string Label)> ColumnNames =
+    [
+        (ImportColumn.Ignore, "Not used"), (ImportColumn.Title, "Title"), (ImportColumn.Artist, "Artist"), (ImportColumn.Album, "Album"),
+        (ImportColumn.Length, "Length"), (ImportColumn.Isrc, "ISRC"), (ImportColumn.MusicBrainzId, "MusicBrainz ID"),
+    ];
+
+    private const long MaxFile = 10 * 1024 * 1024;
+
+    private bool _pasting, _busy, _hasHeader, _request = true, _toReview = true;
+    private string _text = "", _name = "", _playlistName = "";
+    private string? _fileName, _error, _applyError;
+    private ImportPeek? _peek;
+    private List<ImportColumn> _columns = [];
+    private ImportDetail? _import;
+    private ImportOutcome? _show;
+    private ImportPlaylistMode _mode = ImportPlaylistMode.New;
+    private Guid? _playlistId;
+    private IReadOnlyList<PlaylistSummary>? _playlists;
+    private Timer? _timer;
+    private Guid? _loaded;
+
+    private string Delimiter => PlaylistNames.Delimiter(Auth);
+
+    private List<ImportLineInfo> Shown => _import is null ? [] : _show is { } outcome ? _import.Lines.Where(l => l.Outcome == outcome).ToList() : _import.Lines.ToList();
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (Id == _loaded)
+            return;
+        _loaded = Id;
+        _timer?.Dispose();
+        _timer = null;
+        _import = null;
+        _error = null;
+        if (Id is not { } id || !Auth.May(UserPermissions.Request))
+            return;
+        await LoadAsync(id);
+        if (Auth.May(UserPermissions.Listen))
+        {
+            try
+            {
+                _playlists = (await Api.ListPlaylistsAsync()).OrderBy(p => p.Name, StringComparer.CurrentCultureIgnoreCase).ToList();
+            }
+            catch (Exception)
+            {
+                _playlists = [];
+            }
+        }
+        // While its songs are being matched, they're shown as they are.
+        if (_import?.Import.State == ImportState.Matching)
+            _timer = new Timer(_ => InvokeAsync(PollAsync), null, 1500, 1500);
+    }
+
+    private async Task LoadAsync(Guid id)
+    {
+        try
+        {
+            _import = await Api.GetImportAsync(id);
+            if (_import is null)
+                _error = "That import isn't there any more.";
+            else if (_playlistName.Length == 0)
+                _playlistName = _import.Import.Name;
+        }
+        catch (Exception e)
+        {
+            _error = $"Couldn't load the import: {e.Message}";
+        }
+    }
+
+    private async Task PollAsync()
+    {
+        if (Id is not { } id)
+            return;
+        await LoadAsync(id);
+        if (_import?.Import.State != ImportState.Matching)
+        {
+            _timer?.Dispose();
+            _timer = null;
+        }
+        StateHasChanged();
+    }
+
+    private async Task ReadFileAsync(InputFileChangeEventArgs e)
+    {
+        _error = null;
+        _peek = null;
+        if (e.File.Size > MaxFile)
+        {
+            _error = "That file is bigger than 10 MB.";
+            return;
+        }
+        using var stream = e.File.OpenReadStream(MaxFile);
+        using var reader = new StreamReader(stream);
+        _text = await reader.ReadToEndAsync();
+        _fileName = e.File.Name;
+        await PeekAsync(e.File.Name);
+    }
+
+    private async Task PeekAsync(string? fileName)
+    {
+        _busy = true;
+        _error = null;
+        try
+        {
+            if (_pasting)
+                _fileName = null;
+            _peek = await Api.PeekImportAsync(new PeekImport(_text, fileName));
+            _columns = _peek.Guess.ToList();
+            _hasHeader = _peek.HasHeader;
+            _name = fileName is null ? "Pasted list" : Path.GetFileNameWithoutExtension(fileName);
+            if (_peek.Count == 0 && _peek.Format != ImportFormat.Csv)
+                _error = "No songs were found in it.";
+        }
+        catch (MelodexApiException ex)
+        {
+            _error = ex.Message;
+        }
+        _busy = false;
+    }
+
+    private async Task CreateAsync()
+    {
+        _busy = true;
+        _error = null;
+        try
+        {
+            var made = await Api.CreateImportAsync(new CreateImport(_text, _fileName, _peek!.Format,
+                _peek.Format == ImportFormat.Csv ? _columns : null, _peek.Format == ImportFormat.Csv ? _hasHeader : null, _name));
+            Nav.NavigateTo($"tools/import/{made.Id}");
+        }
+        catch (MelodexApiException ex)
+        {
+            _error = ex.Message;
+        }
+        _busy = false;
+    }
+
+    private async Task DropAsync(ImportLineInfo line, bool dropped)
+    {
+        _error = null;
+        try
+        {
+            var changed = await Api.ChangeImportLineAsync(_import!.Import.Id, line.Id, new ChangeImportLine(Dropped: dropped));
+            _import = _import with { Lines = _import.Lines.Select(l => l.Id == changed.Id ? changed : l).ToList() };
+        }
+        catch (MelodexApiException ex)
+        {
+            _error = ex.Message;
+        }
+    }
+
+    private bool CanApply(int placed, int missing, int notFound) => _mode switch
+    {
+        ImportPlaylistMode.New => _playlistName.Trim().Length > 0 && placed > 0,
+        ImportPlaylistMode.Existing => _playlistId is not null && placed > 0,
+        _ => _request && missing > 0 || _toReview && notFound > 0,
+    };
+
+    private async Task ApplyAsync()
+    {
+        _busy = true;
+        _applyError = null;
+        try
+        {
+            await Api.ApplyImportAsync(_import!.Import.Id, new ApplyImport(Auth.May(UserPermissions.Listen) ? _mode : ImportPlaylistMode.None, _playlistName.Trim(), _playlistId, _request, _toReview));
+            await LoadAsync(_import.Import.Id);
+        }
+        catch (MelodexApiException ex)
+        {
+            _applyError = ex.Message;
+        }
+        _busy = false;
+    }
+
+    private string SearchLink(ImportLineInfo line) =>
+        $"search?q={Uri.EscapeDataString($"{line.Song.Title} {line.Song.Artist}".Trim())}&import={_import!.Import.Id}&line={line.Id}";
+
+    private static string Given(ImportSong song) =>
+        string.Join(" · ", new[] { song.Artist ?? "unknown artist", song.Album, song.DurationSeconds is { } length ? Format.Duration(length) : null }.OfType<string>());
+
+    private static string Label(ImportLineInfo line) => line.Outcome switch
+    {
+        ImportOutcome.Owned => "In your library",
+        ImportOutcome.Found => line.Chosen ? "Chosen, to get" : "To get",
+        ImportOutcome.Unsure => "Check it",
+        ImportOutcome.NotFound => line.InReview ? "In Review" : "Not found",
+        ImportOutcome.Dropped => "Left out",
+        _ => "Matching",
+    };
+
+    private static string BadgeClass(ImportLineInfo line) => line.Outcome switch
+    {
+        ImportOutcome.Owned => "owned",
+        ImportOutcome.Found => "covered",
+        ImportOutcome.Unsure => "partial",
+        ImportOutcome.NotFound => "missing",
+        _ => "neutral",
+    };
+
+    private static string Capital(string text) => text.Length == 0 ? text : char.ToUpperInvariant(text[0]) + text[1..];
+
+    public void Dispose() => _timer?.Dispose();
+}

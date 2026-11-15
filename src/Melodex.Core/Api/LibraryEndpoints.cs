@@ -751,6 +751,10 @@ public static class LibraryEndpoints
         var artistIds = tasks.Where(t => t.Kind == ArtistRefreshTask.TaskKind && t.PayloadJson is not null)
             .Select(t => JsonSerializer.Deserialize<Guid>(t.PayloadJson!)).Distinct().ToList();
         var names = await db.Artists.Where(x => artistIds.Contains(x.Id)).ToDictionaryAsync(x => x.Id, x => x.Name, ct);
+        // Imports say which list they're matching.
+        var importIds = tasks.Where(t => t.Kind == Tools.ImportTask.TaskKind && t.PayloadJson is not null)
+            .Select(t => JsonSerializer.Deserialize<Guid>(t.PayloadJson!)).Distinct().ToList();
+        var imports = await db.Imports.Where(i => importIds.Contains(i.Id)).ToDictionaryAsync(i => i.Id, i => i.Name, ct);
         return tasks.Select(t => TaskQueue.ToInfo(t) with
         {
             Title = t.Kind switch
@@ -763,6 +767,7 @@ public static class LibraryEndpoints
                 LyricsTask.TaskKind => LyricsTask.Title,
                 SpectrumTask.TaskKind => SpectrumTask.Title,
                 BarsTask.TaskKind => BarsTask.Title(t.PayloadJson),
+                Tools.ImportTask.TaskKind => Tools.ImportTask.Title(t.PayloadJson is null ? null : imports.GetValueOrDefault(JsonSerializer.Deserialize<Guid>(t.PayloadJson))),
                 _ => t.Kind,
             },
         }).ToList();

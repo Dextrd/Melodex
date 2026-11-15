@@ -1,0 +1,125 @@
+@page "/tools"
+@inject MelodexClient Api
+@inject AuthState Auth
+
+<PageTitle>Tools · Melodex</PageTitle>
+
+@* Things you run to build your library, not settings: a card for each, and your imports below. *@
+<h1>Tools</h1>
+<p class="muted">Things you run now and then to build your library. What each does shows in Activity as it goes.</p>
+
+<div class="tool-cards">
+    @if (Auth.May(UserPermissions.Request))
+    {
+        <a class="card tool-card" href="tools/import">
+            <Icon Name="import" />
+            <span>
+                <strong>Import from a list</strong>
+                <span class="muted small">
+                    An M3U playlist, a CSV, or lines of "Artist – Title". Each song is matched to your library and the catalogue, then made a
+                    playlist, and what you don't have can be asked for.
+                </span>
+            </span>
+        </a>
+    }
+</div>
+
+@if (Auth.May(UserPermissions.Request))
+{
+    <h2 class="section">Your imports</h2>
+    @if (_error is not null)
+    {
+        <div class="empty card error">@_error</div>
+    }
+    else if (_imports is null)
+    {
+        <Loading />
+    }
+    else if (_imports.Count == 0)
+    {
+        <div class="empty card">Nothing imported yet.</div>
+    }
+    else
+    {
+        <div class="card">
+            <table class="table imports-table">
+                <colgroup><col /><col class="hide-narrow" /><col class="import-state-col" /><col class="icons-1-col" /></colgroup>
+                <tbody>
+                    @foreach (var import in _imports)
+                    {
+                        <tr @key="import.Id">
+                            <td>
+                                <div class="ellipsis"><a href="tools/import/@import.Id">@import.Name</a></div>
+                                <div class="muted small ellipsis">
+                                    @Format.Count(import.Total, "song", "songs") · @FormatName(import.Format) · @Format.Ago(import.CreatedAt)
+                                    @if (import.PlaylistId is { } playlist) { <span> · made <a class="muted" href="playlists/@playlist">@import.PlaylistName</a></span> }
+                                </div>
+                            </td>
+                            <td class="hide-narrow muted small">@ImportCounts.Summary(import)</td>
+                            <td><span class="badge @StateClass(import)">@StateLabel(import)</span></td>
+                            <td class="num actions">
+                                <IconButton Icon="discard" Class="small" Title="@(import.State == ImportState.Applied ? "Forget this import (its playlist and requests stay)" : "Delete this import")"
+                                            OnClick="() => DeleteAsync(import)" />
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+}
+
+@code {
+    private IReadOnlyList<ImportSummary>? _imports;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Auth.May(UserPermissions.Request))
+            return;
+        try
+        {
+            _imports = await Api.ListImportsAsync();
+        }
+        catch (Exception e)
+        {
+            _error = $"Couldn't load your imports: {e.Message}";
+        }
+    }
+
+    private async Task DeleteAsync(ImportSummary import)
+    {
+        try
+        {
+            await Api.DeleteImportAsync(import.Id);
+            _imports = _imports!.Where(i => i.Id != import.Id).ToList();
+        }
+        catch (MelodexApiException e)
+        {
+            _error = e.Message;
+        }
+    }
+
+    private static string FormatName(ImportFormat format) => format switch
+    {
+        ImportFormat.M3u => "M3U",
+        ImportFormat.Csv => "CSV",
+        _ => "pasted",
+    };
+
+    private static string StateLabel(ImportSummary import) => import.State switch
+    {
+        ImportState.Matching => "Matching",
+        ImportState.Ready => "Ready to check",
+        _ when import.InReview > 0 => $"{import.InReview} in Review",
+        _ => "Done",
+    };
+
+    private static string StateClass(ImportSummary import) => import.State switch
+    {
+        ImportState.Matching => "neutral",
+        ImportState.Ready => "partial",
+        _ when import.InReview > 0 => "partial",
+        _ => "owned",
+    };
+}

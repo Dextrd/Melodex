@@ -4,6 +4,15 @@ What changed in each release of Melodex. Versions follow [semantic versioning](h
 
 ## [Unreleased]
 
+### Added
+
+- A **Tools** page, with **Import from a list**: an M3U or M3U8 playlist, a CSV from a spreadsheet or another service,
+  or lines of "Artist – Title" you paste. Each song is matched to your library and the catalogue, and you check the
+  matches, choosing another song or leaving one out, before making a playlist of them, adding them to one, or neither.
+  Songs you don't have can be asked for; in the playlist they hold their places, greyed out, until they arrive, and a
+  **Get** button asks for them later. Songs nothing was found for wait in Review, under **Couldn't match**, where
+  matching one puts it in the playlist where it was in the list (#21).
+
 ### Fixed
 
 - A listen-now download says **Expired** or **Deleted** as soon as its song is gone, even in the moment before its

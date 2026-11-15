@@ -367,6 +367,71 @@ namespace Melodex.Core.Data.Migrations
                     b.ToTable("HeldFiles");
                 });
 
+            modelBuilder.Entity("Melodex.Core.Data.ImportLine", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Album")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Artist")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("Chosen")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<double?>("Confidence")
+                        .HasColumnType("REAL");
+
+                    b.Property<double?>("DurationSeconds")
+                        .HasColumnType("REAL");
+
+                    b.Property<Guid?>("EntryId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("FileId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("ImportId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("InReview")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Isrc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("MusicBrainzId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Outcome")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Path")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Position")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("TrackId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("InReview");
+
+                    b.HasIndex("ImportId", "Position");
+
+                    b.ToTable("ImportLines");
+                });
+
             modelBuilder.Entity("Melodex.Core.Data.Job", b =>
                 {
                     b.Property<Guid>("Id")
@@ -548,6 +613,49 @@ namespace Melodex.Core.Data.Migrations
                     b.ToTable("LibraryFiles");
                 });
 
+            modelBuilder.Entity("Melodex.Core.Data.ListImport", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("AppliedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("PlaylistId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("RequestMissing")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("TaskId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("Imports");
+                });
+
             modelBuilder.Entity("Melodex.Core.Data.ListenNowItem", b =>
                 {
                     b.Property<Guid>("Id")
@@ -714,6 +822,9 @@ namespace Melodex.Core.Data.Migrations
                     b.Property<string>("Artist")
                         .IsRequired()
                         .HasColumnType("TEXT");
+
+                    b.Property<bool>("AwaitingFile")
+                        .HasColumnType("INTEGER");
 
                     b.Property<double?>("DurationSeconds")
                         .HasColumnType("REAL");
@@ -1184,6 +1295,17 @@ namespace Melodex.Core.Data.Migrations
                     b.Navigation("Track");
                 });
 
+            modelBuilder.Entity("Melodex.Core.Data.ImportLine", b =>
+                {
+                    b.HasOne("Melodex.Core.Data.ListImport", "Import")
+                        .WithMany("Lines")
+                        .HasForeignKey("ImportId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Import");
+                });
+
             modelBuilder.Entity("Melodex.Core.Data.Job", b =>
                 {
                     b.HasOne("Melodex.Core.Data.PluginInstance", "PluginInstance")
@@ -1217,6 +1339,15 @@ namespace Melodex.Core.Data.Migrations
                     b.Navigation("Edition");
 
                     b.Navigation("Track");
+                });
+
+            modelBuilder.Entity("Melodex.Core.Data.ListImport", b =>
+                {
+                    b.HasOne("Melodex.Core.Data.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Melodex.Core.Data.ListenNowItem", b =>
@@ -1329,6 +1460,11 @@ namespace Melodex.Core.Data.Migrations
             modelBuilder.Entity("Melodex.Core.Data.Edition", b =>
                 {
                     b.Navigation("Tracks");
+                });
+
+            modelBuilder.Entity("Melodex.Core.Data.ListImport", b =>
+                {
+                    b.Navigation("Lines");
                 });
 
             modelBuilder.Entity("Melodex.Core.Data.Playlist", b =>

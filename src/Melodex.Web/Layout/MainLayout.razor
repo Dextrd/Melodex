@@ -19,6 +19,10 @@
         {
             <NavLink href="review" title="Review">@PageIcon("review")<span class="nav-label">Review</span></NavLink>
         }
+        @if (Auth.May(UserPermissions.Request))
+        {
+            <NavLink href="tools" Match="NavLinkMatch.Prefix" title="Tools">@PageIcon("tools")<span class="nav-label">Tools</span></NavLink>
+        }
         @SectionLink(NavSection.Search, "Search")
     </nav>
     <span class="spacer"></span>
@@ -68,6 +72,9 @@
                     break;
                 case "review":
                     <path d="M9 11l3 3 8-8" /><path d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9" />
+                    break;
+                case "tools":
+                    <path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.4-.6-.6-2.4z" />
                     break;
                 case "search":
                     <circle cx="11" cy="11" r="7" /><path d="M21 21l-4.3-4.3" />

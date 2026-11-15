@@ -17,6 +17,7 @@ using Melodex.Core.Playlists;
 using Melodex.Core.Plugins;
 using Melodex.Core.Requests;
 using Melodex.Core.Tasks;
+using Melodex.Core.Tools;
 
 var builder = WebApplication.CreateBuilder(args);
 FromNavidex.AddOldSettings(builder.Configuration);
@@ -78,6 +79,8 @@ builder.Services.AddScoped<LibraryFormatter>();
 builder.Services.AddScoped<CoverChooser>();
 builder.Services.AddScoped<LyricsFinder>();
 builder.Services.AddScoped<PlaylistService>();
+builder.Services.AddScoped<ImportService>();
+builder.Services.AddScoped<ImportMatcher>();
 builder.Services.AddSingleton<PlaylistCovers>();
 builder.Services.AddScoped<PlaylistSync>();
 builder.Services.AddSingleton<PlaylistSyncer>();
@@ -94,6 +97,7 @@ builder.Services.AddScoped<ITaskHandler, FormatTask>();
 builder.Services.AddScoped<ITaskHandler, LyricsTask>();
 builder.Services.AddScoped<ITaskHandler, SpectrumTask>();
 builder.Services.AddScoped<ITaskHandler, BarsTask>();
+builder.Services.AddScoped<ITaskHandler, ImportTask>();
 builder.Services.AddHostedService<TaskWorker>();
 
 // Requests: fetch, verify, import with beets, tell the media server
@@ -205,6 +209,7 @@ api.MapAccessEndpoints();
 api.MapWebhookEndpoints();
 api.MapPlaylistEndpoints();
 api.MapUpgradeEndpoints();
+api.MapToolEndpoints();
 
 // The web app: Blazor WebAssembly, served from the same origin and talking only to the public API.
 app.MapStaticAssets();

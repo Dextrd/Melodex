@@ -3,6 +3,7 @@ using Melodex.Client;
 using Melodex.Contracts.Plugins;
 using Melodex.Core.Data;
 using Melodex.Core.Library;
+using Melodex.Core.Requests;
 
 namespace Melodex.Core.Playlists;
 
@@ -16,6 +17,9 @@ public sealed class PlaylistRefusedException(string field, string message) : Exc
 /// Each user's playlists: of songs in the library, files of their own, and songs only the media server has. Every change
 /// marks the playlist changed, and the syncer sends it to the media server when playlists are synced.
 /// </summary>
+/// <summary>An imported song to put in a playlist: a track (in the library or not yet), or a file of your own.</summary>
+public sealed record ImportedSong(Guid? TrackId, Guid? FileId, string Title, string Artist, string? Album, double? DurationSeconds);
+
 public sealed class PlaylistService(MelodexDbContext db, SettingsService settings, LocalMusic local, PlaylistSyncer syncer, PlaylistCovers covers)
 {
     public const int MaxName = 200;
@@ -80,6 +84,86 @@ public sealed class PlaylistService(MelodexDbContext db, SettingsService setting
             await ChangedAsync(playlist, ct);
         return added;
     }
+
+    /// <summary>
+    /// Puts an import's songs in a playlist, a new one or one of the user's, in order. A song not in the library yet holds
+    /// its place until it arrives. Null if the playlist isn't the user's. Returns the entry each song became.
+    /// </summary>
+    public async Task<(Guid PlaylistId, IReadOnlyList<Guid> Entries)?> ImportAsync(Guid userId, Guid? playlistId, string? name, IReadOnlyList<ImportedSong> songs,
+        CancellationToken ct)
+    {
+        Playlist? playlist;
+        if (playlistId is { } id)
+        {
+            if ((playlist = await FindAsync(userId, id, ct)) is null)
+                return null;
+        }
+        else
+        {
+            playlist = new Playlist { UserId = userId, Name = CheckName(name) };
+            db.Playlists.Add(playlist);
+        }
+        var existing = playlist.Entries.ToList();
+        var position = existing.Count == 0 ? 0 : existing.Max(e => e.Position) + 1;
+        var owned = await OwnedAsync(songs.Select(s => s.TrackId).OfType<Guid>(), ct);
+        var made = new List<Guid>(songs.Count);
+        foreach (var song in songs)
+        {
+            var entry = Entry(song, owned, position++);
+            playlist.Entries.Add(entry);
+            db.PlaylistEntries.Add(entry);
+            made.Add(entry.Id);
+        }
+        if (playlist.AddToTop && existing.Count > 0)
+        {
+            var top = 0;
+            foreach (var entry in playlist.Entries.Except(existing).OrderBy(e => e.Position))
+                entry.Position = top++;
+            foreach (var entry in existing.OrderBy(e => e.Position))
+                entry.Position = top++;
+        }
+        await ChangedAsync(playlist, ct);
+        return (playlist.Id, made);
+    }
+
+    /// <summary>
+    /// Puts one imported song in its place in a playlist, just after an entry (at the start without one, or the end if
+    /// that entry's gone), as one matched later in Review is. Null if the playlist isn't the user's.
+    /// </summary>
+    public async Task<Guid?> InsertImportedAsync(Guid userId, Guid playlistId, ImportedSong song, Guid? after, bool atStart, CancellationToken ct)
+    {
+        if (await FindAsync(userId, playlistId, ct) is not { } playlist)
+            return null;
+        var ordered = playlist.Entries.OrderBy(e => e.Position).ToList();
+        var index = after is { } previous && ordered.FindIndex(e => e.Id == previous) is var at and >= 0 ? at + 1 : atStart ? 0 : ordered.Count;
+        var entry = Entry(song, await OwnedAsync(song.TrackId is { } t ? [t] : [], ct), 0);
+        ordered.Insert(index, entry);
+        for (var i = 0; i < ordered.Count; i++)
+            ordered[i].Position = i;
+        playlist.Entries.Add(entry);
+        db.PlaylistEntries.Add(entry);
+        await ChangedAsync(playlist, ct);
+        return entry.Id;
+    }
+
+    private async Task<HashSet<Guid>> OwnedAsync(IEnumerable<Guid> trackIds, CancellationToken ct)
+    {
+        var ids = trackIds.Distinct().ToList();
+        return ids.Count == 0 ? [] : (await db.LibraryFiles.Where(f => f.TrackId != null && ids.Contains(f.TrackId.Value) && f.HiddenAt == null)
+            .Select(f => f.TrackId!.Value).Distinct().ToListAsync(ct)).ToHashSet();
+    }
+
+    private static PlaylistEntry Entry(ImportedSong song, HashSet<Guid> owned, int position) => new()
+    {
+        Position = position,
+        TrackId = song.TrackId,
+        FileId = song.TrackId is null ? song.FileId : null,
+        Title = song.Title,
+        Artist = song.Artist,
+        Album = song.Album,
+        DurationSeconds = song.DurationSeconds,
+        AwaitingFile = song.TrackId is { } track && !owned.Contains(track),
+    };
 
     /// <summary>Keeps the entries given, in that order, and removes the rest.</summary>
     public async Task<PlaylistDetail?> ArrangeAsync(Guid userId, Guid id, ArrangePlaylist body, CancellationToken ct)
@@ -361,6 +445,9 @@ public sealed class PlaylistService(MelodexDbContext db, SettingsService setting
             own = (await local.LoadAsync(ct)).Albums.SelectMany(a => a.Songs.Select(s => (a, s))).ToDictionary(x => x.s.File.Id);
 
         var inReview = await InReviewAsync(entries, ct);
+        var awaiting = entries.Where(e => e.AwaitingFile && e.TrackId is not null && !found.ContainsKey(e.Id)).Select(e => e.TrackId!.Value).Distinct().ToList();
+        var coming = await ComingAsync(awaiting, ct);
+        var places = await AwaitedPlacesAsync(awaiting, ct);
         var songs = new List<PlaylistSong>();
         foreach (var e in entries)
         {
@@ -376,6 +463,13 @@ public sealed class PlaylistService(MelodexDbContext db, SettingsService setting
                 songs.Add(new PlaylistSong(e.Id, null, fileId, mine.Song.Title, mine.Song.Artist, mine.Album.ArtistLocal ? null : mine.Album.ArtistId,
                     mine.Album.Id, mine.Album.Title, LocalMusic.CoverUrl(fileId), e.DurationSeconds, PlaylistSongState.Local));
             }
+            else if (e.AwaitingFile && e.TrackId is { } awaited && tracks.TryGetValue(awaited, out var song))
+            {
+                var place = places.GetValueOrDefault(awaited);
+                songs.Add(new PlaylistSong(e.Id, awaited, null, song.Title, song.ArtistCredit, song.ArtistId, place?.AlbumId, place?.AlbumTitle ?? e.Album,
+                    place is { } on ? LibraryView.CoverUrl(on.AlbumId, on.EditionId) : null, e.DurationSeconds,
+                    coming.Contains(awaited) ? PlaylistSongState.Coming : PlaylistSongState.Awaiting));
+            }
             else
             {
                 songs.Add(new PlaylistSong(e.Id, e.TrackId, e.FileId, e.Title, e.Artist, null, null, e.Album, null, e.DurationSeconds,
@@ -384,6 +478,28 @@ public sealed class PlaylistService(MelodexDbContext db, SettingsService setting
         }
         return songs;
     }
+
+    /// <summary>The songs not in the library yet that a request is fetching, on their own or with their album.</summary>
+    private async Task<HashSet<Guid>> ComingAsync(IReadOnlyList<Guid> trackIds, CancellationToken ct)
+    {
+        if (trackIds.Count == 0)
+            return [];
+        var active = db.Requests.Where(r => r.Mode == RequestMode.Permanent && !RequestService.Finished.Contains(r.Status));
+        var direct = await active.Where(r => r.TargetKind == EntityKind.Track && trackIds.Contains(r.TargetId)).Select(r => r.TargetId).ToListAsync(ct);
+        var albums = await active.Where(r => r.TargetKind == EntityKind.Album).Select(r => r.TargetId).ToListAsync(ct);
+        var onAlbums = albums.Count == 0 ? [] : await db.EditionTracks.Where(et => trackIds.Contains(et.TrackId) && albums.Contains(et.Edition.AlbumId))
+            .Select(et => et.TrackId).ToListAsync(ct);
+        return direct.Concat(onAlbums).ToHashSet();
+    }
+
+    private sealed record AwaitedPlace(Guid AlbumId, Guid EditionId, string AlbumTitle);
+
+    // The album each song not in the library yet is on, for its cover and link: the first edition the catalogue has it on.
+    private async Task<Dictionary<Guid, AwaitedPlace>> AwaitedPlacesAsync(IReadOnlyList<Guid> trackIds, CancellationToken ct) =>
+        trackIds.Count == 0 ? [] : (await db.EditionTracks.AsNoTracking().Where(et => trackIds.Contains(et.TrackId))
+                .Select(et => new { et.TrackId, et.EditionId, et.Edition.AlbumId, et.Edition.Album.Title, et.Edition.Album.FirstReleaseDate }).ToListAsync(ct))
+            .GroupBy(x => x.TrackId)
+            .ToDictionary(g => g.Key, g => g.OrderBy(x => x.FirstReleaseDate ?? "9999").Select(x => new AwaitedPlace(x.AlbumId, x.EditionId, x.Title)).First());
 
     /// <summary>
     /// Songs only the media server has that look to be among the files waiting for review: the same title, an artist in
