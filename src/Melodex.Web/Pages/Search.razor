@@ -717,7 +717,7 @@ else
                                 else { <Cover Url="@track.CoverUrl" /> }
                             </td>
                             <td class="track-main">
-                                <div class="ellipsis"><a href="tracks/@track.Id" class="plain">@track.Title</a></div>
+                                <div class="ellipsis"><a href="tracks/@track.Id" class="plain">@track.Title</a>@if (!track.Owned) { <FetchNote Id="track.Id" /> }</div>
                                 <div class="muted small ellipsis">
                                     @if (_file is null) { <span class="show-narrow"><StatusBadge Track="track.Owned ? TrackStatus.Owned : TrackStatus.Missing" /></span> }
                                     @if (track.ArtistId is { } artistId) { <a href="artists/@artistId" @onclick="() => RememberArtistAsync(artistId, track.ArtistCredit)">@track.ArtistCredit</a> } else { @track.ArtistCredit }

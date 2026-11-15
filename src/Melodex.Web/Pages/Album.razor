@@ -172,6 +172,7 @@ else
                                 <div class="ellipsis" title="@track.Title">
                                     <a href="tracks/@track.TrackId" class="plain">@track.Title</a>
                                     <QualityBadge Quality="track.Quality" Dot="true" />
+                                    @if (track.Status is TrackStatus.Missing or TrackStatus.Elsewhere) { <FetchNote Id="track.TrackId" /> }
                                     @if (track.ArtistCredit != album.ArtistCredit) { <span class="muted small"> · @track.ArtistCredit</span> }
                                 </div>
                                 @if (track.FilePath is not null)
