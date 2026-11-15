@@ -4,18 +4,22 @@
 
 @*
     Asks for an artist, album or track to be fetched, or shows how that's going. The other actions for the same thing
-    (play, listen, ignore and so on) are its child content: they go once it's asked for, leaving the status chip.
+    (play, listen, ignore and so on) are its child content: they go while it's being fetched, leaving the status chip.
+    One that ended without a copy keeps them, with a button to Review, where it can be looked for again.
 *@
-@if (Tracker.Find(Kind, Id) is { } request)
+@if (Tracker.Find(Kind, Id) is { Active: true } request)
 {
     <a class="badge @Format.RequestBadge(request)" href="activity?open=@request.Id" title="@request.Detail">@Format.RequestLabel(request)</a>
-    @if (!request.Active && Auth.May(UserPermissions.Request))
-    {
-        <IconButton Icon="retry" Large="Large" Title="@(ScanStatus.Reading ? WaitHint : "Try again")" Disabled="@(_busy || ScanStatus.Reading)" OnClick="GetAsync" />
-    }
 }
 else
 {
+    @if (FetchNote.CouldntFetch(Tracker, Kind, Id) is { } ended)
+    {
+        <a class="icon-button review-flag @(Large ? "large" : "")" href="review/couldnt-fetch"
+           title="@($"Couldn't fetch it: {ended.Detail ?? "see what went wrong"}. Open Review to look again.")">
+            <Icon Name="attention" />@if (Large) { <span>Couldn't fetch</span> }
+        </a>
+    }
     @ChildContent
     @if (!Auth.May(UserPermissions.Request) || !Button)
     {
