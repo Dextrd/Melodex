@@ -5,11 +5,13 @@
 @inject AuthState Auth
 @inject NavigationManager Nav
 @inject RequestTracker Tracker
+@inject ToolsMemory Memory
 
 <PageTitle>@(_import?.Import.Name ?? "Import from a list") · Melodex</PageTitle>
 
 @* Importing a list: choosing it and, for a CSV, its columns; then its songs as they're matched, to check and change;
-   then where they go. *@
+   then where they go. What's chosen and not yet sent is kept for the session (ToolsMemory). *@
+<ToolsPlace />
 <p class="small">@if (_import?.Import.BatchId is { } batch) { <a href="tools/import/batch/@batch">← Import from @ServiceNames.Of(_import.Import.Format)</a> } else { <a href="tools">← Tools</a> }</p>
 <h1>@(_import?.Import.Name ?? "Import from a list")</h1>
 
@@ -322,11 +324,39 @@ else
 
     private List<ImportLineInfo> Shown => _import is null ? [] : _show is { } outcome ? _import.Lines.Where(l => l.Outcome == outcome).ToList() : _import.Lines.ToList();
 
+    // A list chosen and not yet imported, and how an import's songs were shown and where they were to go.
+    private sealed record Draft(bool Pasting, string Text, string? FileName, ImportPeek? Peek, List<ImportColumn> Columns, bool HasHeader, string Name);
+    private sealed record Choices(ImportOutcome? Show, ImportPlaylistMode Mode, Guid? PlaylistId, string PlaylistName, bool Request);
+
+    private string Page(Guid? id) => id is { } import ? $"tools/import/{import}" : "tools/import";
+
+    private void Keep()
+    {
+        if (_loaded is { } id)
+            Memory.Keep(Page(id), new Choices(_show, _mode, _playlistId, _playlistName, _request));
+        else
+            Memory.Keep(Page(null), new Draft(_pasting, _text, _fileName, _peek, _columns, _hasHeader, _name));
+    }
+
+    private void Recall()
+    {
+        if (Id is null && Memory.Recall<Draft>(Page(null)) is { } draft)
+            (_pasting, _text, _fileName, _peek, _columns, _hasHeader, _name) = (draft.Pasting, draft.Text, draft.FileName, draft.Peek, draft.Columns, draft.HasHeader, draft.Name);
+        else if (Id is { } id && Memory.Recall<Choices>(Page(id)) is { } chosen)
+            (_show, _mode, _playlistId, _playlistName, _request) = (chosen.Show, chosen.Mode, chosen.PlaylistId, chosen.PlaylistName, chosen.Request);
+    }
+
+    private bool _started;
+
     protected override async Task OnParametersSetAsync()
     {
-        if (Id == _loaded)
+        if (Id == _loaded && _started)
             return;
+        if (_started)
+            Keep();
+        _started = true;
         _loaded = Id;
+        Recall();
         _timer?.Dispose();
         _timer = null;
         _import = null;
@@ -438,6 +468,8 @@ else
         {
             var made = await Api.CreateImportAsync(new CreateImport(_text, _fileName, _peek!.Format,
                 _peek.Format == ImportFormat.Csv ? _columns : null, _peek.Format == ImportFormat.Csv ? _hasHeader : null, _name));
+            // Sent: coming back to Import from a list starts afresh.
+            (_pasting, _text, _fileName, _peek, _columns, _hasHeader, _name) = (false, "", null, null, [], false, "");
             Nav.NavigateTo($"tools/import/{made.Id}");
         }
         catch (MelodexApiException ex)
@@ -508,6 +540,7 @@ else
 
     public void Dispose()
     {
+        Keep();
         _timer?.Dispose();
         Tracker.Changed -= OnRequestsChanged;
     }

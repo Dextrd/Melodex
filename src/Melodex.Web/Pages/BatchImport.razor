@@ -5,6 +5,7 @@
 @inject RequestTracker Tracker
 @using Microsoft.JSInterop
 @inject IJSRuntime Js
+@inject ToolsMemory Memory
 
 <PageTitle>Import from @Service · Melodex</PageTitle>
 
@@ -12,6 +13,7 @@
     The lists imported from one export, each matched as a list import is: tick the songs to import, then apply them all.
     The list being matched, or fetched once it's applied, opens and comes into view, as Activity's do.
 *@
+<ToolsPlace />
 <p class="small"><a href="tools">← Tools</a></p>
 <h1>Import from @Service</h1>
 
@@ -175,8 +177,16 @@ else
         return Where(r => r.Active && r.State != RequestState.Queued) ?? Where(r => r.Active);
     }
 
+    // Which lists were open, and which of those you opened or closed yourself, kept for the session.
+    private sealed record Lists(HashSet<Guid> Open, HashSet<Guid> Yours);
+
     protected override async Task OnInitializedAsync()
     {
+        if (Memory.Recall<Lists>($"tools/import/batch/{Id}") is { } kept)
+        {
+            _open.UnionWith(kept.Open);
+            _yours.UnionWith(kept.Yours);
+        }
         Tracker.Changed += OnRequestsChanged;
         await Tracker.EnsureLoadedAsync();
         await LoadAsync();
@@ -286,6 +296,7 @@ else
 
     public void Dispose()
     {
+        Memory.Keep($"tools/import/batch/{Id}", new Lists([.. _open], [.. _yours]));
         _timer?.Dispose();
         Tracker.Changed -= OnRequestsChanged;
     }

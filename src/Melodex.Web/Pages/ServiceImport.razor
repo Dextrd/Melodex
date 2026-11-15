@@ -2,10 +2,13 @@
 @inject MelodexClient Api
 @inject AuthState Auth
 @inject NavigationManager Nav
+@inject ToolsMemory Memory
+@implements IDisposable
 
 <PageTitle>Import from @Name · Melodex</PageTitle>
 
 @* A music service's export of your data: what's in it, then which lists to import, each matched as a list import is. *@
+<ToolsPlace />
 <p class="small"><a href="tools">← Tools</a></p>
 <h1>Import from @Name</h1>
 
@@ -127,6 +130,39 @@ else
     private HashSet<string> _chosen = [];
     private string _folder = "", _likedName = "Liked Songs";
 
+    // The export read and what was chosen from it, kept for the session until it's imported.
+    private sealed record Draft(List<(string Name, byte[] Bytes)> Files, ServicePeek? Peek, HashSet<string> Chosen, string Folder, bool FolderEdited, string LikedName);
+
+    private string? _slug;
+
+    // Each service's page has its own; going from one to another keeps the one left.
+    protected override void OnParametersSet()
+    {
+        if (Slug == _slug)
+            return;
+        if (_slug is not null)
+            KeepDraft(_slug);
+        _slug = Slug;
+        (_error, _otherService) = (null, null);
+        (_files, _peek, _chosen, _folder, _folderEdited, _likedName) = Memory.Recall<Draft>($"tools/import/{Slug}") is { } draft
+            ? (draft.Files, draft.Peek, draft.Chosen, draft.Folder, draft.FolderEdited, draft.LikedName)
+            : ([], null, [], "", false, "Liked Songs");
+    }
+
+    private void KeepDraft(string slug)
+    {
+        if (_peek is null)
+            Memory.Forget($"tools/import/{slug}");
+        else
+            Memory.Keep($"tools/import/{slug}", new Draft(_files, _peek, _chosen, _folder, _folderEdited, _likedName));
+    }
+
+    public void Dispose()
+    {
+        if (_slug is not null)
+            KeepDraft(_slug);
+    }
+
     private List<ServiceList> Choosable => _peek?.Lists.Where(l => l.New > 0).ToList() ?? [];
 
     private async Task ReadAsync(InputFileChangeEventArgs e)
@@ -218,6 +254,8 @@ else
         try
         {
             var batch = await Api.CreateServiceImportAsync(Streams(), new CreateServiceImport(_chosen.ToList(), Folder(), _likedName));
+            // Sent: coming back starts afresh.
+            _peek = null;
             Nav.NavigateTo($"tools/import/batch/{batch.Id}");
         }
         catch (MelodexApiException ex)

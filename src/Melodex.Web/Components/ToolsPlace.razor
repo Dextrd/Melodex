@@ -1,0 +1,12 @@
+@inject IJSRuntime Js
+@using Microsoft.JSInterop
+
+@* On a Tools page: comes back scrolled to where the page was left this session, however it was come back to. *@
+
+@code {
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+            await Js.InvokeVoidAsync("melodexScroll.toLeft");
+    }
+}
