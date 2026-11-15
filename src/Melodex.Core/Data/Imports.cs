@@ -132,8 +132,11 @@ public class ImportLine
     /// <summary>For an import of albums, the catalogue album it was matched to.</summary>
     public Guid? AlbumId { get; set; }
 
-    /// <summary>How sure the match is, from 0 to 1.</summary>
+    /// <summary>How sure the match is, from 0 to 1; for one not found, how sure its suggestion is.</summary>
     public double? Confidence { get; set; }
+
+    /// <summary>For one not found, the closest the catalogues had, to suggest in Review.</summary>
+    public Guid? SuggestedTrackId { get; set; }
 
     /// <summary>Its match was chosen by hand, so matching again leaves it be.</summary>
     public bool Chosen { get; set; }

@@ -40,7 +40,7 @@ Scans and other long jobs show on **Activity**, where they can be paused, cancel
 
 ## Review
 
-**Review** has four tabs: **Matching**, files to match; **Seems lossy**, lossless files that seem lossy, to replace or
+**Review** has four tabs: **Matching**, files and imported songs to match; **Seems lossy**, lossless files that seem lossy, to replace or
 trust (see [Lossless that seems lossy](requests-and-listening.md#lossless-that-seems-lossy)); **Couldn't fetch**,
 requests that ended without a copy to keep (see [Requests and listening](requests-and-listening.md)); and
 **Upgraded**, upgrades to approve or roll back (see
@@ -57,6 +57,11 @@ sure the match is, the files' names, their paths or when they last changed; the 
   knows, such as your own recordings.
 - **Defer** it: it leaves the list, and each scan tries it again, matching it only when it's confident.
 - **Hide** it: it leaves the library altogether.
+
+Songs from an import that couldn't be matched wait under **Matching** too, if you sent them there. Each shows the
+import it came from and when, beside the closest song the catalogues had. **Approve** it or **Search** for the right
+one, and it goes into the import's playlist; **Dismiss** takes it off the list (see
+[Tools](tools.md#checking-and-applying-the-lists)).
 
 Every file stays in your music folder whichever you choose. The lists at the bottom of Review (Excluded, Incomplete
 metadata, Deferred and Hidden) move a file from one to another, or put it back on the review list, where the next scan

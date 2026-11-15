@@ -490,6 +490,8 @@ td.actions > * + * { margin-left: .6rem; }
 .review-item .reasons { margin: 0; padding-left: 1.2rem; }
 .review-item .reasons li + li { margin-top: .2rem; }
 .review-actions { display: flex; gap: .5rem; align-items: center; justify-content: flex-end; white-space: nowrap; }
+/* Files and imported songs to match have different buttons, but their columns line up: room for a file's five. */
+.review-item.matching .review-actions { min-width: 12rem; }
 .suggestion { display: flex; align-items: baseline; gap: .5rem; flex-wrap: wrap; }
 .confidence { font-size: .78rem; font-weight: 700; padding: .05rem .45rem; border-radius: 999px; font-variant-numeric: tabular-nums; }
 .confidence.high { color: var(--owned); background: var(--owned-bg); }
@@ -500,6 +502,7 @@ a.button:hover { text-decoration: none; border-color: var(--accent); }
 @media (max-width: 640px) {
     .review-item { grid-template-columns: 1fr; gap: .6rem; }
     .review-actions { justify-content: flex-start; }
+    .review-item.matching .review-actions { min-width: 0; }
 }
 
 /* Activity: one row per request, opening to its parts and attempts. */
@@ -1224,6 +1227,11 @@ svg.flip { transform: scaleY(-1); }
     .review-bar .toolbar.one-line { flex-wrap: nowrap; gap: .5rem; }
     .review-bar .icon-button > span:not(.spinner) { display: none; }
     .review-bar .icon-button:has(span:not(.spinner)) { padding: 0; }
+}
+/* Matching's files and imported songs together bring a button more, so the names go sooner. */
+@container (max-width: 940px) {
+    .review-bar.crowded .icon-button > span:not(.spinner) { display: none; }
+    .review-bar.crowded .icon-button:has(span:not(.spinner)) { padding: 0; }
 }
 @container (max-width: 330px) {
     .review-bar .toolbar.one-line { flex-wrap: wrap; }

@@ -199,7 +199,9 @@ public sealed record ApplyImport(
 /// <param name="ToReview">Songs sent to Review.</param>
 public sealed record ImportApplied(Guid? PlaylistId, int Added, int Requested, int ToReview);
 
-/// <summary>An imported song nothing was found for, waiting in Review, from <c>GET /imports/unmatched</c>.</summary>
+/// <summary>An imported song that couldn't be matched, waiting in Review, from <c>GET /imports/unmatched</c>.</summary>
+/// <param name="Suggestion">The closest the catalogues had, which wasn't close enough to take.</param>
+/// <param name="Confidence">How sure the suggestion is, from 0 to 1.</param>
 public sealed record UnmatchedImportSong(
     Guid LineId,
     Guid ImportId,
@@ -207,7 +209,9 @@ public sealed record UnmatchedImportSong(
     Guid? PlaylistId,
     string? PlaylistName,
     ImportSong Song,
-    DateTime ImportedAt);
+    DateTime ImportedAt,
+    ImportMatch? Suggestion = null,
+    double? Confidence = null);
 
 /// <summary>Body of <c>POST /imports/unmatched/{lineId}/match</c>: the song it is.</summary>
 public sealed record MatchImportSong(Guid TrackId);
