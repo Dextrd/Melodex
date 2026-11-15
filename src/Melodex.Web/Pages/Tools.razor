@@ -24,10 +24,10 @@
         <a class="card tool-card" href="tools/import/service">
             <Icon Name="import" />
             <span>
-                <strong>Import from Spotify</strong>
+                <strong>Import from Spotify or YouTube Music</strong>
                 <span class="muted small">
-                    The copy of your data Spotify sends you: your playlists and liked songs become playlists here, and saved albums can be
-                    asked for. Importing it again later brings only what's new.
+                    The copy of your data a music service sends you: your playlists and liked songs become playlists here, and saved
+                    albums can be asked for. Importing it again later brings only what's new.
                 </span>
             </span>
         </a>
@@ -120,13 +120,7 @@
         }
     }
 
-    private static string FormatName(ImportFormat format) => format switch
-    {
-        ImportFormat.M3u => "M3U",
-        ImportFormat.Csv => "CSV",
-        ImportFormat.Spotify => "Spotify",
-        _ => "pasted",
-    };
+    private static string FormatName(ImportFormat format) => ServiceNames.Of(format);
 
     private static string StateLabel(ImportSummary import) => import.State switch
     {

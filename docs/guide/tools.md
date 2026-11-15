@@ -44,27 +44,46 @@ Then say what to do with them:
 
 Your imports are listed on the Tools page, newest first. Deleting one leaves its playlist and requests as they are.
 
-## Importing from Spotify
+## Importing from a music service
 
-**Import from Spotify** reads the copy of your data Spotify gives you, so your playlists, liked songs and saved albums
-come across. It needs no Spotify account linked to Melodex.
+**Import from Spotify or YouTube Music** reads the copy of your data a music service gives you, so your playlists, liked
+songs and saved albums come across. It needs no account of theirs linked to Melodex.
 
-To get the copy, sign in on Spotify's website, open **Account → Privacy settings**, tick **Account data** (the extended
-streaming history isn't needed) and ask for it. Spotify emails a link to a zip, usually within a few days.
+### Getting the copy
 
-Choose the zip, or the JSON files from it (`YourLibrary.json` and the `Playlist` files), and Melodex lists what's in it:
-your liked songs, saved albums and each playlist, with how many songs each has. Untick any you don't want, choose the
-folder the playlists go in (`Spotify/` to start with), and what liked songs' playlist is called.
+- **Spotify**: sign in on Spotify's website, open **Account → Privacy settings**, tick **Account data** (the extended
+  streaming history isn't needed) and ask for it. Spotify emails a link to a zip, usually within a few days. Choose the
+  zip, or the JSON files from it (`YourLibrary.json` and the `Playlist` files).
+- **YouTube Music**: at [Google Takeout](https://takeout.google.com), choose **Deselect all**, tick **YouTube and YouTube
+  Music**, and under **All YouTube data included** keep **music library songs** and **playlists** (the rest isn't
+  needed). It usually comes within the hour. Choose the zip, or the CSV files from its `playlists` and
+  `music (library and uploads)` folders.
 
-Each list is then matched as a list import is, by its songs' titles, artists and albums (Spotify's export has no lengths
-or ISRCs, so it's worth checking the matches). Open any of them to check it, choose another song or leave one out, then
-**Apply** them all: each playlist and your liked songs become playlists, and saved albums you don't have can be asked
-for. Songs you don't have hold their places in the playlists, and songs not found can wait in Review, as with a list
-import. Followed artists aren't imported.
+### What comes across
 
-**Importing again updates.** Melodex knows each playlist by its name on Spotify, and each song by Spotify's ID for it,
-so a later export brings only what's new since: new songs go on the end of the playlist made the first time, and a list
-with nothing new is shown as such and left out. Songs taken off a playlist on Spotify stay in Melodex's.
+Melodex lists what's in the copy, with how many songs each has:
+
+- From Spotify: your **liked songs**, **saved albums** and each **playlist**. Followed artists aren't imported.
+- From YouTube Music: the **songs in your library**, and each **playlist**. Takeout doesn't include liked songs, and
+  **Watch later** is left out. YouTube's other playlists are listed too, music or not, so untick any of videos.
+
+Untick any you don't want, and choose the folder the playlists go in (the service's name to start with) and, for
+Spotify, what liked songs' playlist is called.
+
+Each list is then matched as a list import is, by its songs' titles, artists and albums. Neither copy has lengths or
+ISRCs, so it's worth checking the matches. YouTube's playlists hold only each video's ID: Melodex asks YouTube for each
+one's title and channel as it matches them (a song from YouTube Music's own catalogue has an "Artist - Topic" channel,
+which names its artist), and a video that's gone or private is shown as not found.
+
+Open any list to check it, choose another song or leave one out, then **Apply** them all: each playlist (and Spotify's
+liked songs, and YouTube Music's library songs) becomes a playlist, and Spotify's saved albums you don't have can be asked
+for. **Ask for the songs and albums you don't have** asks for every song found in the catalogue that you don't own, as
+well as the albums; songs you don't have hold their places in the playlists either way, and songs not found can wait in
+Review, as with a list import.
+
+**Importing again updates.** Melodex knows each playlist by its name on the service, and each song by the service's ID
+for it, so a later copy brings only what's new since: new songs go on the end of the playlist made the first time, and a
+list with nothing new is shown as such and left out. Songs taken off a playlist on the service stay in Melodex's.
 
 ## Exporting
 

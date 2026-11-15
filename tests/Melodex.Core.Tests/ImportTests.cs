@@ -218,6 +218,43 @@ public sealed class ImportTests : IDisposable
         Assert.Null(ServiceExports.Read([("notes.json", "{\"hello\":1}"u8.ToArray())]));
     }
 
+    [Fact]
+    public void A_youtube_takeout_gives_its_library_songs_and_playlists_by_video()
+    {
+        const string root = "Takeout/YouTube and YouTube Music/";
+        var files = new (string, string)[]
+        {
+            (root + "music (library and uploads)/music library songs.csv",
+                "Video ID,Song Title,Album Title,Artist Name 1,Artist Name 2,Artist Name 3\nvid1,Glory Box,Dummy,Portishead,Geoff Barrow,\nvid2,\"Harder, Better, Faster, Stronger\",Discovery,Daft Punk,,\n\n\n"),
+            (root + "playlists/playlists.csv", "Playlist ID,Add new videos to top,Playlist Title (Original),Playlist Visibility\nPL1,False,Evening,Private\n"),
+            (root + "playlists/Evening-videos.csv", "Video ID,Playlist Video Creation Timestamp\nvid2,2026-11-15T01:54:20+00:00\nvid9,2026-11-15T01:54:27+00:00\n\n"),
+            (root + "playlists/Watch later-videos.csv", "Video ID,Playlist Video Creation Timestamp\nvid7,2026-10-22T00:17:37+00:00\n"),
+            (root + "comments/comments.csv", "Comment ID,Channel ID\nx,y\n"),
+        };
+        using var bytes = new MemoryStream();
+        using (var zip = new System.IO.Compression.ZipArchive(bytes, System.IO.Compression.ZipArchiveMode.Create, leaveOpen: true))
+            foreach (var (name, text) in files)
+            {
+                using var writer = new StreamWriter(zip.CreateEntry(name).Open());
+                writer.Write(text);
+            }
+
+        var export = ServiceExports.Read([("takeout.zip", bytes.ToArray())])!;
+        Assert.Equal(ImportFormat.YouTubeMusic, export.Service);
+        Assert.Equal(["library", "playlist:Evening"], export.Lists.Select(l => l.Key));
+        Assert.Equal(new ImportSong("Harder, Better, Faster, Stronger", "Daft Punk", "Discovery", null), export.Lists[0].Items[1].Song);
+        // A playlist's video the library has is named from it; the other is only its ID, to look up.
+        Assert.Equal([("Harder, Better, Faster, Stronger", "youtube:vid2"), ("", "youtube:vid9")], export.Lists[1].Items.Select(i => (i.Song.Title, i.Id)));
+    }
+
+    [Theory]
+    [InlineData("Glory Box", "Portishead - Topic", "Glory Box", "Portishead")]
+    [InlineData("Daft Punk - One More Time (Official Video)", "Daft Punk", "One More Time", "Daft Punk")]
+    [InlineData("Portishead - Roads [Official Music Video]", "PortisheadVEVO", "Roads", "Portishead")]
+    [InlineData("Teardrop", "MassiveAttackVEVO", "Teardrop", "MassiveAttack")]
+    public void A_videos_title_and_channel_say_what_song_it_is(string title, string channel, string song, string artist) =>
+        Assert.Equal((song, artist), VideoLookup.Song(title, channel));
+
     [TestLibraryFact]
     public async Task A_spotify_export_makes_its_playlists_and_importing_it_again_adds_what_is_new()
     {

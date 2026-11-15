@@ -3,11 +3,11 @@
 @inject MelodexClient Api
 @inject AuthState Auth
 
-<PageTitle>Import from Spotify · Melodex</PageTitle>
+<PageTitle>Import from @Service · Melodex</PageTitle>
 
 @* The lists imported from one export, each matched as a list import is: open one to check its matches, then apply them all. *@
 <p class="small"><a href="tools">← Tools</a></p>
-<h1>Import from Spotify</h1>
+<h1>Import from @Service</h1>
 
 @if (_error is not null && _batch is null)
 {
@@ -70,7 +70,10 @@ else
 
     @if (matching == 0 && ready.Count > 0)
     {
-        var missing = ready.Sum(i => i.Counts.GetValueOrDefault(ImportOutcome.Found) + i.Counts.GetValueOrDefault(ImportOutcome.Unsure));
+        int Missing(bool albums) => ready.Where(i => i.Albums == albums).Sum(i => i.Counts.GetValueOrDefault(ImportOutcome.Found) + i.Counts.GetValueOrDefault(ImportOutcome.Unsure));
+        var (missingSongs, missingAlbums) = (Missing(false), Missing(true));
+        var missing = missingSongs + missingAlbums;
+        var what = string.Join(" and ", new[] { missingSongs > 0 ? Format.Count(missingSongs, "song", "songs") : null, missingAlbums > 0 ? Format.Count(missingAlbums, "album", "albums") : null }.OfType<string>());
         var notFound = ready.Where(i => !i.Albums).Sum(i => i.Counts.GetValueOrDefault(ImportOutcome.NotFound));
         <h2 class="section">Apply them</h2>
         <div class="import-apply">
@@ -82,7 +85,7 @@ else
             {
                 <label class="check">
                     <input type="checkbox" checked="@_request" @onchange="e => _request = (bool)e.Value!" />
-                    Ask for the @Format.Count(missing, "song or album", "songs and albums") you don't have, to add to your library
+                    Ask for the @what you don't have, to add to your library
                 </label>
                 <p class="muted small indent">In the playlists, songs hold their places until they arrive@(_request ? "" : "; a Get button on each asks for them later").</p>
             }
@@ -105,6 +108,8 @@ else
     [Parameter] public Guid Id { get; set; }
 
     private ImportBatch? _batch;
+
+    private string Service => _batch?.Imports.FirstOrDefault() is { } first ? ServiceNames.Of(first.Format) : "a music service";
     private ImportBatchApplied? _applied;
     private bool _busy, _request = true, _toReview = true;
     private string? _error;
