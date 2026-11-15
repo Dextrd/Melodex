@@ -23,6 +23,8 @@
 else
 {
     var ready = _import.Import.State == ImportState.Ready;
+    // The song being matched now: the first still waiting, as they're matched in order.
+    var matching = _import.Import.State == ImportState.Matching ? _import.Lines.FirstOrDefault(l => l.Outcome == ImportOutcome.Pending)?.Id : null;
     <div class="row scan-files-head">
         <span class="muted small">@(ImportCounts.Summary(_import.Import) is { Length: > 0 } summary ? summary : "Waiting to be matched")</span>
         <a class="small" href="tools/import/@Import">Check its matches</a>
@@ -53,9 +55,13 @@ else
                         <div class="muted small ellipsis">@(line.Song.Artist ?? "unknown artist")@(line.Song.Album is { } given ? $" · {given}" : "")</div>
                     }
                 </div>
-                @if (line.Outcome == ImportOutcome.Pending && _import.Import.State == ImportState.Matching)
+                @if (line.Id == matching)
                 {
-                    <span class="badge neutral">Waiting</span>
+                    <span class="badge active">Matching</span>
+                }
+                else if (line.Outcome == ImportOutcome.Pending && _import.Import.State == ImportState.Matching)
+                {
+                    <span class="badge active waiting">Waiting</span>
                 }
                 else if (ImportCounts.Request(Tracker.Requests, _import.Import, line) is { } request)
                 {
