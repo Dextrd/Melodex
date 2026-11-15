@@ -11,6 +11,9 @@ public enum ImportSource
 
     /// <summary>Lines of "Artist – Title", pasted.</summary>
     Text,
+
+    /// <summary>A playlist, liked songs or saved albums from Spotify's export of your data.</summary>
+    Spotify,
 }
 
 /// <summary>How far an import has got.</summary>
@@ -74,6 +77,21 @@ public class ListImport
     /// <summary>Songs not owned were requested when it was applied, as are those matched later in Review.</summary>
     public bool RequestMissing { get; set; }
 
+    /// <summary>The imports made together from one service's export, a list each.</summary>
+    public Guid? BatchId { get; set; }
+
+    /// <summary>Which of the service's lists it is, such as "liked" or "playlist:Road trip", to know it when it's imported again.</summary>
+    public string? ServiceList { get; set; }
+
+    /// <summary>Its lines are albums, such as saved albums, to request rather than put in a playlist.</summary>
+    public bool Albums { get; set; }
+
+    /// <summary>
+    /// A playlist an earlier import of the same list made: applying this one adds to it what's new since, rather than
+    /// making another.
+    /// </summary>
+    public Guid? UpdatesPlaylistId { get; set; }
+
     public List<ImportLine> Lines { get; set; } = [];
 }
 
@@ -97,6 +115,9 @@ public class ImportLine
     /// <summary>The path a playlist file gave, which may be a file in the library.</summary>
     public string? Path { get; set; }
 
+    /// <summary>The service's own ID for it, such as a Spotify URI, so importing again brings only what's new.</summary>
+    public string? ExternalId { get; set; }
+
     public ImportOutcome Outcome { get; set; }
 
     /// <summary>The catalogue track it was matched to.</summary>
@@ -104,6 +125,9 @@ public class ImportLine
 
     /// <summary>A file of your own no catalogue knows, when that's what it is.</summary>
     public Guid? FileId { get; set; }
+
+    /// <summary>For an import of albums, the catalogue album it was matched to.</summary>
+    public Guid? AlbumId { get; set; }
 
     /// <summary>How sure the match is, from 0 to 1.</summary>
     public double? Confidence { get; set; }

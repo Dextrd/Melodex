@@ -754,6 +754,44 @@ public sealed class MelodexClient(HttpClient http)
         await EnsureAsync(response, ct);
     }
 
+    /// <summary>Reads a music service's export of your data (the zip, or the files from it) without importing anything.</summary>
+    public async Task<ServicePeek> PeekServiceImportAsync(IReadOnlyList<(string Name, Stream Content)> files, CancellationToken ct = default)
+    {
+        using var form = Form(files);
+        using var response = await http.PostAsync($"{Api}/imports/services/peek", form, ct);
+        await EnsureAsync(response, ct);
+        return (await response.Content.ReadFromJsonAsync<ServicePeek>(MelodexJson.Options, ct))!;
+    }
+
+    /// <summary>Imports the chosen lists of a music service's export, an import each.</summary>
+    public async Task<ImportBatch> CreateServiceImportAsync(IReadOnlyList<(string Name, Stream Content)> files, CreateServiceImport choice, CancellationToken ct = default)
+    {
+        using var form = Form(files);
+        form.Add(new StringContent(System.Text.Json.JsonSerializer.Serialize(choice, MelodexJson.Options)), "choice");
+        using var response = await http.PostAsync($"{Api}/imports/services", form, ct);
+        await EnsureAsync(response, ct);
+        return (await response.Content.ReadFromJsonAsync<ImportBatch>(MelodexJson.Options, ct))!;
+    }
+
+    public Task<ImportBatch?> GetImportBatchAsync(Guid id, CancellationToken ct = default) =>
+        GetOrNullAsync<ImportBatch>($"{Api}/imports/batches/{id}", ct);
+
+    /// <summary>Applies every import of a batch that's ready.</summary>
+    public async Task<ImportBatchApplied> ApplyImportBatchAsync(Guid id, ApplyImportBatch body, CancellationToken ct = default)
+    {
+        using var response = await http.PostAsJsonAsync($"{Api}/imports/batches/{id}/apply", body, MelodexJson.Options, ct);
+        await EnsureAsync(response, ct);
+        return (await response.Content.ReadFromJsonAsync<ImportBatchApplied>(MelodexJson.Options, ct))!;
+    }
+
+    private static MultipartFormDataContent Form(IReadOnlyList<(string Name, Stream Content)> files)
+    {
+        var form = new MultipartFormDataContent();
+        foreach (var (name, content) in files)
+            form.Add(new StreamContent(content), "files", name);
+        return form;
+    }
+
     // ---- Exports ----
 
     /// <summary>

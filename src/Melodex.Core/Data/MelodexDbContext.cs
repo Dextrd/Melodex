@@ -226,6 +226,7 @@ public partial class MelodexDbContext(DbContextOptions<MelodexDbContext> options
         {
             e.HasOne<User>().WithMany().HasForeignKey(i => i.UserId).OnDelete(DeleteBehavior.Cascade);
             e.HasIndex(i => i.UserId);
+            e.HasIndex(i => i.BatchId);
         });
 
         modelBuilder.Entity<ImportLine>(e =>

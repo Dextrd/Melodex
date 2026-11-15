@@ -24,7 +24,7 @@ public sealed class ImportTask(ImportMatcher matcher, MelodexDbContext db, TaskF
     public async Task RunAsync(BackgroundTask task, IProgress<string> progress, CancellationToken ct)
     {
         var importId = JsonSerializer.Deserialize<Guid>(task.PayloadJson!);
-        if (await db.Imports.FindAsync([importId], ct) is not { } import)
+        if (await db.Imports.AsNoTracking().FirstOrDefaultAsync(i => i.Id == importId, ct) is not { } import)
         {
             progress.Report("The import was deleted");
             return;
@@ -46,7 +46,10 @@ public sealed class ImportTask(ImportMatcher matcher, MelodexDbContext db, TaskF
             foreach (var line in lines)
             {
                 rows.Put(line.Id.ToString(), TaskRowState.Working, line.Title, line.Artist);
-                await matcher.MatchAsync(line, ct);
+                if (import.Albums)
+                    await matcher.MatchAlbumAsync(line, ct);
+                else
+                    await matcher.MatchAsync(line, ct);
                 await db.SaveChangesAsync(ct);
                 await RowAsync(rows, line, ct);
                 done++;
@@ -68,9 +71,11 @@ public sealed class ImportTask(ImportMatcher matcher, MelodexDbContext db, TaskF
             parts.Add($"{unsure} to check");
         if (counts.GetValueOrDefault(ImportOutcome.NotFound) is > 0 and var none)
             parts.Add($"{none} not found");
-        progress.Report($"Matched {LibraryMatcher.Plural(all.Count, "song", "songs")}: {string.Join(", ", parts)}. Check and apply it from Tools.");
+        progress.Report($"Matched {Things(all.Count)}: {string.Join(", ", parts)}. Check and apply it from Tools.");
 
-        void Report() => progress.Report($"Matching {import.Name}: {done} of {LibraryMatcher.Plural(all.Count, "song", "songs")}");
+        void Report() => progress.Report($"Matching {import.Name}: {done} of {Things(all.Count)}");
+
+        string Things(int count) => import.Albums ? LibraryMatcher.Plural(count, "album", "albums") : LibraryMatcher.Plural(count, "song", "songs");
     }
 
     // The song as it came out: what it was matched to, and how sure.
@@ -78,7 +83,9 @@ public sealed class ImportTask(ImportMatcher matcher, MelodexDbContext db, TaskF
     {
         var track = line.TrackId is { } id
             ? await db.Tracks.AsNoTracking().Where(t => t.Id == id).Select(t => new { t.Title, t.ArtistCredit }).FirstOrDefaultAsync(ct)
-            : null;
+            : line.AlbumId is { } album
+                ? await db.Albums.AsNoTracking().Where(a => a.Id == album).Select(a => new { a.Title, a.ArtistCredit }).FirstOrDefaultAsync(ct)
+                : null;
         var what = track is null ? null : $"{track.Title} · {track.ArtistCredit}";
         var (state, detail) = line.Outcome switch
         {
@@ -87,6 +94,6 @@ public sealed class ImportTask(ImportMatcher matcher, MelodexDbContext db, TaskF
             ImportOutcome.Unsure => (TaskRowState.Skipped, $"Not sure: {what}, {line.Confidence:P0} alike"),
             _ => (TaskRowState.Failed, "Nothing like it in the library or the catalogue"),
         };
-        rows.Put(line.Id.ToString(), state, line.Title, line.Artist, detail, line.TrackId is { } trackId ? $"tracks/{trackId}" : null);
+        rows.Put(line.Id.ToString(), state, line.Title, line.Artist, detail, line.TrackId is { } trackId ? $"tracks/{trackId}" : line.AlbumId is { } albumId ? $"albums/{albumId}" : null);
     }
 }

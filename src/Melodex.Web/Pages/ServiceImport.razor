@@ -1,0 +1,158 @@
+@page "/tools/import/service"
+@inject MelodexClient Api
+@inject AuthState Auth
+@inject NavigationManager Nav
+
+<PageTitle>Import from Spotify · Melodex</PageTitle>
+
+@* A music service's export of your data: what's in it, then which lists to import, each matched as a list import is. *@
+<p class="small"><a href="tools">← Tools</a></p>
+<h1>Import from Spotify</h1>
+
+@if (!Auth.May(UserPermissions.Request))
+{
+    <div class="empty card">Importing needs the Request permission.</div>
+}
+else
+{
+    <p class="muted">
+        Spotify gives anyone a copy of their data: on Spotify's website, open <strong>Account → Privacy settings</strong>, tick
+        <strong>Account data</strong> and ask for it. An email brings a zip within a few days. Choose that zip here, or the JSON
+        files from it, and then which playlists, liked songs and saved albums to import. <a href="settings/help/tools#importing-from-spotify">More in the guide</a>.
+    </p>
+    <div class="field">
+        <label class="field-label" for="service-files">The export's zip, or its files</label>
+        <InputFile id="service-files" OnChange="ReadAsync" multiple accept=".zip,.json,application/zip,application/json" />
+    </div>
+    @if (_busy && _peek is null) { <Loading /> }
+    @if (_error is not null) { <p class="error">@_error</p> }
+
+    @if (_peek is not null)
+    {
+        @if (_peek.Lists.Count == 0)
+        {
+            <div class="empty card">There are no playlists, liked songs or saved albums in it.</div>
+        }
+        else
+        {
+            <h2 class="section">What to import</h2>
+            <div class="card export-playlists service-lists">
+                <label class="check export-all">
+                    <input type="checkbox" checked="@(_chosen.Count == Choosable.Count)" @onchange="e => ChooseAll((bool)e.Value!)" />
+                    <strong>All @Choosable.Count</strong>
+                </label>
+                @foreach (var list in _peek.Lists)
+                {
+                    var nothingNew = list.New == 0;
+                    <label class="check @(nothingNew ? "dim" : "")" @key="list.Key">
+                        <input type="checkbox" checked="@_chosen.Contains(list.Key)" disabled="@nothingNew" @onchange="e => Choose(list.Key, (bool)e.Value!)" />
+                        <span class="ellipsis">
+                            @(list.Kind == ServiceListKind.Liked ? _likedName : list.Name)
+                            <span class="muted small">@Describe(list)</span>
+                        </span>
+                        <span class="muted small">@Format.Count(list.Count, list.Kind == ServiceListKind.Albums ? "album" : "song", list.Kind == ServiceListKind.Albums ? "albums" : "songs")</span>
+                    </label>
+                }
+            </div>
+            <div class="field">
+                <label class="field-label" for="service-folder">Put the playlists in a folder</label>
+                <input id="service-folder" type="text" @bind="_folder" @bind:event="oninput" placeholder="No folder" />
+            </div>
+            @if (_peek.Lists.Any(l => l.Kind == ServiceListKind.Liked))
+            {
+                <div class="field">
+                    <label class="field-label" for="service-liked">Call liked songs' playlist</label>
+                    <input id="service-liked" type="text" @bind="_likedName" @bind:event="oninput" />
+                </div>
+            }
+            <div class="toolbar">
+                <button class="primary" disabled="@(_busy || _chosen.Count == 0)" @onclick="CreateAsync">
+                    @if (_busy) { <span class="spinner"></span> }Match @Format.Count(_chosen.Count, "list", "lists")
+                </button>
+                <span class="muted small">Nothing changes until you've checked the matches and applied them. Matching goes on in Activity if you leave.</span>
+            </div>
+        }
+    }
+}
+
+@code {
+    private const long MaxExport = 30 * 1024 * 1024;
+
+    private bool _busy;
+    private string? _error;
+    private List<(string Name, byte[] Bytes)> _files = [];
+    private ServicePeek? _peek;
+    private HashSet<string> _chosen = [];
+    private string _folder = "", _likedName = "Liked Songs";
+
+    private List<ServiceList> Choosable => _peek?.Lists.Where(l => l.New > 0).ToList() ?? [];
+
+    protected override void OnInitialized() => _folder = $"Spotify{PlaylistNames.Delimiter(Auth)}";
+
+    private async Task ReadAsync(InputFileChangeEventArgs e)
+    {
+        _error = null;
+        _peek = null;
+        _files = [];
+        var chosen = e.GetMultipleFiles(500);
+        if (chosen.Sum(f => f.Size) > MaxExport)
+        {
+            _error = "That's more than 30 MB. Choose only the files with your library and playlists in: YourLibrary.json and the Playlist files.";
+            return;
+        }
+        _busy = true;
+        try
+        {
+            foreach (var file in chosen)
+            {
+                using var stream = file.OpenReadStream(MaxExport);
+                using var copy = new MemoryStream();
+                await stream.CopyToAsync(copy);
+                _files.Add((file.Name, copy.ToArray()));
+            }
+            _peek = await Api.PeekServiceImportAsync(Streams());
+            _chosen = Choosable.Select(l => l.Key).ToHashSet();
+        }
+        catch (MelodexApiException ex)
+        {
+            _error = ex.Message;
+        }
+        _busy = false;
+    }
+
+    private List<(string Name, Stream Content)> Streams() => _files.Select(f => (f.Name, (Stream)new MemoryStream(f.Bytes))).ToList();
+
+    private string Describe(ServiceList list) => list switch
+    {
+        { New: 0 } => "· nothing new since you last imported it",
+        { UpdatesPlaylistName: { } playlist } => $"· {list.New} new, to add to {playlist}",
+        { Kind: ServiceListKind.Albums } => "· to ask for those you don't have",
+        _ => "",
+    };
+
+    private void ChooseAll(bool all) => _chosen = all ? Choosable.Select(l => l.Key).ToHashSet() : [];
+
+    private void Choose(string key, bool chosen)
+    {
+        if (chosen)
+            _chosen.Add(key);
+        else
+            _chosen.Remove(key);
+    }
+
+    private async Task CreateAsync()
+    {
+        _busy = true;
+        _error = null;
+        try
+        {
+            var batch = await Api.CreateServiceImportAsync(Streams(), new CreateServiceImport(_chosen.ToList(), _folder, _likedName));
+            Nav.NavigateTo($"tools/import/batch/{batch.Id}");
+        }
+        catch (MelodexApiException ex)
+        {
+            _error = ex.Message;
+        }
+        _busy = false;
+    }
+}

@@ -376,6 +376,9 @@ namespace Melodex.Core.Data.Migrations
                     b.Property<string>("Album")
                         .HasColumnType("TEXT");
 
+                    b.Property<Guid?>("AlbumId")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("Artist")
                         .HasColumnType("TEXT");
 
@@ -389,6 +392,9 @@ namespace Melodex.Core.Data.Migrations
                         .HasColumnType("REAL");
 
                     b.Property<Guid?>("EntryId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ExternalId")
                         .HasColumnType("TEXT");
 
                     b.Property<Guid?>("FileId")
@@ -619,7 +625,13 @@ namespace Melodex.Core.Data.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("TEXT");
 
+                    b.Property<bool>("Albums")
+                        .HasColumnType("INTEGER");
+
                     b.Property<DateTime?>("AppliedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("BatchId")
                         .HasColumnType("TEXT");
 
                     b.Property<DateTime>("CreatedAt")
@@ -635,6 +647,9 @@ namespace Melodex.Core.Data.Migrations
                     b.Property<bool>("RequestMissing")
                         .HasColumnType("INTEGER");
 
+                    b.Property<string>("ServiceList")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("Source")
                         .IsRequired()
                         .HasColumnType("TEXT");
@@ -646,10 +661,15 @@ namespace Melodex.Core.Data.Migrations
                     b.Property<Guid?>("TaskId")
                         .HasColumnType("TEXT");
 
+                    b.Property<Guid?>("UpdatesPlaylistId")
+                        .HasColumnType("TEXT");
+
                     b.Property<Guid>("UserId")
                         .HasColumnType("TEXT");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("BatchId");
 
                     b.HasIndex("UserId");
 
