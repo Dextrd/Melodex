@@ -63,6 +63,9 @@ jobs:
           - image: melodex-retriever-bandcamp
             context: plugins/retriever-bandcamp
             file: plugins/retriever-bandcamp/Dockerfile
+          - image: melodex-retriever-soulseek
+            context: plugins/retriever-soulseek
+            file: plugins/retriever-soulseek/Dockerfile
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-qemu-action@v3

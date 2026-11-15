@@ -31,15 +31,16 @@ the first scan.
 | `MELODEX_PORT` | The port the web app listens on | `8787` |
 | `MELODEX_VERSION` | Which release to run, such as `1.0.0`; `latest` follows each release | `latest` |
 | `INBOX_PATH` | The folder the inbox plugin watches for files you drop in | `./inbox` |
-| `COMPOSE_PROFILES` | More retrieval plugins to run, comma-separated: `archive`, `prowlarr`, `qobuz`, `tidal`, `bandcamp` | none |
+| `COMPOSE_PROFILES` | More retrieval plugins to run, comma-separated: `archive`, `prowlarr`, `qobuz`, `tidal`, `bandcamp`, `soulseek` | none |
 | `DOWNLOADS_PATH` | qBittorrent's downloads folder, for the `prowlarr` plugin | `./downloads` |
+| `SLSKD_DOWNLOADS_PATH` | slskd's downloads folder, for the `soulseek` plugin, which moves what it downloads into staging | `./slskd-downloads` |
 
 ### In a compose dashboard
 
 Server dashboards that run compose files, such as OpenMediaVault's (**Services → Compose → Files**), Portainer's
 stacks or Dockge, take the same file. Paste `docker-compose.yml` in as a new file or stack, put the settings above in
 its environment box (one `NAME=value` a line), and start it. Use full paths for `MUSIC_PATH`, `INBOX_PATH` and
-`DOWNLOADS_PATH`, as the dashboard's working folder may not be where you expect.
+`DOWNLOADS_PATH` and `SLSKD_DOWNLOADS_PATH`, as the dashboard's working folder may not be where you expect.
 
 ### Retrieval plugins
 
@@ -53,6 +54,7 @@ the install stays small until you want them:
 | `qobuz` | Qobuz | Your own subscription |
 | `tidal` | Tidal | Your own subscription |
 | `bandcamp` | Albums and songs you've bought on Bandcamp | Your Bandcamp account |
+| `soulseek` | What Soulseek's users share, through slskd | Your own [slskd](https://github.com/slskd/slskd), and `SLSKD_DOWNLOADS_PATH` set to its downloads folder |
 
 For example `COMPOSE_PROFILES=archive,bandcamp`. Once it's running, add it under **Settings → Plugins**, where it's
 among the templates under **Add**: see [plugins](plugins.md).
@@ -71,6 +73,18 @@ both. Say qBittorrent's container mounts your pool at `/data` (as the TRaSH guid
 If **Save folder** isn't somewhere qBittorrent has, it can't write the files: every fetch fails with qBittorrent's
 "Permission denied". The plugin's health check warns when the save folder isn't under qBittorrent's own default save
 path, and names that path; a failed fetch says what to change.
+
+### Soulseek, through slskd
+
+Soulseek is a network of people sharing their music with each other, and slskd is a client for it you run yourself.
+The plugin asks your slskd to search and download, then moves what it downloaded into Melodex's staging, so both
+must see slskd's downloads folder: set `SLSKD_DOWNLOADS_PATH` to that folder as your server sees it, writable. Give
+the plugin one of the API keys in slskd's settings (`web.authentication.api_keys`).
+
+slskd expects you to share too, and some people won't send to those who share nothing; the plugin's health says when
+you don't. Sharing is up to you: slskd's `shares.directories` setting can point at your music folder, read-only. What
+people share is theirs to share, or not, so the plugin is off until you add it, and is best placed late in the order,
+after the retrievers you'd rather use.
 
 ## The folders Melodex keeps
 

@@ -24,11 +24,35 @@ What changed in each release of Melodex. Versions follow [semantic versioning](h
   the list import reads back. Several come as a zip. Songs you don't have are left out, or kept by name only. The
   library exports as a CSV too, a row for each song you have or each album, with the columns you choose. A playlist's
   page has an export button (#24).
+- Playlists and folders have a **⋯** menu, as songs do, in the list, on their squares and on their pages, also opened by
+  right-clicking or pressing and holding. A playlist's pins it, edits it, changes its picture or deletes it; a folder's
+  makes a playlist in it, renames it, changes its picture, or removes it with every playlist in it, saying how many
+  first. A playlist square's pin is back in its top left, and folders' picture buttons are in their menus now (#139).
+- Songs fetched to listen to get their lyrics too, a moment after they're ready to play so they're never held up; adding
+  one to the library brings its lyrics with it (#41).
+- A wishlist, under Library → Wishlist: songs and albums you'd like, each user their own. Add them from their menus, or
+  with the star that takes Listen now's place while no retriever is on; they leave it once your library has them (#44).
+- A Soulseek retriever, through your own slskd: whole folders matched to albums, lossless and ready peers first, and
+  another peer's copy tried when one refuses, queues too long or stalls. Turn it on with the soulseek Compose profile
+  (#96).
 
 ### Changed
 
 - A song that couldn't be fetched no longer shows a big "Needs review" badge in track lists: a "couldn't fetch" note sits by
   its title, a small button outlined in yellow opens Review's Couldn't fetch tab, and its menu stays (#141).
+- A link into Activity or Review that names something (a download's badge, a scan's progress, an import's "Watch it in
+  Activity", a song's Review button) lands on it: it's scrolled into view and flashes briefly. Earlier downloads load
+  until it's there (#136).
+- The Tools pages remember where you were for the session, as the Library and Search do: Tools in the top bar goes back
+  to the Tools page you were last on, and each comes back scrolled to where you left it, with what you'd chosen and not
+  yet sent (a pasted list, an export read, its lists ticked, an export's choices, which of an import's lists were open)
+  (#137).
+- Checkboxes are round and in your theme's colours, with a tick that pops in, and **Choose file** buttons look like the
+  app's other buttons, in light and dark and every accent colour (#140).
+- The Prowlarr plugin's health check warns when its **Save folder** isn't under qBittorrent's own default save path, as
+  qBittorrent may not have it (a different mount in its container), and suggests one that is; a fetch that fails with
+  qBittorrent's "Permission denied" says what to change. Its settings and the guide show both sides with an example
+  (#114).
 
 ### Fixed
 
@@ -36,6 +60,16 @@ What changed in each release of Melodex. Versions follow [semantic versioning](h
   matching fetches its album's editions. A request that can't be filed anywhere now shows as failed, not In library.
 - A listen-now download says **Expired** or **Deleted** as soon as its song is gone, even in the moment before its
   request has caught up (#133).
+- A greyed-out song's menu (a placeholder in a playlist, or a played song in the queue) showed greyed out with its row;
+  it shows in full now (#138).
+- In Activity, an attempt's state badge no longer crowds the line below it (#149).
+- On Settings → Quality, **Use the default** sits under the qualities it puts back, not in the lossless check section
+  (#150).
+- Activity's **Downloads** showed only the newest 200 requests, so with more queued (an Upgrade now, say) the ones
+  running could be missing. Every request still going is shown now, however many, and **Earlier** loads the ones before
+  as you scroll to the end. Long lists draw as they're scrolled to, so they stay quick (#148).
+- The Prowlarr plugin left a `melodex-<job>` tag in qBittorrent for every fetch. Each is deleted when its fetch is done
+  now, and the first time the plugin reaches qBittorrent after starting it clears any left from before (#135).
 
 ## [1.4.0] - 2026-11-14
 

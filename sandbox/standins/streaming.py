@@ -1,5 +1,5 @@
-"""Stand-ins for Qobuz's, Tidal's and Bandcamp's APIs, for the sandbox only, so their plugins can be tried without
-accounts.
+"""Stand-ins for Qobuz's, Tidal's, Bandcamp's and slskd's APIs, for the sandbox only, so their plugins can be tried
+without accounts.
 
 Albums and songs are looked up in MusicBrainz, so whatever Melodex asks for is found, with MusicBrainz's titles,
 lengths, barcodes and ISRCs. The audio is a quiet tone of each track's length, made when it's first asked for:
@@ -39,7 +39,7 @@ INTERNAL = os.environ.get("INTERNAL_URL", "http://streaming-standin:8080")
 AUDIO = Path(os.environ.get("AUDIO_ROOT", "/tmp/standin"))
 MUSICBRAINZ = "https://musicbrainz.org/ws/2"
 
-app = FastAPI(title="Qobuz, Tidal and Bandcamp stand-ins")
+app = FastAPI(title="Qobuz, Tidal, Bandcamp and slskd stand-ins")
 _lock = threading.Lock()
 _last_call = 0.0
 _releases: dict[str, dict[str, Any] | None] = {}
@@ -471,3 +471,136 @@ def bandcamp_file(kind: str, id: str, enc: str = "flac") -> Response:
                 out.write(_flac(track["id"], False), f"{artist} - {title} - {n:02} {track['title'].replace('/', '_')}.flac")
         zipped.with_suffix(".tmp").rename(zipped)
     return FileResponse(zipped, media_type="application/zip", filename=f"{artist} - {title}.zip")
+
+
+# ---- slskd ----
+#
+# slskd's REST API, for the Soulseek plugin: a search finds what MusicBrainz has for the words, as folders shared by two
+# peers, one with FLAC and a free slot and one with MP3s and a queue. A download makes the tones into slskd's downloads
+# folder, shared with the plugin, as slskd does: in a folder named after the peer's.
+
+SLSKD_KEY = "standin"
+SLSKD_DOWNLOADS = Path(os.environ.get("SLSKD_DOWNLOADS", "/slskd-downloads"))
+_slskd_searches: dict[str, list[dict[str, Any]]] = {}
+# The tone each shared file is of, by its name, and what's been downloaded from each peer.
+_slskd_files: dict[str, int] = {}
+_slskd_transfers: dict[str, list[dict[str, Any]]] = {}
+
+
+def _slskd_refused(request: Request) -> JSONResponse | None:
+    return None if request.headers.get("X-API-Key") == SLSKD_KEY else JSONResponse({"error": "Unauthorized"}, 401)
+
+
+def _slskd_name(text: str) -> str:
+    return re.sub(r'[\\/:*?"<>|]', "_", text)
+
+
+def _slskd_shared(album: dict[str, Any], peer: str) -> dict[str, Any]:
+    flac = peer == "standin-flac"
+    # Each release in a folder of its own, as people keep them: an album's editions are told apart by their number.
+    folder = f"Music\\{_slskd_name(album['artist'])}\\{_slskd_name(album['title'])} ({album['id']}) [{'FLAC' if flac else 'MP3 320'}]"
+    files = []
+    for track in album["tracks"]:
+        name = f"{folder}\\{track['position']:02} - {_slskd_name(track['title'])}.{'flac' if flac else 'mp3'}"
+        _slskd_files[name] = track["id"]
+        files.append({"filename": name, "size": track["duration"] * (60_000 if flac else 40_000), "extension": "flac" if flac else "mp3",
+                      "length": track["duration"], "bitRate": 700 if flac else 320, "isLocked": False,
+                      **({"bitDepth": 16, "sampleRate": 44100} if flac else {})})
+    return {"username": peer, "files": files}
+
+
+@app.get("/slskd/api/v0/application")
+def slskd_application(request: Request) -> JSONResponse:
+    return _slskd_refused(request) or JSONResponse({
+        "version": "0.0.0-standin",
+        "server": {"state": "Connected, LoggedIn", "isConnected": True, "isLoggedIn": True},
+        "shares": {"directories": 0, "files": 0}})
+
+
+@app.post("/slskd/api/v0/searches")
+async def slskd_search(request: Request) -> JSONResponse:
+    if refused := _slskd_refused(request):
+        return refused
+    body = await request.json()
+    # Found at once, rather than over the search's timeout.
+    albums = _search_albums(body["searchText"])
+    albums += [album for _, album in _search_tracks(body["searchText"]) if album not in albums]
+    found: dict[str, dict[str, Any]] = {}
+    for album in albums:
+        for peer in ("standin-flac", "standin-mp3"):
+            shared = _slskd_shared(album, peer)
+            found.setdefault(peer, {"username": peer, "hasFreeUploadSlot": peer == "standin-flac",
+                                    "queueLength": 0 if peer == "standin-flac" else 3, "uploadSpeed": 2_000_000, "files": []})
+            found[peer]["files"] += shared["files"]
+    _slskd_searches[body["id"]] = list(found.values())
+    return JSONResponse({"id": body["id"], "searchText": body["searchText"], "state": "Completed, TimedOut", "isComplete": True})
+
+
+@app.get("/slskd/api/v0/searches/{search_id}")
+def slskd_search_state(search_id: str, request: Request) -> JSONResponse:
+    return _slskd_refused(request) or JSONResponse({"id": search_id, "state": "Completed, TimedOut", "isComplete": True,
+                                                    "responseCount": len(_slskd_searches.get(search_id, []))})
+
+
+@app.get("/slskd/api/v0/searches/{search_id}/responses")
+def slskd_responses(search_id: str, request: Request) -> JSONResponse:
+    return _slskd_refused(request) or JSONResponse(_slskd_searches.get(search_id, []))
+
+
+@app.delete("/slskd/api/v0/searches/{search_id}")
+def slskd_forget_search(search_id: str, request: Request) -> Response:
+    if refused := _slskd_refused(request):
+        return refused
+    _slskd_searches.pop(search_id, None)
+    return Response(status_code=204)
+
+
+def _slskd_download(transfer: dict[str, Any]) -> None:
+    try:
+        transfer["state"] = "InProgress"
+        source = _flac(_slskd_files[transfer["filename"]], False)
+        names = transfer["filename"].split("\\")
+        folder = SLSKD_DOWNLOADS / names[-2]
+        folder.mkdir(parents=True, exist_ok=True)
+        folder.chmod(0o777)
+        target = folder / names[-1]
+        if target.suffix == ".mp3":
+            subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(source), "-c:a", "libmp3lame", "-b:a", "320k", str(target)], check=True)
+        else:
+            target.write_bytes(source.read_bytes())
+        target.chmod(0o666)
+        transfer.update(size=target.stat().st_size, bytesTransferred=target.stat().st_size, percentComplete=100,
+                        state="Completed, Succeeded")
+    except Exception:
+        transfer["state"] = "Completed, Errored"
+
+
+@app.post("/slskd/api/v0/transfers/downloads/{username}")
+async def slskd_enqueue(username: str, request: Request) -> Response:
+    if refused := _slskd_refused(request):
+        return refused
+    for wanted in await request.json():
+        if wanted["filename"] not in _slskd_files:
+            return JSONResponse({"error": f"{username} doesn't share {wanted['filename']}"}, 400)
+        transfer = {"id": secrets.token_hex(8), "username": username, "filename": wanted["filename"], "size": wanted["size"],
+                    "state": "Queued, Remotely", "bytesTransferred": 0, "percentComplete": 0}
+        _slskd_transfers.setdefault(username, []).append(transfer)
+        threading.Thread(target=_slskd_download, args=(transfer,), daemon=True).start()
+    return Response(status_code=201)
+
+
+@app.get("/slskd/api/v0/transfers/downloads/{username}")
+def slskd_downloads(username: str, request: Request) -> JSONResponse:
+    if refused := _slskd_refused(request):
+        return refused
+    if username not in _slskd_transfers:
+        return JSONResponse({"error": "Not found"}, 404)
+    return JSONResponse({"username": username, "directories": [{"directory": "standin", "files": _slskd_transfers[username]}]})
+
+
+@app.delete("/slskd/api/v0/transfers/downloads/{username}/{transfer_id}")
+def slskd_cancel(username: str, transfer_id: str, request: Request) -> Response:
+    if refused := _slskd_refused(request):
+        return refused
+    _slskd_transfers[username] = [t for t in _slskd_transfers.get(username, []) if t["id"] != transfer_id]
+    return Response(status_code=204)
