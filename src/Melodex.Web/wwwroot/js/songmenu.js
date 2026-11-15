@@ -1,12 +1,14 @@
 // A song, album or artist's menu (ItemMenu.razor) opens from its row or tile too, where it was pointed at: by
-// right-clicking it with a mouse, or pressing and holding it on a touch screen. Links and fields in a row keep their own.
+// right-clicking it with a mouse, or pressing and holding it on a touch screen. Links and fields in a row keep their own,
+// except in a row marked .menu-row, which is a link as a whole. Playlists' and folders' menus (PlaylistMenu.razor) too.
 // Every menu opens upward when there's no room below it.
 (() => {
     // A tile is a link as a whole, so it opens from anywhere on it; in a row, links keep their own menu.
     const menuOf = target => {
         if (target.closest('input, textarea, select, .menu, .menu-backdrop'))
             return null;
-        const tile = target.closest('.tile-wrap');
+        // A row that's a link as a whole, such as a playlist's, opens it from its link too.
+        const tile = target.closest('.tile-wrap') ?? target.closest('.menu-row');
         if (!tile && target.closest('a'))
             return null;
         return (tile ?? target.closest('tr, li'))?.querySelector('.song-menu > .icon-button') ?? null;
