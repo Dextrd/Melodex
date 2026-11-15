@@ -2,11 +2,16 @@
 @implements IDisposable
 @inject MelodexClient Api
 @inject AuthState Auth
-@inject NavigationManager Nav
+@inject RequestTracker Tracker
+@using Microsoft.JSInterop
+@inject IJSRuntime Js
 
 <PageTitle>Import from @Service · Melodex</PageTitle>
 
-@* The lists imported from one export, each matched as a list import is: open one to check its matches, then apply them all. *@
+@*
+    The lists imported from one export, each matched as a list import is: tick the songs to import, then apply them all.
+    The list being matched, or fetched once it's applied, opens and comes into view, as Activity's do.
+*@
 <p class="small"><a href="tools">← Tools</a></p>
 <h1>Import from @Service</h1>
 
@@ -22,6 +27,7 @@ else
 {
     var matching = _batch.Imports.Count(i => i.State == ImportState.Matching);
     var ready = _batch.Imports.Where(i => i.State == ImportState.Ready).ToList();
+    var fetching = Fetching().ToList();
     @if (matching > 0)
     {
         var total = _batch.Imports.Sum(i => i.Total);
@@ -31,30 +37,42 @@ else
             <div class="progress"><span style="width: @(total == 0 ? 0 : 100 * done / total)%"></span></div>
         </div>
     }
-    else if (_applied is { } applied)
+    else if (fetching.Count > 0)
+    {
+        var landed = fetching.Count(r => r.State == RequestState.InLibrary);
+        var ended = fetching.Count(r => !r.Active);
+        var failed = ended - landed;
+        <div class="notice">
+            @(ended == fetching.Count ? "Got" : "Getting") the missing ones: @landed of @fetching.Count in your library@(failed > 0 ? $", {failed} couldn't be fetched" : "").
+            @if (failed > 0) { <a href="review/couldnt-fetch">See them in Review</a><text>.</text> }
+            @if (InReview > 0) { <span> @Format.Count(InReview, "song waits", "songs wait") in <a href="review">Review</a> to be matched.</span> }
+            <div class="progress"><span style="width: @(100 * ended / fetching.Count)%"></span></div>
+        </div>
+    }
+    else if (ready.Count == 0)
     {
         <div class="notice">
-            Applied @Format.Count(applied.Imports, "list", "lists"): @Format.Count(applied.Added, "song", "songs") in playlists@(applied.Requested > 0 ? $", {applied.Requested} asked for" : "").
-            @if (applied.ToReview > 0) { <text> @Format.Count(applied.ToReview, "song waits", "songs wait") in </text><a href="review">Review</a><text> to be matched.</text> }
+            Applied.
+            @if (InReview > 0) { <span> @Format.Count(InReview, "song waits", "songs wait") in <a href="review">Review</a> to be matched.</span> }
         </div>
     }
     else
     {
-        <p class="muted">Open a list to check its matches, choosing another song or leaving one out, then apply them all.</p>
+        <p class="muted">Open a list to check its matches, ticking the songs to import, then apply them all.</p>
     }
 
     <div class="card">
         @foreach (var import in _batch.Imports)
         {
-            var open = _open.GetValueOrDefault(import.Id);
-            <div class="request" @key="import.Id">
+            var open = _open.Contains(import.Id);
+            <div class="request" @key="import.Id" id="@($"import-{import.Id}")">
                 <div class="request-head import-head">
-                    <button class="request-toggle" aria-expanded="@(open ? "true" : "false")" @onclick="() => _open[import.Id] = !open">
+                    <button class="request-toggle" aria-expanded="@(open ? "true" : "false")" @onclick="() => Toggle(import.Id)">
                         <span class="chevron @(open ? "open" : "")" aria-hidden="true"></span>
                         <span class="request-title">@import.Name</span>
                     </button>
                     <span class="request-state"><span class="badge @(import.State switch { ImportState.Matching => "neutral", ImportState.Ready => "partial", _ => "owned" })">
-                        @(import.State switch { ImportState.Matching => "Matching", ImportState.Ready => "Ready to check", _ => "Done" })</span></span>
+                        @(import.State switch { ImportState.Matching => "Matching", ImportState.Ready => "Ready to apply", _ => "Applied" })</span></span>
                 </div>
                 <div class="muted small request-detail">
                     @Format.Count(import.Total, import.Albums ? "album" : "song", import.Albums ? "albums" : "songs") ·
@@ -66,7 +84,9 @@ else
                 </div>
                 @if (open)
                 {
-                    <div class="request-body"><ImportSongs Import="import.Id" /></div>
+                    <div class="request-body" @onpointerdown="() => Touch(import.Id)" @onwheel="() => Touch(import.Id)" @onfocusin="() => Touch(import.Id)">
+                        <ImportSongs @key="(import.Id, import.State)" Import="import.Id" OnChanged="LoadAsync" />
+                    </div>
                 }
             </div>
         }
@@ -74,12 +94,13 @@ else
 
     @if (matching == 0 && ready.Count > 0)
     {
-        int Missing(bool albums) => ready.Where(i => i.Albums == albums).Sum(i => i.Counts.GetValueOrDefault(ImportOutcome.Found) + i.Counts.GetValueOrDefault(ImportOutcome.Unsure));
+        int Missing(bool albums) => ready.Where(i => i.Albums == albums)
+            .Sum(i => i.Counts.GetValueOrDefault(ImportOutcome.Found) + (albums ? i.Counts.GetValueOrDefault(ImportOutcome.Unsure) : 0));
         var (missingSongs, missingAlbums) = (Missing(false), Missing(true));
         var missing = missingSongs + missingAlbums;
         var what = string.Join(" and ", new[] { missingSongs > 0 ? Format.Count(missingSongs, "song", "songs") : null, missingAlbums > 0 ? Format.Count(missingAlbums, "album", "albums") : null }.OfType<string>());
-        var notFound = ready.Where(i => !i.Albums).Sum(i => i.Counts.GetValueOrDefault(ImportOutcome.NotFound));
-        <h2 class="section">Apply them</h2>
+        var toReview = ready.Where(i => !i.Albums).Sum(i => i.Counts.GetValueOrDefault(ImportOutcome.NotFound) + i.Counts.GetValueOrDefault(ImportOutcome.Unsure));
+        <h2 class="section">Apply it</h2>
         <div class="import-apply">
             @if (!Auth.May(UserPermissions.Listen))
             {
@@ -89,29 +110,22 @@ else
             {
                 <label class="check">
                     <input type="checkbox" checked="@_request" @onchange="e => _request = (bool)e.Value!" />
-                    Ask for the missing @what, to add to your library
+                    Get the missing @what, to add to your library
                 </label>
                 <p class="muted small indent">In the playlists, songs hold their places until they arrive@(_request ? "" : "; a Get button on each asks for them later").</p>
             }
-            @if (notFound > 0)
-            {
-                <label class="check">
-                    <input type="checkbox" checked="@_toReview" @onchange="e => _toReview = (bool)e.Value!" />
-                    Send the @Format.Count(notFound, "song", "songs") that couldn't be matched to Review, to match there; otherwise they're left out
-                </label>
-            }
             <div class="toolbar">
-                <button class="primary" disabled="@_busy" @onclick="ApplyAsync">@if (_busy) { <span class="spinner"></span> }Apply @Format.Count(ready.Count, "list", "lists")</button>
+                <button class="primary" disabled="@_busy" @onclick="ApplyAsync">@if (_busy) { <span class="spinner"></span> }Apply Import</button>
                 @if (_error is not null) { <span class="error small">@_error</span> }
             </div>
+            @if (toReview > 0)
+            {
+                <p class="muted small">
+                    The @Format.Count(toReview, "song", "songs") that couldn't be matched or are to review go to <a href="review">Review</a> once
+                    the import is applied, to be matched there.
+                </p>
+            }
         </div>
-    }
-    @if (_batch.Imports.All(i => i.State != ImportState.Applied))
-    {
-        <p class="small import-forget">
-            <button class="link" disabled="@_busy" @onclick="DeleteAsync">Delete these imports</button>
-            <span class="muted">Nothing they would have made is made.</span>
-        </p>
     }
 }
 
@@ -121,22 +135,49 @@ else
     private ImportBatch? _batch;
 
     private string Service => _batch?.Imports.FirstOrDefault() is { } first ? ServiceNames.Of(first.Format) : "a music service";
-    private ImportBatchApplied? _applied;
-    private readonly Dictionary<Guid, bool> _open = [];
 
-    // The list being matched now, so it can be watched.
-    private static bool Underway(ImportSummary import) =>
-        import.State == ImportState.Matching && import.Counts.GetValueOrDefault(ImportOutcome.Pending) is var pending && pending > 0 && pending < import.Total;
-    private bool _busy, _request = true, _toReview = true;
+    // The lists open now; those you opened or closed yourself are left as you had them.
+    private readonly HashSet<Guid> _open = [];
+    private readonly HashSet<Guid> _yours = [];
+    private readonly Dictionary<Guid, DateTime> _touched = [];
+    private Guid? _following;
+
+    // Each applied list's missing songs or albums, to find their requests by.
+    private readonly Dictionary<Guid, (ImportSummary Import, List<ImportLineInfo> Lines)> _missing = [];
+
+    private bool _busy, _request = true;
     private string? _error;
     private Timer? _timer;
 
-    protected override async Task OnParametersSetAsync()
+    private int InReview => _batch?.Imports.Sum(i => i.InReview) ?? 0;
+
+    // The requests applying it made, for the missing songs and albums of every list.
+    private IEnumerable<RequestInfo> Fetching() => _missing.Values
+        .SelectMany(m => m.Lines.Select(l => ImportCounts.Request(Tracker.Requests, m.Import, l))).OfType<RequestInfo>();
+
+    // The list being worked on: the one being matched, or the one a song's being fetched for, else the next to be.
+    private Guid? Underway()
     {
+        if (_batch is null)
+            return null;
+        if (_batch.Imports.FirstOrDefault(i => i.State == ImportState.Matching && i.Counts.GetValueOrDefault(ImportOutcome.Pending) is var pending && pending > 0 && pending < i.Total) is { } matching)
+            return matching.Id;
+        Guid? Where(Func<RequestInfo, bool> state) => _missing.Values
+            .Where(m => m.Lines.Any(l => ImportCounts.Request(Tracker.Requests, m.Import, l) is { } r && state(r))).Select(m => (Guid?)m.Import.Id).FirstOrDefault();
+        return Where(r => r.Active && r.State != RequestState.Queued) ?? Where(r => r.Active);
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        Tracker.Changed += OnRequestsChanged;
+        await Tracker.EnsureLoadedAsync();
         await LoadAsync();
+        await LoadMissingAsync();
         if (_batch?.Imports.Any(i => i.State == ImportState.Matching) == true)
             _timer = new Timer(_ => InvokeAsync(PollAsync), null, 1500, 1500);
     }
+
+    protected override Task OnAfterRenderAsync(bool firstRender) => FollowAsync();
 
     private async Task LoadAsync()
     {
@@ -145,14 +186,45 @@ else
             _batch = await Api.GetImportBatchAsync(Id);
             if (_batch is null)
                 _error = "Those imports aren't there any more.";
-            // The list being matched opens, and stays open once it's done.
-            foreach (var import in _batch?.Imports.Where(Underway) ?? [])
-                _open.TryAdd(import.Id, true);
         }
         catch (Exception e)
         {
             _error = $"Couldn't load the imports: {e.Message}";
         }
+    }
+
+    private async Task LoadMissingAsync()
+    {
+        foreach (var import in _batch?.Imports.Where(i => i.State == ImportState.Applied && !_missing.ContainsKey(i.Id)).ToList() ?? [])
+            if (await Api.GetImportAsync(import.Id) is { } detail)
+                _missing[import.Id] = (detail.Import, detail.Lines.Where(l => l.Outcome == ImportOutcome.Found).ToList());
+    }
+
+    // The list being worked on opens and comes into view; the one before closes, unless it's yours or in use.
+    private async Task FollowAsync()
+    {
+        if (Underway() is not { } underway || underway == _following)
+            return;
+        var before = _following;
+        _following = underway;
+        if (before is { } last && !_yours.Contains(last) && !InUse(last))
+            _open.Remove(last);
+        if (_yours.Contains(underway))
+            return;
+        _open.Add(underway);
+        StateHasChanged();
+        await Js.InvokeVoidAsync("melodexScroll.follow", $"import-{underway}");
+    }
+
+    private bool InUse(Guid import) => _touched.TryGetValue(import, out var at) && DateTime.UtcNow - at < TimeSpan.FromSeconds(10);
+
+    private void Touch(Guid import) => _touched[import] = DateTime.UtcNow;
+
+    private void Toggle(Guid import)
+    {
+        _yours.Add(import);
+        if (!_open.Remove(import))
+            _open.Add(import);
     }
 
     private async Task PollAsync()
@@ -166,14 +238,18 @@ else
         StateHasChanged();
     }
 
+    private void OnRequestsChanged() => InvokeAsync(StateHasChanged);
+
     private async Task ApplyAsync()
     {
         _busy = true;
         _error = null;
         try
         {
-            _applied = await Api.ApplyImportBatchAsync(Id, new ApplyImportBatch(_request, _toReview));
+            await Api.ApplyImportBatchAsync(Id, new ApplyImportBatch(_request, NotFoundToReview: true));
+            await Tracker.RefreshAsync();
             await LoadAsync();
+            await LoadMissingAsync();
         }
         catch (MelodexApiException e)
         {
@@ -182,21 +258,9 @@ else
         _busy = false;
     }
 
-    private async Task DeleteAsync()
+    public void Dispose()
     {
-        _busy = true;
-        try
-        {
-            foreach (var import in _batch!.Imports)
-                await Api.DeleteImportAsync(import.Id);
-            Nav.NavigateTo("tools");
-        }
-        catch (MelodexApiException e)
-        {
-            _error = e.Message;
-            _busy = false;
-        }
+        _timer?.Dispose();
+        Tracker.Changed -= OnRequestsChanged;
     }
-
-    public void Dispose() => _timer?.Dispose();
 }

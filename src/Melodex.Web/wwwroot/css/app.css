@@ -934,6 +934,9 @@ tr.playing td:nth-child(2) { color: var(--accent); font-weight: 600; }
 .scan-file-text { min-width: 0; }
 .scan-file.matched.fresh, .task-row.done.fresh { animation: matched .6s ease-out; }
 .task-row.waiting .scan-file-text { opacity: .55; }
+/* An import's songs before it's applied: a tick for each, to go in or be left out. */
+.scan-file.choosable { grid-template-columns: auto 2.25rem minmax(0, 1fr) auto; }
+.scan-file.dim > :not(input) { opacity: .5; }
 .task-row.failed .scan-file-text .small { color: var(--missing); }
 @keyframes matched { from { background: var(--owned-bg); } to { background: transparent; } }
 
@@ -1694,6 +1697,7 @@ a.card.tool-card { display: flex; gap: .85rem; align-items: flex-start; padding:
 a.card.tool-card:hover { border-color: var(--accent); text-decoration: none; }
 .tool-card > .glyph { flex: none; width: 1.6rem; height: 1.6rem; color: var(--accent); fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .tool-card > span { display: flex; flex-direction: column; gap: .3rem; }
+.tool-card > .glyph .fill { fill: currentColor; stroke: none; }
 .imports-table col.import-state-col, .import-lines col.import-state-col { width: 9rem; }
 /* An export's lists on its import page: a name and how far it's got, opening to its songs. */
 .request-head.import-head { grid-template-columns: minmax(0, 1fr) auto; }

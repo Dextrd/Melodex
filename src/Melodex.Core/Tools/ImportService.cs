@@ -89,8 +89,8 @@ public sealed class ImportService(MelodexDbContext db, TaskQueue queue, Playlist
     }
 
     /// <summary>
-    /// Makes the playlist (or adds to one) in the list's order, with songs not owned holding their places, requests what
-    /// isn't owned if asked, and sends what wasn't found to Review or leaves it out.
+    /// Makes the playlist (or adds to one) in the list's order, with missing songs holding their places, requests those if
+    /// asked, and sends the songs that couldn't be matched, or that need checking, to Review or leaves them out.
     /// </summary>
     public async Task<ImportApplied?> ApplyAsync(Guid userId, string requester, bool mayPlaylist, Guid id, ApplyImport body, CancellationToken ct)
     {
@@ -119,13 +119,13 @@ public sealed class ImportService(MelodexDbContext db, TaskQueue queue, Playlist
             await db.SaveChangesAsync(ct);
             return new ImportApplied(null, 0, requested, 0);
         }
-        var wanted = lines.Where(l => l.Outcome is ImportOutcome.Found or ImportOutcome.Unsure && l.TrackId is not null).ToList();
+        var wanted = lines.Where(l => l.Outcome == ImportOutcome.Found && l.TrackId is not null).ToList();
         if (body.RequestMissing)
             foreach (var trackId in wanted.Select(l => l.TrackId!.Value).Distinct())
                 if ((await requests.CreateAsync(new CreateRequest(RequestKind.Track, trackId), requester, ct)).Request is not null)
                     requested++;
 
-        var placed = lines.Where(l => l.Outcome is ImportOutcome.Owned or ImportOutcome.Found or ImportOutcome.Unsure && (l.TrackId is not null || l.FileId is not null)).ToList();
+        var placed = lines.Where(l => l.Outcome is ImportOutcome.Owned or ImportOutcome.Found && (l.TrackId is not null || l.FileId is not null)).ToList();
         Guid? playlistId = null;
         if (body.Playlist != ImportPlaylistMode.None && placed.Count > 0)
         {
@@ -140,9 +140,14 @@ public sealed class ImportService(MelodexDbContext db, TaskQueue queue, Playlist
         else if (body.Playlist == ImportPlaylistMode.Existing && body.PlaylistId is { } existing)
             playlistId = existing;
 
-        var notFound = lines.Where(l => l.Outcome == ImportOutcome.NotFound).ToList();
+        // One that needs checking is matched in Review as one that couldn't be, its match the suggestion there.
+        var notFound = lines.Where(l => l.Outcome is ImportOutcome.NotFound or ImportOutcome.Unsure).ToList();
         foreach (var line in notFound)
+        {
             line.InReview = body.NotFoundToReview;
+            if (line.Outcome == ImportOutcome.Unsure && line.TrackId is { } unsure)
+                line.SuggestedTrackId = unsure;
+        }
         var toReview = body.NotFoundToReview ? notFound.Count : 0;
         import.Status = ImportStatus.Applied;
         import.AppliedAt = DateTime.UtcNow;

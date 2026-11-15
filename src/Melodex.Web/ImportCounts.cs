@@ -10,7 +10,7 @@ public static class ImportCounts
     [
         (ImportOutcome.Owned, "owned"),
         (ImportOutcome.Found, "missing"),
-        (ImportOutcome.Unsure, "to check"),
+        (ImportOutcome.Unsure, "to review"),
         (ImportOutcome.NotFound, "couldn't match"),
         (ImportOutcome.Dropped, "left out"),
     ];
@@ -30,18 +30,34 @@ public static class ImportCounts
     {
         ImportOutcome.Owned => "Owned",
         ImportOutcome.Found => line.Chosen ? "Chosen, missing" : "Missing",
-        ImportOutcome.Unsure => "Check it",
-        ImportOutcome.NotFound => line.InReview ? "In Review" : "Couldn't match",
+        ImportOutcome.Unsure or ImportOutcome.NotFound when line.InReview => "In Review",
+        ImportOutcome.Unsure => "To review",
+        ImportOutcome.NotFound => "Couldn't match",
         ImportOutcome.Dropped => "Left out",
         _ => "Matching",
     };
 
     public static string BadgeClass(ImportLineInfo line) => line.Outcome switch
     {
+        ImportOutcome.Unsure or ImportOutcome.NotFound when line.InReview => "partial",
         ImportOutcome.Owned => "owned",
         ImportOutcome.Found => "missing",
         ImportOutcome.Unsure => "partial",
         ImportOutcome.NotFound => "ignored",
         _ => "neutral",
     };
+
+    /// <summary>
+    /// The request applying the import made for a song or album, to show how it's getting on: the newest for it since the
+    /// import was applied.
+    /// </summary>
+    public static RequestInfo? Request(IEnumerable<RequestInfo> requests, ImportSummary import, ImportLineInfo line)
+    {
+        if (import.AppliedAt is not { } applied || line.Outcome != ImportOutcome.Found)
+            return null;
+        var (kind, target) = import.Albums ? (RequestKind.Album, line.Match?.AlbumId) : (RequestKind.Track, line.Match?.TrackId);
+        return target is { } id
+            ? requests.FirstOrDefault(r => r.Kind == kind && r.TargetId == id && !r.ListenNow && r.CreatedAt >= applied.AddMinutes(-1))
+            : null;
+    }
 }

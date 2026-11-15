@@ -93,7 +93,7 @@ else
             }
             <div class="toolbar">
                 <button class="primary" disabled="@(_busy || _chosen.Count == 0)" @onclick="CreateAsync">
-                    @if (_busy) { <span class="spinner"></span> }Match @Format.Count(_chosen.Count, "list", "lists")
+                    @if (_busy) { <span class="spinner"></span> }Start Import
                 </button>
                 <span class="muted small">Nothing changes until you've checked the matches and applied them. Matching goes on in Activity if you leave.</span>
             </div>

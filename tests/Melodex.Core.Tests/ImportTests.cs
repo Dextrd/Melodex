@@ -166,6 +166,23 @@ public sealed class ImportTests : IDisposable
         Assert.Equal("Pasted list", (await _api.GetPlaylistAsync(applied.PlaylistId.Value))!.Playlist.Name);
     }
 
+    [TestLibraryFact]
+    public async Task A_song_to_review_goes_to_review_with_its_match_suggested_and_is_not_asked_for()
+    {
+        await ScanAsync();
+        var import = await _api.CreateImportAsync(new CreateImport("Portishead - Glory Box\nDaft Punks Tribute - Digital Love\n"));
+        var detail = await MatchedAsync(import.Id);
+        var unsure = detail.Lines[1];
+        Assert.Equal(ImportOutcome.Unsure, unsure.Outcome);
+
+        var applied = await _api.ApplyImportAsync(import.Id, new ApplyImport(RequestMissing: true));
+        Assert.Equal(new ImportApplied(applied.PlaylistId, 1, 0, 1), applied);
+        Assert.Equal(["Glory Box"], (await _api.GetPlaylistAsync(applied.PlaylistId!.Value))!.Songs.Select(s => s.Title));
+        var waiting = Assert.Single(await _api.GetUnmatchedImportSongsAsync());
+        Assert.Equal(unsure.Match!.TrackId, waiting.Suggestion!.TrackId);
+        Assert.Equal(unsure.Confidence, waiting.Confidence);
+    }
+
     // ---- Services' exports ----
 
     private const string YourLibrary = """
