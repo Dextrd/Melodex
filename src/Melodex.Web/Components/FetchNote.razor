@@ -1,0 +1,27 @@
+@implements IDisposable
+@inject RequestTracker Tracker
+
+@* "couldn't fetch", beside the title of a song whose request ended without a copy. *@
+@if (CouldntFetch(Tracker, Kind, Id) is { } request)
+{
+    <span class="fetch-note" title="@request.Detail">couldn't fetch</span>
+}
+
+@code {
+    [Parameter] public RequestKind Kind { get; set; } = RequestKind.Track;
+    [Parameter, EditorRequired] public Guid Id { get; set; }
+
+    /// <summary>Its newest request, if that ended without a copy: nothing was found, or nothing right.</summary>
+    public static RequestInfo? CouldntFetch(RequestTracker tracker, RequestKind kind, Guid id) =>
+        tracker.Find(kind, id) is { State: RequestState.NeedsReview or RequestState.Failed } request ? request : null;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Tracker.Changed += Refresh;
+        await Tracker.EnsureLoadedAsync();
+    }
+
+    private void Refresh() => InvokeAsync(StateHasChanged);
+
+    public void Dispose() => Tracker.Changed -= Refresh;
+}

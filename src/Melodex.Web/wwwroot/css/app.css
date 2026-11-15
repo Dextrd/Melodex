@@ -1752,3 +1752,8 @@ a.button.primary:hover { filter: brightness(1.1); }
 .export-columns { display: flex; flex-wrap: wrap; gap: .4rem; margin: .5rem 0; }
 .export-columns .toggle { display: inline-flex; align-items: center; gap: .35rem; }
 .export-columns .toggle:has(input:checked) { border-color: var(--accent); color: var(--text); background: color-mix(in srgb, var(--accent) 14%, var(--surface)); }
+
+/* A song whose request ended without a copy: a note by its title, and a button to Review outlined in the "to review" yellow. */
+.fetch-note { margin-left: .4rem; font-size: .75rem; color: var(--partial); white-space: nowrap; }
+.icon-button.review-flag { border-color: var(--partial); color: var(--partial); text-decoration: none; }
+.icon-button.review-flag:hover { background: var(--partial-bg); text-decoration: none; }

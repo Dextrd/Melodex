@@ -25,6 +25,11 @@ What changed in each release of Melodex. Versions follow [semantic versioning](h
   library exports as a CSV too, a row for each song you have or each album, with the columns you choose. A playlist's
   page has an export button (#24).
 
+### Changed
+
+- A song that couldn't be fetched no longer shows a big "Needs review" badge in track lists: a "couldn't fetch" note sits by
+  its title, a small button outlined in yellow opens Review's Couldn't fetch tab, and its menu stays (#141).
+
 ### Fixed
 
 - A song asked for straight after an import found it in the catalogue no longer fails with "isn't on any edition":
