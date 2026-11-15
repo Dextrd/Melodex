@@ -125,7 +125,7 @@ else
     {
         <div class="notice">
             Matching: @matched of @Format.Count(summary.Total, summary.Albums ? "album" : "song", summary.Albums ? "albums" : "songs").
-            <a href="activity/tasks">Watch it in Activity</a>
+            <a href="@(summary.TaskId is { } watched ? $"activity?open={watched}" : "activity/tasks")">Watch it in Activity</a>
             <div class="progress"><span style="width: @(summary.Total == 0 ? 0 : 100 * matched / summary.Total)%"></span></div>
         </div>
     }

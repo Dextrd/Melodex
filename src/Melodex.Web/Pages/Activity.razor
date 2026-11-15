@@ -76,7 +76,7 @@ else
                 var isScan = task.Kind == "library-scan";
                 var canOpen = Opens.Contains(task.Kind);
                 var taskOpen = canOpen && (_openTasks.TryGetValue(task.Id, out var opened) ? opened : task.Active);
-                <div class="request">
+                <div class="request" id="task-@task.Id">
                     <div class="request-head">
                         @if (canOpen)
                         {
@@ -111,7 +111,7 @@ else
             }
             var request = item.Request!;
             var open = _open.ContainsKey(request.Id);
-            <div class="request">
+            <div class="request" id="request-@request.Id">
                 <div class="request-head">
                     <div class="request-toggle with-cover" @onclick="() => ToggleAsync(request.Id)">
                         <button class="chevron-button" aria-expanded="@(open ? "true" : "false")" aria-label="@(open ? "Hide its attempts" : "Show its attempts")"
@@ -211,6 +211,7 @@ else
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        await LandAsync();
         if (!_hasEnd)
             return;
         _self ??= DotNetObjectReference.Create(this);
@@ -392,20 +393,66 @@ else
             _remembered = Tab;
             await Prefs.SetAsync(TabKey, Tab);
         }
-        if (OpenId is { } id && !_open.ContainsKey(id))
+        if (OpenId is { } id && id != _landed)
         {
+            // Where the link points: a request, or failing that a task. Either is shown open, scrolled to and flashed.
+            _landed = id;
+            if (await Api.GetRequestAsync(id) is not { } request)
+            {
+                await LoadTasksAsync();
+                if (_tasks.FirstOrDefault(t => t.Id == id) is { } task)
+                {
+                    if (Tab is null)
+                        _remembered = "tasks";
+                    _recent = IsRecent(task.Active, task.UpdatedAt);
+                    if (Opens.Contains(task.Kind))
+                        _openTasks[id] = true;
+                    _landing = $"task-{id}";
+                }
+                return;
+            }
             // A link to a request shows it under Downloads, recent or earlier as it is.
-            var request = await Api.GetRequestAsync(id);
             if (Tab is null)
                 _remembered = "downloads";
             // A link to a part opens its parent too, if it's one.
-            var top = request?.ParentId is { } parent ? await Api.GetRequestAsync(parent) : request;
+            var top = request.ParentId is { } parent ? await Api.GetRequestAsync(parent) : request;
             if (top is not null)
                 _recent = IsRecent(top.Active, top.UpdatedAt);
-            if (request?.ParentId is { } parentId)
+            if (request.ParentId is { } parentId)
                 _open[parentId] = top;
             _open[id] = request;
+            _landing = $"request-{top?.Id ?? id}";
         }
+    }
+
+    // The request or task a link named, and the row to scroll to and flash once it's drawn.
+    private Guid? _landed;
+    private string? _landing;
+
+    // Draws enough of the list to include the row landed on, loading earlier downloads until it's there.
+    private async Task LandAsync()
+    {
+        if (_landing is not { } row || !_loaded)
+            return;
+        _landing = null;
+        var id = Guid.Parse(row[(row.IndexOf('-') + 1)..]);
+        for (var tries = 0; tries < 50; tries++)
+        {
+            var index = Visible.ToList().FindIndex(i => (i.Request?.Id ?? i.Task!.Id) == id);
+            if (index >= 0)
+            {
+                _shown = Math.Max(_shown, (index / Step + 1) * Step);
+                break;
+            }
+            if (Shown != "downloads" || _recent || !Tracker.HasEarlier)
+                break;
+            var had = Tracker.Requests.Count;
+            await Tracker.LoadEarlierAsync();
+            if (Tracker.Requests.Count == had)
+                break;
+        }
+        StateHasChanged();
+        await Js.InvokeVoidAsync("melodexScroll.land", row);
     }
 
     private void Refresh() => InvokeAsync(async () =>

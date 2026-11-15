@@ -539,6 +539,14 @@ a.button:hover { text-decoration: none; border-color: var(--accent); }
 /* A long list's end, while more is coming. */
 .list-end { display: flex; align-items: center; justify-content: center; gap: .5rem; padding: 1rem; }
 
+/* What a link landed on flashes, then fades back. */
+.landed { animation: landed 2s ease-out; }
+@keyframes landed {
+    0%, 25% { box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--accent) 70%, transparent); background-color: color-mix(in srgb, var(--accent) 14%, var(--surface, transparent)); }
+    100% { box-shadow: inset 0 0 0 2px transparent; }
+}
+@media (prefers-reduced-motion: reduce) { .landed { animation-duration: 3s; } }
+
 /* Activity: one row per request, opening to its parts and attempts. */
 .request { padding: .75rem 1rem; }
 .request + .request { border-top: 1px solid var(--border); }
