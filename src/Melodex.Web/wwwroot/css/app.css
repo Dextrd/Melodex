@@ -551,6 +551,9 @@ button.request-toggle, div.request-toggle { cursor: pointer; }
 .attempts-track::-webkit-scrollbar { display: none; }
 .attempt-slide { flex: 0 0 100%; min-width: 0; box-sizing: border-box; padding: 0 .5rem; scroll-snap-align: start; scroll-snap-stop: always; }
 .attempt-slide > .job { border-top: none; }
+/* An attempt's head, badge and all, keeps clear of what's under it. */
+.job > .row:first-child { margin-bottom: .35rem; row-gap: .3rem; }
+.job > .row:first-child .badge { margin: .1rem 0; }
 .job details > summary { margin: .3rem 0; }
 .job-log { margin: 0; padding: .5rem .75rem; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; font-size: .8rem; white-space: pre-wrap; overflow-wrap: anywhere; }
 .notice.error { max-width: none; white-space: normal; }
