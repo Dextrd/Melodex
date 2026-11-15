@@ -10,7 +10,8 @@
 #
 # Works with podman or docker. Navidrome's and Melodex's credentials are generated on first run into sandbox/.env.
 # Prowlarr and qBittorrent come too, for the Prowlarr plugin, with PandaCD (Creative Commons music) as the indexer.
-# The Qobuz, Tidal and Bandcamp plugins talk to stand-ins for those services (sandbox/standins), which play tones.
+# The Qobuz, Tidal, Bandcamp and Soulseek plugins talk to stand-ins for those services and slskd (sandbox/standins),
+# which play tones.
 
 set -euo pipefail
 
@@ -35,9 +36,9 @@ QBITTORRENT_PORT="${QBITTORRENT_PORT:-8090}"
 STANDIN_PORT="${STANDIN_PORT:-8095}"
 CONTAINERS=(melodex-sandbox-navidrome melodex-sandbox-core melodex-sandbox-beets melodex-sandbox-ytdlp melodex-sandbox-inbox melodex-sandbox-archive
   melodex-sandbox-prowlarr melodex-sandbox-qbittorrent melodex-sandbox-torrents melodex-sandbox-standin melodex-sandbox-qobuz
-  melodex-sandbox-tidal melodex-sandbox-bandcamp)
+  melodex-sandbox-tidal melodex-sandbox-bandcamp melodex-sandbox-soulseek)
 VOLUMES=(melodex-sandbox-navidrome melodex-sandbox-config melodex-sandbox-staging melodex-sandbox-prowlarr
-  melodex-sandbox-qbittorrent melodex-sandbox-downloads melodex-sandbox-tidal)
+  melodex-sandbox-qbittorrent melodex-sandbox-downloads melodex-sandbox-tidal melodex-sandbox-slskd)
 
 # Image, then build context and Dockerfile.
 IMAGES=(
@@ -50,6 +51,7 @@ IMAGES=(
   "localhost/melodex/retriever-qobuz:dev|$ROOT/plugins/retriever-qobuz|$ROOT/plugins/retriever-qobuz/Dockerfile"
   "localhost/melodex/retriever-tidal:dev|$ROOT/plugins/retriever-tidal|$ROOT/plugins/retriever-tidal/Dockerfile"
   "localhost/melodex/retriever-bandcamp:dev|$ROOT/plugins/retriever-bandcamp|$ROOT/plugins/retriever-bandcamp/Dockerfile"
+  "localhost/melodex/retriever-soulseek:dev|$ROOT/plugins/retriever-soulseek|$ROOT/plugins/retriever-soulseek/Dockerfile"
 )
 
 ENGINE="$(command -v podman || command -v docker || true)"
@@ -154,7 +156,7 @@ configure() {
   done
 }
 
-# The Qobuz, Tidal and Bandcamp plugins, with the stand-ins' app keys and cookie. Tidal still needs signing in: its
+# The Qobuz, Tidal, Bandcamp and Soulseek plugins, with the stand-ins' app keys, cookie and API key. Tidal still needs signing in: its
 # status gives the link. Bandcamp's collection starts empty: buy things on the stand-in's page.
 configure_streaming() {
   local plugins="$1" endpoint settings
@@ -171,6 +173,7 @@ configure_streaming() {
 http://retriever-qobuz:8080 {"appId":"standin","appSecret":"standin-secret","email":"listener@sandbox.invalid","password":"sandbox"}
 http://retriever-tidal:8080 {"clientId":"standin"}
 http://retriever-bandcamp:8080 {"identity":"standin"}
+http://retriever-soulseek:8080 {"url":"http://streaming-standin:8080/slskd","apiKey":"standin"}
 PLUGINS
 }
 
@@ -287,10 +290,15 @@ up() {
     -v melodex-sandbox-staging:/staging -v melodex-sandbox-downloads:/downloads:ro \
     localhost/melodex/retriever-prowlarr:dev >/dev/null
 
-  # Stand-ins for Qobuz, Tidal and Bandcamp, run with the Tidal plugin's image, which has ffmpeg to make their tones.
+  # Stand-ins for Qobuz, Tidal, Bandcamp and slskd, run with the Tidal plugin's image, which has ffmpeg to make their
+  # tones. slskd's downloads folder is shared with the Soulseek plugin, which moves them into staging.
+  # The folder starts out root's, and both run as other users.
+  "$ENGINE" run --rm --user 0 --entrypoint chmod -v melodex-sandbox-slskd:/slskd-downloads localhost/melodex/retriever-tidal:dev \
+    1777 /slskd-downloads
   "$ENGINE" run -d --name melodex-sandbox-standin "${SHARED[@]}" --network-alias streaming-standin \
     -p "127.0.0.1:$STANDIN_PORT:8080" -e PUBLIC_URL="http://localhost:$STANDIN_PORT" \
     -e INTERNAL_URL=http://streaming-standin:8080 -v "$SANDBOX/standins:/standin:ro,z" \
+    -v melodex-sandbox-slskd:/slskd-downloads \
     localhost/melodex/retriever-tidal:dev uvicorn streaming:app --app-dir /standin --host 0.0.0.0 --port 8080 >/dev/null
   "$ENGINE" run -d --name melodex-sandbox-qobuz "${SHARED[@]}" --network-alias retriever-qobuz "${AS_YOU[@]}" \
     -v melodex-sandbox-staging:/staging -e QOBUZ_API=http://streaming-standin:8080/qobuz/api.json/0.2 \
@@ -302,6 +310,9 @@ up() {
   "$ENGINE" run -d --name melodex-sandbox-bandcamp "${SHARED[@]}" --network-alias retriever-bandcamp "${AS_YOU[@]}" \
     -v melodex-sandbox-staging:/staging -e BANDCAMP_URL=http://streaming-standin:8080/bandcamp \
     localhost/melodex/retriever-bandcamp:dev >/dev/null
+  "$ENGINE" run -d --name melodex-sandbox-soulseek "${SHARED[@]}" --network-alias retriever-soulseek "${AS_YOU[@]}" \
+    -v melodex-sandbox-staging:/staging -v melodex-sandbox-slskd:/downloads \
+    localhost/melodex/retriever-soulseek:dev >/dev/null
 
   wait_for Navidrome "$navidrome_url/ping"
   # First run only: Navidrome accepts creating the admin while it has no users.

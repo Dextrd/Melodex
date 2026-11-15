@@ -7,8 +7,9 @@
 #   MELODEX_PORT      the port the web app is on (default 8787)
 #   MELODEX_VERSION   the release, such as 1.0.0; latest follows each one
 #   INBOX_PATH        a folder to drop music into for the inbox plugin (default ./inbox)
-#   COMPOSE_PROFILES  more retrieval plugins, comma-separated: archive, prowlarr, qobuz, tidal, bandcamp
+#   COMPOSE_PROFILES  more retrieval plugins, comma-separated: archive, prowlarr, qobuz, tidal, bandcamp, soulseek
 #   DOWNLOADS_PATH    qBittorrent's downloads folder, for prowlarr
+#   SLSKD_DOWNLOADS_PATH  slskd's downloads folder, for soulseek
 #
 # Open http://your-server:8787 and setup walks you through the rest, Navidrome and the plugins included.
 # To build from source instead: docker compose -f docker-compose.yml -f docker-compose.build.yml up --build
@@ -106,6 +107,16 @@ services:
     container_name: melodex-retriever-bandcamp
     volumes:
       - staging:/staging
+
+  # Moves what your slskd downloads into staging, so it mounts the same folder, writable.
+  retriever-soulseek:
+    <<: *plugin
+    profiles: [soulseek]
+    image: ghcr.io/dextrd/melodex-retriever-soulseek:${MELODEX_VERSION:-latest}
+    container_name: melodex-retriever-soulseek
+    volumes:
+      - staging:/staging
+      - ${SLSKD_DOWNLOADS_PATH:-./slskd-downloads}:/downloads
 
 volumes:
   config:

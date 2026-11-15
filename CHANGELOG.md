@@ -24,6 +24,9 @@ What changed in each release of Melodex. Versions follow [semantic versioning](h
   the list import reads back. Several come as a zip. Songs you don't have are left out, or kept by name only. The
   library exports as a CSV too, a row for each song you have or each album, with the columns you choose. A playlist's
   page has an export button (#24).
+- A Soulseek retriever, through your own slskd: whole folders matched to albums, lossless and ready peers first, and
+  another peer's copy tried when one refuses, queues too long or stalls. Turn it on with the soulseek Compose profile
+  (#96).
 
 ### Changed
 

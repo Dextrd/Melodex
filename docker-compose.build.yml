@@ -21,3 +21,5 @@ services:
     build: plugins/retriever-tidal
   retriever-bandcamp:
     build: plugins/retriever-bandcamp
+  retriever-soulseek:
+    build: plugins/retriever-soulseek
