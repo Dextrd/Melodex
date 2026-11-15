@@ -89,9 +89,9 @@ public sealed class RequestWorker(IServiceScopeFactory scopes, RequestSignal sig
                 .Any(p => p.Capabilities.Contains(RetrievalCapabilities.FetchAlbum));
             var plan = await services.GetRequiredService<RequestPlanner>().PlanAsync(request, albumFetch, cts.Token);
             var requests = services.GetRequiredService<RequestService>();
-            if (plan.Done is not null)
+            if (plan.Done is not null || plan.Failed is not null)
             {
-                await SetAsync(db, request, RequestStatus.InLibrary, plan.Done, cts.Token);
+                await SetAsync(db, request, plan.Failed is null ? RequestStatus.InLibrary : RequestStatus.Failed, plan.Failed ?? plan.Done, cts.Token);
                 await requests.UpdateAncestorsAsync(request.ParentRequestId, cts.Token);
                 return;
             }

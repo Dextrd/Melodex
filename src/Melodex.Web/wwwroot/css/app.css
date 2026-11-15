@@ -1687,6 +1687,9 @@ a.card.tool-card:hover { border-color: var(--accent); text-decoration: none; }
 .tool-card > .glyph { flex: none; width: 1.6rem; height: 1.6rem; color: var(--accent); fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .tool-card > span { display: flex; flex-direction: column; gap: .3rem; }
 .imports-table col.import-state-col, .import-lines col.import-state-col { width: 9rem; }
+/* An export's lists on its import page: a name and how far it's got, opening to its songs. */
+.request-head.import-head { grid-template-columns: minmax(0, 1fr) auto; }
+.import-forget { margin-top: 1.25rem; display: flex; gap: .6rem; flex-wrap: wrap; align-items: baseline; }
 .import-lines col.import-given-col { width: 30%; }
 .import-text { font-family: inherit; }
 .field .import-text { max-width: 48rem; }

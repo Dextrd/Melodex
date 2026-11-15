@@ -80,13 +80,13 @@ public sealed class ImportTask(ImportMatcher matcher, VideoLookup videos, Melode
             .Select(g => new { g.Key, Count = g.Count() }).ToDictionaryAsync(g => g.Key, g => g.Count, ct);
         var parts = new List<string>();
         if (counts.GetValueOrDefault(ImportOutcome.Owned) is > 0 and var owned)
-            parts.Add($"{owned} in your library");
+            parts.Add($"{owned} owned");
         if (counts.GetValueOrDefault(ImportOutcome.Found) is > 0 and var found)
-            parts.Add($"{found} to get");
+            parts.Add($"{found} missing");
         if (counts.GetValueOrDefault(ImportOutcome.Unsure) is > 0 and var unsure)
             parts.Add($"{unsure} to check");
         if (counts.GetValueOrDefault(ImportOutcome.NotFound) is > 0 and var none)
-            parts.Add($"{none} not found");
+            parts.Add($"{none} couldn't match");
         progress.Report($"Matched {Things(all.Count)}: {string.Join(", ", parts)}. Check and apply it from Tools.");
 
         void Report() => progress.Report($"Matching {import.Name}: {done} of {Things(all.Count)}");

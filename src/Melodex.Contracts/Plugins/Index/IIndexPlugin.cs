@@ -35,7 +35,14 @@ public interface IIndexPlugin : IPlugin
 /// <param name="Text">Free text.</param>
 /// <param name="Kinds">Which entity kinds to return; all of them when empty.</param>
 /// <param name="Limit">Maximum results per kind.</param>
-public sealed record IndexSearchQuery(string Text, IReadOnlySet<SearchKind>? Kinds = null, int Limit = 25);
+/// <param name="Fields">
+/// The same search by its parts, when they're known, as when matching a song from a list: a catalogue that can search by
+/// field does so, and the rest search the text.
+/// </param>
+public sealed record IndexSearchQuery(string Text, IReadOnlySet<SearchKind>? Kinds = null, int Limit = 25, IndexSearchFields? Fields = null);
+
+/// <summary>A search's parts: a song's or album's title, its artist, and for a song the album it's from.</summary>
+public sealed record IndexSearchFields(string Title, string? Artist, string? Album = null);
 
 /// <summary>Entity kinds a search can return.</summary>
 public enum SearchKind

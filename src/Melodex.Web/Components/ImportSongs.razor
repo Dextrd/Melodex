@@ -1,0 +1,91 @@
+@implements IDisposable
+@inject MelodexClient Api
+@using Microsoft.AspNetCore.Components.Web.Virtualization
+
+@*
+    One import's songs as they're matched: each keeps its place, and fills in with what it was matched to. Kept up with
+    while it's matching, as Activity's task lists are.
+*@
+@if (_import is null)
+{
+    @if (_error is not null) { <div class="muted small error">@_error</div> } else { <Loading Inline="true" /> }
+}
+else
+{
+    <div class="row scan-files-head">
+        <span class="muted small">@(ImportCounts.Summary(_import.Import) is { Length: > 0 } summary ? summary : "Waiting to be matched")</span>
+        <a class="small" href="tools/import/@Import">Check its matches</a>
+    </div>
+    <div class="scan-files">
+        <Virtualize Items="_import.Lines.ToList()" Context="line" ItemSize="52" OverscanCount="10">
+            <div @key="line.Id" class="scan-file task-row @(line.Outcome == ImportOutcome.Pending ? "waiting" : "done")">
+                <Cover Url="@line.Match?.CoverUrl" />
+                <div class="scan-file-text">
+                    @if (line.Match is { } match)
+                    {
+                        <div class="ellipsis" title="@match.Title">
+                            @if (match.TrackId is { } trackId) { <a href="tracks/@trackId">@match.Title</a> }
+                            else if (match.AlbumId is { } albumId) { <a href="albums/@albumId">@match.Title</a> }
+                            else { @match.Title }
+                        </div>
+                        <div class="muted small ellipsis">@match.Artist@(match.Album is { } album ? $" · {album}" : "")</div>
+                    }
+                    else
+                    {
+                        <div class="ellipsis" title="@line.Song.Title">@(line.Song.Title.Length > 0 ? line.Song.Title : "A YouTube video, to look up")</div>
+                        <div class="muted small ellipsis">@(line.Song.Artist ?? "unknown artist")@(line.Song.Album is { } given ? $" · {given}" : "")</div>
+                    }
+                </div>
+                @if (line.Outcome == ImportOutcome.Pending && _import.Import.State == ImportState.Matching)
+                {
+                    <span class="badge neutral">Waiting</span>
+                }
+                else
+                {
+                    <span class="badge @ImportCounts.BadgeClass(line)">@ImportCounts.Label(line)</span>
+                }
+            </div>
+        </Virtualize>
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public Guid Import { get; set; }
+
+    private ImportDetail? _import;
+    private string? _error;
+    private Timer? _timer;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+        if (_import?.Import.State == ImportState.Matching)
+            _timer = new Timer(_ => InvokeAsync(PollAsync), null, 1500, 1500);
+    }
+
+    private async Task LoadAsync()
+    {
+        try
+        {
+            _import = await Api.GetImportAsync(Import);
+            _error = _import is null ? "That import isn't there any more." : null;
+        }
+        catch (Exception e)
+        {
+            _error = $"Couldn't load its songs: {e.Message}";
+        }
+    }
+
+    private async Task PollAsync()
+    {
+        await LoadAsync();
+        if (_import?.Import.State != ImportState.Matching)
+        {
+            _timer?.Dispose();
+            _timer = null;
+        }
+        StateHasChanged();
+    }
+
+    public void Dispose() => _timer?.Dispose();
+}

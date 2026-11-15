@@ -9,13 +9,14 @@ What changed in each release of Melodex. Versions follow [semantic versioning](h
 - A **Tools** page, with **Import from a list**: an M3U or M3U8 playlist, a CSV from a spreadsheet or another service,
   or lines of "Artist – Title" you paste. Each song is matched to your library and the catalogue, and you check the
   matches, choosing another song or leaving one out, before making a playlist of them, adding them to one, or neither.
-  Songs you don't have can be asked for; in the playlist they hold their places, greyed out, until they arrive, and a
-  **Get** button asks for them later. Songs nothing was found for wait in Review, under **Couldn't match**, where
-  matching one puts it in the playlist where it was in the list (#21).
+  Missing songs can be asked for; in the playlist they hold their places, greyed out, until they arrive, and a **Get**
+  button asks for them later. Songs that couldn't be matched wait in Review, under **Imports**, where matching one puts
+  it in the playlist where it was in the list (#21).
 - **Import from Spotify** on the Tools page, from the copy of your data Spotify sends you (no Spotify account linked):
   choose its playlists, liked songs and saved albums, check the matches, and apply them. Each playlist and your liked
-  songs become playlists, in a folder of your choice, and saved albums you don't have can be asked for. Importing a
-  later export adds only what's new to the playlists made the first time (#22).
+  songs become playlists, in a folder of your choice, and missing saved albums can be asked for. Each list can be opened
+  to watch its songs matched as it goes. Importing a later export adds only what's new to the playlists made the first
+  time (#22).
 - **Import from YouTube Music** too, from Google Takeout's copy of your YouTube data: your library's songs and your
   playlists, whose videos Melodex looks up on YouTube by their IDs (#25).
 - **Export** on the Tools page: your playlists as M3U8 playlists, with paths in the music folder or under the folder
@@ -26,6 +27,8 @@ What changed in each release of Melodex. Versions follow [semantic versioning](h
 
 ### Fixed
 
+- A song asked for straight after an import found it in the catalogue no longer fails with "isn't on any edition":
+  matching fetches its album's editions. A request that can't be filed anywhere now shows as failed, not In library.
 - A listen-now download says **Expired** or **Deleted** as soon as its song is gone, even in the moment before its
   request has caught up (#133).
 
