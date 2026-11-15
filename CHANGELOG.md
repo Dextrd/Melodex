@@ -16,7 +16,9 @@ What changed in each release of Melodex. Versions follow [semantic versioning](h
 - **Import from Spotify** on the Tools page, from the copy of your data Spotify sends you (no Spotify account linked):
   choose its playlists, liked songs and saved albums, check the matches, and apply them. Each playlist and your liked
   songs become playlists, in a folder of your choice, and missing saved albums can be asked for. Each list can be opened
-  to watch its songs matched as it goes. Importing a later export adds only what's new to the playlists made the first
+  to watch its songs matched as it goes: the one being matched opens and comes into view by itself. Tick the songs to
+  import; **Apply Import** stays on the page and shows the missing ones being fetched. Songs to review or that couldn't be
+  matched go to Review. Importing a later export adds only what's new to the playlists made the first
   time (#22).
 - **Import from YouTube Music** too, from Google Takeout's copy of your YouTube data: your library's songs and your
   playlists, whose videos Melodex looks up on YouTube by their IDs (#25).

@@ -184,8 +184,8 @@ public enum ImportPlaylistMode
 /// <summary>Body of <c>POST /imports/{id}/apply</c>.</summary>
 /// <param name="Name">The new playlist's name, folders and all; the import's name when not given.</param>
 /// <param name="PlaylistId">The playlist to add to.</param>
-/// <param name="RequestMissing">Request every song found that you don't own.</param>
-/// <param name="NotFoundToReview">Send songs not found to Review, to match there; otherwise they're left out.</param>
+/// <param name="RequestMissing">Request every missing song: found, and not owned.</param>
+/// <param name="NotFoundToReview">Send songs that couldn't be matched, or need checking, to Review; otherwise they're left out.</param>
 public sealed record ApplyImport(
     ImportPlaylistMode Playlist = ImportPlaylistMode.New,
     string? Name = null,
@@ -257,8 +257,8 @@ public sealed record CreateServiceImport(IReadOnlyList<string> Lists, string? Fo
 public sealed record ImportBatch(Guid Id, IReadOnlyList<ImportSummary> Imports, int Unchanged = 0);
 
 /// <summary>Body of <c>POST /imports/batches/{id}/apply</c>: apply every import in it that's ready.</summary>
-/// <param name="RequestMissing">Request every song and album found that you don't own.</param>
-/// <param name="NotFoundToReview">Send songs not found to Review, to match there.</param>
+/// <param name="RequestMissing">Request every missing song and album.</param>
+/// <param name="NotFoundToReview">Send songs that couldn't be matched, or need checking, to Review.</param>
 public sealed record ApplyImportBatch(bool RequestMissing = true, bool NotFoundToReview = true);
 
 /// <summary>What applying a batch did.</summary>

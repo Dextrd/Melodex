@@ -33,6 +33,15 @@ window.melodexScroll = {
         const view = page ? window.innerHeight : scroller.clientHeight;
         scroller.scrollTo({ top: Math.max(0, top + index * rowHeight - view / 4), behavior: 'instant' });
     },
+    // Something the page is getting on with, such as the list an import is matching: brought into view, unless the
+    // page has been scrolled by hand in the last little while.
+    follow: id => {
+        const element = document.getElementById(id);
+        if (!element || Date.now() - window.melodexScroll.touched < 8000)
+            return;
+        element.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    },
+    touched: 0,
     // A row of tabs that scrolls sideways on a phone: the open tab, centred where it can be.
     tabIntoView: () => {
         const tab = document.querySelector('.page-tabs .active');
@@ -43,6 +52,9 @@ window.melodexScroll = {
         row.scrollTo({ left: left - (row.clientWidth - tab.offsetWidth) / 2, behavior: 'instant' });
     },
 };
+
+for (const name of ['wheel', 'touchmove', 'keydown'])
+    window.addEventListener(name, () => window.melodexScroll.touched = Date.now(), { passive: true, capture: true });
 
 // Blazor scrolls the window to the top as a new page opens; where the page scrolls in its own box, that box is what goes.
 (() => {
