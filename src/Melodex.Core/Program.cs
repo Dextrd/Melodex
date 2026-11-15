@@ -81,6 +81,8 @@ builder.Services.AddScoped<LyricsFinder>();
 builder.Services.AddScoped<PlaylistService>();
 builder.Services.AddScoped<ImportService>();
 builder.Services.AddScoped<ExportService>();
+builder.Services.AddSingleton<VideoLookup>();
+builder.Services.AddHttpClient(VideoLookup.HttpClientName, http => http.Timeout = TimeSpan.FromSeconds(15));
 builder.Services.AddScoped<ImportMatcher>();
 builder.Services.AddSingleton<PlaylistCovers>();
 builder.Services.AddScoped<PlaylistSync>();

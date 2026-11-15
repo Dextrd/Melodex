@@ -19,7 +19,8 @@ public sealed class RequestPlanner(MelodexDbContext db, CatalogueService catalog
     /// <param name="Fetch">The request itself fetches files: a track, or a whole album.</param>
     /// <param name="Children">Requests to create under it.</param>
     /// <param name="Done">Nothing to fetch; why.</param>
-    public sealed record Plan(bool Fetch, IReadOnlyList<Request> Children, string? Done);
+    /// <param name="Failed">It can't be fetched; why.</param>
+    public sealed record Plan(bool Fetch, IReadOnlyList<Request> Children, string? Done, string? Failed = null);
 
     public async Task<Plan> PlanAsync(Request request, bool albumFetchAvailable, CancellationToken ct) => request.TargetKind switch
     {
@@ -50,7 +51,7 @@ public sealed class RequestPlanner(MelodexDbContext db, CatalogueService catalog
         var detail = (await view.GetAlbumAsync(album.Id, null, ct))!;
         request.EditionId ??= detail.OwnedEditionId ?? await ChooseEditionAsync(album.Id, ct);
         if (request.EditionId is null)
-            return new Plan(false, [], "MusicBrainz lists no editions of this album, so there's nothing to fetch");
+            return new Plan(false, [], null, "The catalogue lists no editions of this album, so there's nothing to fetch");
         if (request.EditionId != detail.ShownEditionId)
             detail = (await view.GetAlbumAsync(album.Id, request.EditionId, ct))!;
 
@@ -68,7 +69,7 @@ public sealed class RequestPlanner(MelodexDbContext db, CatalogueService catalog
     {
         request.EditionId ??= await ChooseEditionForTrackAsync(request.TargetId, ct);
         if (request.EditionId is null)
-            return new Plan(false, [], "This track isn't on any edition in the catalogue, so it has nowhere to go");
+            return new Plan(false, [], null, "This track isn't on any edition in the catalogue, so it has nowhere to go");
 
         var albumId = await db.Editions.Where(e => e.Id == request.EditionId).Select(e => e.AlbumId).FirstAsync(ct);
         var detail = (await view.GetAlbumAsync(albumId, request.EditionId, ct))!;

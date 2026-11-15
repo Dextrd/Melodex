@@ -134,6 +134,7 @@ public sealed class ImportTests : IDisposable
         var unmatched = Assert.Single(await _api.GetUnmatchedImportSongsAsync());
         Assert.Equal("Qwxyz Never A Song", unmatched.Song.Title);
         Assert.Equal("Imported/Evening", unmatched.PlaylistName);
+        Assert.True(unmatched.Suggestion is null || unmatched.Confidence < Melodex.Core.Tools.ImportMatcher.Close);
         await _api.MatchUnmatchedImportSongAsync(unmatched.LineId, new MatchImportSong(detail.Lines[3].Match!.TrackId!.Value));
         playlist = (await _api.GetPlaylistAsync(applied.PlaylistId.Value))!;
         Assert.Equal(["Glory Box", digitalLove, "Hunter", digitalLove], playlist.Songs.Select(s => s.Title));
@@ -163,6 +164,152 @@ public sealed class ImportTests : IDisposable
         var applied = await _api.ApplyImportAsync(import.Id, new ApplyImport(RequestMissing: false));
         Assert.Equal([detail.Lines[1].Match!.Title], (await _api.GetPlaylistAsync(applied.PlaylistId!.Value))!.Songs.Select(s => s.Title));
         Assert.Equal("Pasted list", (await _api.GetPlaylistAsync(applied.PlaylistId.Value))!.Playlist.Name);
+    }
+
+    [TestLibraryFact]
+    public async Task A_song_to_review_goes_to_review_with_its_match_suggested_and_is_not_asked_for()
+    {
+        await ScanAsync();
+        var import = await _api.CreateImportAsync(new CreateImport("Portishead - Glory Box\nDaft Punks Tribute - Digital Love\n"));
+        var detail = await MatchedAsync(import.Id);
+        var unsure = detail.Lines[1];
+        Assert.Equal(ImportOutcome.Unsure, unsure.Outcome);
+
+        var applied = await _api.ApplyImportAsync(import.Id, new ApplyImport(RequestMissing: true));
+        Assert.Equal(new ImportApplied(applied.PlaylistId, 1, 0, 1), applied);
+        Assert.Equal(["Glory Box"], (await _api.GetPlaylistAsync(applied.PlaylistId!.Value))!.Songs.Select(s => s.Title));
+        var waiting = Assert.Single(await _api.GetUnmatchedImportSongsAsync());
+        Assert.Equal(unsure.Match!.TrackId, waiting.Suggestion!.TrackId);
+        Assert.Equal(unsure.Confidence, waiting.Confidence);
+    }
+
+    // ---- Services' exports ----
+
+    private const string YourLibrary = """
+        {"tracks":[{"artist":"Portishead","album":"Dummy","track":"Glory Box","uri":"spotify:track:glory"},
+                   {"artist":"Portishead","album":"Third","track":"Hunter","uri":"spotify:track:hunter"}],
+         "albums":[{"artist":"Portishead","album":"Dummy","uri":"spotify:album:dummy"},
+                   {"artist":"Daft Punk","album":"Discovery","uri":"spotify:album:discovery"}],
+         "artists":[{"name":"Portishead","uri":"spotify:artist:p"}],"shows":[],"episodes":[],"bannedTracks":[],"other":[]}
+        """;
+
+    private const string OneMore = """
+        ,{"track":{"trackName":"One More Time","artistName":"Daft Punk","albumName":"Discovery","trackUri":"spotify:track:onemore"}}
+        """;
+
+    private static string Playlists(bool more) => $$"""
+        {"playlists":[{"name":"Road trip","lastModifiedDate":"2026-10-01","items":[
+          {"track":{"trackName":"Glory Box","artistName":"Portishead","albumName":"Dummy","trackUri":"spotify:track:glory"},"episode":null,"localTrack":null,"addedDate":"2026-10-01"},
+          {"track":null,"episode":{"episodeName":"A podcast","showName":"Show","episodeUri":"spotify:episode:x"},"localTrack":null,"addedDate":"2026-10-01"},
+          {"track":null,"episode":null,"localTrack":{"uri":"spotify:local:Daft+Punk:Homework:Da+Funk:328"},"addedDate":"2026-10-01"},
+          {"track":{"trackName":"Digital Love","artistName":"Daft Punk","albumName":"Discovery","trackUri":"spotify:track:digital"},"episode":null,"localTrack":null,"addedDate":"2026-10-02"}
+          {{(more ? OneMore : "")}}
+        ],"description":null,"numberOfFollowers":0}]}
+        """;
+
+    private static byte[] SpotifyZip(bool more)
+    {
+        using var bytes = new MemoryStream();
+        using (var zip = new System.IO.Compression.ZipArchive(bytes, System.IO.Compression.ZipArchiveMode.Create, leaveOpen: true))
+        {
+            foreach (var (name, text) in new[] { ("Spotify Account Data/YourLibrary.json", YourLibrary), ("Spotify Account Data/Playlist1.json", Playlists(more)),
+                         ("Spotify Account Data/Userdata.json", """{"username":"someone"}""") })
+            {
+                using var writer = new StreamWriter(zip.CreateEntry(name).Open());
+                writer.Write(text);
+            }
+        }
+        return bytes.ToArray();
+    }
+
+    [Fact]
+    public void A_spotify_export_gives_its_liked_songs_saved_albums_and_playlists()
+    {
+        var export = ServiceExports.Read([("my_spotify_data.zip", SpotifyZip(more: false))])!;
+        Assert.Equal(ImportFormat.Spotify, export.Service);
+        Assert.Equal([("liked", ServiceListKind.Liked, 2), ("albums", ServiceListKind.Albums, 2), ("playlist:Road trip", ServiceListKind.Playlist, 3)],
+            export.Lists.Select(l => (l.Key, l.Kind, l.Items.Count)));
+        var trip = export.Lists[2].Items;
+        Assert.Equal(new ImportSong("Da Funk", "Daft Punk", "Homework", 328), trip[1].Song);
+        Assert.Equal("spotify:track:digital", trip[2].Id);
+        Assert.Equal(new ImportSong("Discovery", "Daft Punk", null, null), export.Lists[1].Items[1].Song);
+        Assert.Null(ServiceExports.Read([("notes.json", "{\"hello\":1}"u8.ToArray())]));
+    }
+
+    [Fact]
+    public void A_youtube_takeout_gives_its_library_songs_and_playlists_by_video()
+    {
+        const string root = "Takeout/YouTube and YouTube Music/";
+        var files = new (string, string)[]
+        {
+            (root + "music (library and uploads)/music library songs.csv",
+                "Video ID,Song Title,Album Title,Artist Name 1,Artist Name 2,Artist Name 3\nvid1,Glory Box,Dummy,Portishead,Geoff Barrow,\nvid2,\"Harder, Better, Faster, Stronger\",Discovery,Daft Punk,,\n\n\n"),
+            (root + "playlists/playlists.csv", "Playlist ID,Add new videos to top,Playlist Title (Original),Playlist Visibility\nPL1,False,Evening,Private\n"),
+            (root + "playlists/Evening-videos.csv", "Video ID,Playlist Video Creation Timestamp\nvid2,2026-11-15T01:54:20+00:00\nvid9,2026-11-15T01:54:27+00:00\n\n"),
+            (root + "playlists/Watch later-videos.csv", "Video ID,Playlist Video Creation Timestamp\nvid7,2026-10-22T00:17:37+00:00\n"),
+            (root + "comments/comments.csv", "Comment ID,Channel ID\nx,y\n"),
+        };
+        using var bytes = new MemoryStream();
+        using (var zip = new System.IO.Compression.ZipArchive(bytes, System.IO.Compression.ZipArchiveMode.Create, leaveOpen: true))
+            foreach (var (name, text) in files)
+            {
+                using var writer = new StreamWriter(zip.CreateEntry(name).Open());
+                writer.Write(text);
+            }
+
+        var export = ServiceExports.Read([("takeout.zip", bytes.ToArray())])!;
+        Assert.Equal(ImportFormat.YouTubeMusic, export.Service);
+        Assert.Equal(["library", "playlist:Evening"], export.Lists.Select(l => l.Key));
+        Assert.Equal(new ImportSong("Harder, Better, Faster, Stronger", "Daft Punk", "Discovery", null), export.Lists[0].Items[1].Song);
+        // A playlist's video the library has is named from it; the other is only its ID, to look up.
+        Assert.Equal([("Harder, Better, Faster, Stronger", "youtube:vid2"), ("", "youtube:vid9")], export.Lists[1].Items.Select(i => (i.Song.Title, i.Id)));
+    }
+
+    [Theory]
+    [InlineData("Glory Box", "Portishead - Topic", "Glory Box", "Portishead")]
+    [InlineData("Daft Punk - One More Time (Official Video)", "Daft Punk", "One More Time", "Daft Punk")]
+    [InlineData("Portishead - Roads [Official Music Video]", "PortisheadVEVO", "Roads", "Portishead")]
+    [InlineData("Teardrop", "MassiveAttackVEVO", "Teardrop", "MassiveAttack")]
+    public void A_videos_title_and_channel_say_what_song_it_is(string title, string channel, string song, string artist) =>
+        Assert.Equal((song, artist), VideoLookup.Song(title, channel));
+
+    [TestLibraryFact]
+    public async Task A_spotify_export_makes_its_playlists_and_importing_it_again_adds_what_is_new()
+    {
+        await ScanAsync();
+        var peek = await _api.PeekServiceImportAsync([("my_spotify_data.zip", new MemoryStream(SpotifyZip(more: false)))]);
+        Assert.Equal(["liked", "albums", "playlist:Road trip"], peek.Lists.Select(l => l.Key));
+        Assert.All(peek.Lists, l => Assert.Equal(l.Count, l.New));
+
+        var batch = await _api.CreateServiceImportAsync([("my_spotify_data.zip", new MemoryStream(SpotifyZip(more: false)))],
+            new CreateServiceImport(["liked", "albums", "playlist:Road trip"], "Spotify/", "Loved"));
+        Assert.Equal(["Saved albums", "Spotify/Loved", "Spotify/Road trip"], batch.Imports.Select(i => i.Name).Order());
+        var albums = await MatchedAsync(batch.Imports.Single(i => i.Albums).Id);
+        Assert.Equal([ImportOutcome.Owned, ImportOutcome.Owned], albums.Lines.Select(l => l.Outcome));
+        Assert.Equal(["Dummy", "Discovery"], albums.Lines.Select(l => l.Match!.Title));
+        foreach (var import in batch.Imports)
+            await MatchedAsync(import.Id);
+
+        var applied = await _api.ApplyImportBatchAsync(batch.Id, new ApplyImportBatch(RequestMissing: false));
+        Assert.Equal(3, applied.Imports);
+        var playlists = await _api.ListPlaylistsAsync();
+        var trip = playlists.Single(p => p.Name == "Spotify/Road trip");
+        Assert.Equal(["Glory Box", "Da Funk", "Digital Love"], (await _api.GetPlaylistAsync(trip.Id))!.Songs.Select(s => s.Title[..Math.Min(s.Title.Length, 12)]));
+        Assert.Contains(playlists, p => p.Name == "Spotify/Loved" && p.Count == 2);
+
+        // Again, a song longer: only it's new, and it goes on the end of the same playlist.
+        peek = await _api.PeekServiceImportAsync([("Playlist1.json", new MemoryStream(System.Text.Encoding.UTF8.GetBytes(Playlists(more: true))))]);
+        var again = Assert.Single(peek.Lists);
+        Assert.Equal((4, 1, trip.Id), (again.Count, again.New, again.UpdatesPlaylistId));
+        var second = await _api.CreateServiceImportAsync([("my_spotify_data.zip", new MemoryStream(SpotifyZip(more: true)))],
+            new CreateServiceImport(["liked", "albums", "playlist:Road trip"], "Spotify/", "Loved"));
+        Assert.Equal(2, second.Unchanged);
+        var update = Assert.Single(second.Imports);
+        Assert.Equal((1, trip.Id), (update.Total, update.UpdatesPlaylistId));
+        await MatchedAsync(update.Id);
+        await _api.ApplyImportBatchAsync(second.Id, new ApplyImportBatch(RequestMissing: false));
+        Assert.Equal("One More Time", (await _api.GetPlaylistAsync(trip.Id))!.Songs[^1].Title);
+        Assert.Equal(playlists.Count, (await _api.ListPlaylistsAsync()).Count);
     }
 
     // ---- Exporting ----

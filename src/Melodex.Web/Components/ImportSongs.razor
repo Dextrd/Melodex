@@ -1,0 +1,222 @@
+@implements IDisposable
+@inject MelodexClient Api
+@inject RequestTracker Tracker
+@using Microsoft.AspNetCore.Components.Web.Virtualization
+@using Microsoft.JSInterop
+@inject IJSRuntime Js
+
+@*
+    One import's songs as they're matched: each keeps its place, and fills in with what it was matched to. Before it's
+    applied, each can be ticked or not, to go in or be left out; once it's applied, the missing ones asked for show how
+    they're getting on. The list keeps up with where it's matching or fetching while it's left alone, as Activity's do.
+*@
+@if (_import is null)
+{
+    @if (_error is not null) { <div class="muted small error">@_error</div> }
+    else
+    {
+        @* As tall as its songs will be, so opening it doesn't jump when they come. *@
+        <div class="row scan-files-head"><span class="muted small">Loading…</span></div>
+        <div class="scan-files import-songs-waiting" style="height: min(@(Math.Max(1, Total) * 52)px, 32rem, 70vh)"></div>
+    }
+}
+else
+{
+    var ready = _import.Import.State == ImportState.Ready;
+    // The song being matched now: the first still waiting, as they're matched in order.
+    var matching = _import.Import.State == ImportState.Matching ? _import.Lines.FirstOrDefault(l => l.Outcome == ImportOutcome.Pending)?.Id : null;
+    <div class="row scan-files-head">
+        <span class="muted small">@(ImportCounts.Summary(_import.Import) is { Length: > 0 } summary ? summary : "Waiting to be matched")</span>
+        <a class="small" href="tools/import/@Import">Check its matches</a>
+    </div>
+    @if (_changeError is not null) { <div class="error small">@_changeError</div> }
+    <div class="scan-files @(_ticksArriving ? "ticks-arriving" : "")" @ref="_list">
+        <Virtualize Items="_import.Lines.ToList()" Context="line" ItemSize="52" OverscanCount="10">
+            <div @key="line.Id" class="scan-file task-row import-song @(ready ? "choosable" : "") @(line.Outcome == ImportOutcome.Pending ? "waiting" : "done") @(line.Outcome == ImportOutcome.Dropped ? "dim" : "")">
+                @if (ready)
+                {
+                    <input type="checkbox" aria-label="@($"Import {Title(line)}")" checked="@(line.Outcome != ImportOutcome.Dropped)"
+                           @onchange="e => ChooseAsync(line, (bool)e.Value!)" />
+                }
+                <Cover Url="@line.Match?.CoverUrl" />
+                <div class="scan-file-text">
+                    @if (line.Match is { } match)
+                    {
+                        <div class="ellipsis" title="@match.Title">
+                            @if (match.TrackId is { } trackId) { <a href="tracks/@trackId">@match.Title</a> }
+                            else if (match.AlbumId is { } albumId) { <a href="albums/@albumId">@match.Title</a> }
+                            else { @match.Title }
+                        </div>
+                        <div class="muted small ellipsis">@match.Artist@(match.Album is { } album ? $" · {album}" : "")</div>
+                    }
+                    else
+                    {
+                        <div class="ellipsis" title="@line.Song.Title">@Title(line)</div>
+                        <div class="muted small ellipsis">@(line.Song.Artist ?? "unknown artist")@(line.Song.Album is { } given ? $" · {given}" : "")</div>
+                    }
+                </div>
+                @if (line.Id == matching)
+                {
+                    <span class="badge active">Matching</span>
+                }
+                else if (line.Outcome == ImportOutcome.Pending && _import.Import.State == ImportState.Matching)
+                {
+                    <span class="badge active waiting">Waiting</span>
+                }
+                else if (ImportCounts.Request(Tracker.Requests, _import.Import, line) is { } request)
+                {
+                    <span class="badge @Format.RequestBadge(request)" title="@request.Detail">@Format.RequestLabel(request)</span>
+                }
+                else
+                {
+                    <span class="badge @ImportCounts.BadgeClass(line)">@ImportCounts.Label(line)</span>
+                }
+            </div>
+        </Virtualize>
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public Guid Import { get; set; }
+
+    /// <summary>Where the import's got to, as the page knows it: a change loads its songs again, keeping them shown till then.</summary>
+    [Parameter] public ImportState State { get; set; }
+
+    /// <summary>How many songs it has, to keep their room while they load.</summary>
+    [Parameter] public int Total { get; set; }
+
+    /// <summary>Raised when a song is ticked or not, as that changes the import's counts.</summary>
+    [Parameter] public EventCallback OnChanged { get; set; }
+
+    private ImportDetail? _import;
+    private string? _error, _changeError;
+    private Timer? _timer;
+    private ElementReference _list;
+    private bool _placed, _follow;
+
+    // Just after matching finishes, while the ticks slide in; rows drawn later, as the list scrolls, just have them.
+    private bool _ticksArriving;
+
+    private static string Title(ImportLineInfo line) => line.Song.Title.Length > 0 ? line.Song.Title : "A YouTube video, to look up";
+
+    // Where it's at: the first song still being matched, or once applied, the first fetching and then the first waiting.
+    private int? Current
+    {
+        get
+        {
+            var lines = _import!.Lines;
+            if (_import.Import.State == ImportState.Matching)
+                return lines.ToList().FindIndex(l => l.Outcome == ImportOutcome.Pending) is >= 0 and var pending ? pending : null;
+            if (_import.Import.State != ImportState.Applied)
+                return null;
+            var requests = lines.Select(l => ImportCounts.Request(Tracker.Requests, _import.Import, l)).ToList();
+            var fetching = requests.FindIndex(r => r is { Active: true, State: not RequestState.Queued });
+            var waiting = requests.FindIndex(r => r is { Active: true });
+            return fetching >= 0 ? fetching : waiting >= 0 ? waiting : null;
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        Tracker.Changed += OnRequestsChanged;
+        await Tracker.EnsureLoadedAsync();
+        await LoadAsync();
+        if (_import?.Import.State == ImportState.Matching)
+            _timer = new Timer(_ => InvokeAsync(PollAsync), null, 1500, 1500);
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_import is not null && _import.Import.State != State)
+            await ReloadAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_import is null || (_placed && !_follow))
+            return;
+        _follow = false;
+        if (Current is not { } at)
+            return;
+        await Js.InvokeVoidAsync("melodexScanList.show", _list, at, !_placed);
+        _placed = true;
+    }
+
+    /// <summary>Loads it again: after it's applied, say, which the page knows of first.</summary>
+    public async Task ReloadAsync()
+    {
+        var was = _import?.Import.State;
+        await LoadAsync();
+        if (was == ImportState.Matching && _import?.Import.State == ImportState.Ready)
+            _ = TicksArriveAsync();
+        _follow = true;
+        if (_import?.Import.State == ImportState.Matching && _timer is null)
+            _timer = new Timer(_ => InvokeAsync(PollAsync), null, 1500, 1500);
+        StateHasChanged();
+    }
+
+    private async Task LoadAsync()
+    {
+        try
+        {
+            _import = await Api.GetImportAsync(Import);
+            _error = _import is null ? "That import isn't there any more." : null;
+        }
+        catch (Exception e)
+        {
+            _error = $"Couldn't load its songs: {e.Message}";
+        }
+    }
+
+    private async Task TicksArriveAsync()
+    {
+        _ticksArriving = true;
+        await Task.Delay(600);
+        _ticksArriving = false;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task PollAsync()
+    {
+        var was = _import?.Import.State;
+        await LoadAsync();
+        if (was == ImportState.Matching && _import?.Import.State == ImportState.Ready)
+            _ = TicksArriveAsync();
+        _follow = true;
+        if (_import?.Import.State != ImportState.Matching)
+        {
+            _timer?.Dispose();
+            _timer = null;
+        }
+        StateHasChanged();
+    }
+
+    private void OnRequestsChanged() => InvokeAsync(() =>
+    {
+        if (_import?.Import.State != ImportState.Applied)
+            return;
+        _follow = true;
+        StateHasChanged();
+    });
+
+    private async Task ChooseAsync(ImportLineInfo line, bool chosen)
+    {
+        _changeError = null;
+        try
+        {
+            await Api.ChangeImportLineAsync(Import, line.Id, new ChangeImportLine(Dropped: !chosen));
+            await LoadAsync();
+            await OnChanged.InvokeAsync();
+        }
+        catch (MelodexApiException e)
+        {
+            _changeError = e.Message;
+        }
+    }
+
+    public void Dispose()
+    {
+        _timer?.Dispose();
+        Tracker.Changed -= OnRequestsChanged;
+    }
+}

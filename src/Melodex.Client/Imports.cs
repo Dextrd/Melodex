@@ -11,6 +11,12 @@ public enum ImportFormat
 
     /// <summary>Lines of "Artist – Title".</summary>
     Text,
+
+    /// <summary>Spotify's export of your data: a playlist, liked songs or saved albums.</summary>
+    Spotify,
+
+    /// <summary>Google Takeout's YouTube and YouTube Music export: a playlist, or the songs in your library.</summary>
+    YouTubeMusic,
 }
 
 /// <summary>What a CSV column holds.</summary>
@@ -106,6 +112,9 @@ public sealed record CreateImport(
 /// <param name="PlaylistName">The playlist it made or added to, once applied.</param>
 /// <param name="TaskId">The task matching its songs, to watch in Activity.</param>
 /// <param name="InReview">Songs not found when it was applied, still waiting in Review.</param>
+/// <param name="BatchId">The imports made together from one service's export.</param>
+/// <param name="Albums">Its lines are albums, to request, rather than songs for a playlist.</param>
+/// <param name="UpdatesPlaylistId">A playlist an earlier import of the same list made, which this one adds what's new to.</param>
 public sealed record ImportSummary(
     Guid Id,
     string Name,
@@ -118,7 +127,11 @@ public sealed record ImportSummary(
     Guid? PlaylistId,
     string? PlaylistName,
     Guid? TaskId,
-    int InReview = 0);
+    int InReview = 0,
+    Guid? BatchId = null,
+    bool Albums = false,
+    Guid? UpdatesPlaylistId = null,
+    string? UpdatesPlaylistName = null);
 
 /// <summary>What an import's song was matched to.</summary>
 /// <param name="TrackId">The catalogue track; null for a file of your own.</param>
@@ -171,8 +184,8 @@ public enum ImportPlaylistMode
 /// <summary>Body of <c>POST /imports/{id}/apply</c>.</summary>
 /// <param name="Name">The new playlist's name, folders and all; the import's name when not given.</param>
 /// <param name="PlaylistId">The playlist to add to.</param>
-/// <param name="RequestMissing">Request every song found that you don't own.</param>
-/// <param name="NotFoundToReview">Send songs not found to Review, to match there; otherwise they're left out.</param>
+/// <param name="RequestMissing">Request every missing song: found, and not owned.</param>
+/// <param name="NotFoundToReview">Send songs that couldn't be matched, or need checking, to Review; otherwise they're left out.</param>
 public sealed record ApplyImport(
     ImportPlaylistMode Playlist = ImportPlaylistMode.New,
     string? Name = null,
@@ -186,7 +199,9 @@ public sealed record ApplyImport(
 /// <param name="ToReview">Songs sent to Review.</param>
 public sealed record ImportApplied(Guid? PlaylistId, int Added, int Requested, int ToReview);
 
-/// <summary>An imported song nothing was found for, waiting in Review, from <c>GET /imports/unmatched</c>.</summary>
+/// <summary>An imported song that couldn't be matched, waiting in Review, from <c>GET /imports/unmatched</c>.</summary>
+/// <param name="Suggestion">The closest the catalogues had, which wasn't close enough to take.</param>
+/// <param name="Confidence">How sure the suggestion is, from 0 to 1.</param>
 public sealed record UnmatchedImportSong(
     Guid LineId,
     Guid ImportId,
@@ -194,7 +209,57 @@ public sealed record UnmatchedImportSong(
     Guid? PlaylistId,
     string? PlaylistName,
     ImportSong Song,
-    DateTime ImportedAt);
+    DateTime ImportedAt,
+    ImportMatch? Suggestion = null,
+    double? Confidence = null);
 
 /// <summary>Body of <c>POST /imports/unmatched/{lineId}/match</c>: the song it is.</summary>
 public sealed record MatchImportSong(Guid TrackId);
+
+/// <summary>What one of a service's lists is.</summary>
+public enum ServiceListKind
+{
+    Playlist,
+
+    /// <summary>Liked or favourite songs, which become a playlist.</summary>
+    Liked,
+
+    /// <summary>Saved albums, to request.</summary>
+    Albums,
+}
+
+/// <summary>One list in a service's export.</summary>
+/// <param name="Key">Says which it is, to choose it.</param>
+/// <param name="Sample">Its first few songs, or albums (an album's title as the title).</param>
+/// <param name="UpdatesPlaylistId">A playlist an earlier import of this list made, which importing it again adds to.</param>
+/// <param name="New">How many of its songs or albums weren't in an earlier import; all of them if none was.</param>
+public sealed record ServiceList(
+    string Key,
+    string Name,
+    ServiceListKind Kind,
+    int Count,
+    IReadOnlyList<ImportSong> Sample,
+    Guid? UpdatesPlaylistId = null,
+    string? UpdatesPlaylistName = null,
+    int New = 0);
+
+/// <summary>What's in a service's export, from <c>POST /imports/services/peek</c>.</summary>
+public sealed record ServicePeek(ImportFormat Service, IReadOnlyList<ServiceList> Lists);
+
+/// <summary>What to import from a service's export, sent with it to <c>POST /imports/services</c>.</summary>
+/// <param name="Lists">The keys of the lists to import.</param>
+/// <param name="Folder">Put before each playlist's name, such as "Spotify/".</param>
+/// <param name="LikedName">What liked songs' playlist is called.</param>
+public sealed record CreateServiceImport(IReadOnlyList<string> Lists, string? Folder = null, string? LikedName = null);
+
+/// <summary>The imports made from a service's export, one for each list with something new.</summary>
+/// <param name="Unchanged">Lists left out because an earlier import had everything in them.</param>
+public sealed record ImportBatch(Guid Id, IReadOnlyList<ImportSummary> Imports, int Unchanged = 0);
+
+/// <summary>Body of <c>POST /imports/batches/{id}/apply</c>: apply every import in it that's ready.</summary>
+/// <param name="RequestMissing">Request every missing song and album.</param>
+/// <param name="NotFoundToReview">Send songs that couldn't be matched, or need checking, to Review.</param>
+public sealed record ApplyImportBatch(bool RequestMissing = true, bool NotFoundToReview = true);
+
+/// <summary>What applying a batch did.</summary>
+public sealed record ImportBatchApplied(int Imports, int Added, int Requested, int ToReview);

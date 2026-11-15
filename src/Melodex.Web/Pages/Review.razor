@@ -1,7 +1,7 @@
 @page "/review"
 @page "/review/seems-lossy"
 @page "/review/couldnt-fetch"
-@page "/review/couldnt-match"
+@page "/review/imports"
 @page "/review/upgraded"
 @implements IDisposable
 @inject MelodexClient Api
@@ -17,8 +17,8 @@
 <PageTitle>Review · Melodex</PageTitle>
 
 <h1>Review</h1>
-@* Five things wait for you here: files to match, lossless files that seem lossy, requests that ended without a copy, imported songs
-   nothing was found for, and upgrades to keep or roll back. *@
+@* Four things wait for you here: files and imported songs to match, lossless files that seem lossy, requests that ended without
+   a copy, and upgrades to keep or roll back. *@
 <nav class="page-tabs" aria-label="Review">
     @foreach (var (tab, label, count) in Tabs)
     {
@@ -37,6 +37,10 @@
             <strong>Defer</strong> takes a file off this list; each scan tries it again and matches it only when it's confident.
             <strong>Hide</strong> takes it out of the library altogether. Every file stays in your music folder.
         </p>
+        <p class="muted">
+            Songs from lists you imported that couldn't be matched wait here too. Matched, one goes into its import's playlist where
+            it was in the list, and is asked for if the import asked for what's missing. <strong>Dismiss</strong> takes one off the list.
+        </p>
         break;
     case "seems-lossy":
         <p class="muted">
@@ -53,13 +57,6 @@
             as it is. <strong>Look again</strong> searches every plugin again. <strong>Details</strong> shows each attempt, where you can
             pick another candidate. <strong>Dismiss</strong> takes one off the list. One leaves by itself once it's in the library
             however it got there, or when it's asked for again.
-        </p>
-        break;
-    case "couldnt-match":
-        <p class="muted">
-            Songs from lists you imported that nothing was found for. <strong>Choose</strong> searches for the song it is: it goes into
-            the import's playlist where it was in the list, and is asked for if the import asked for what you don't have.
-            <strong>Dismiss</strong> takes one off the list.
         </p>
         break;
     default:
@@ -84,10 +81,9 @@ else if (Total == 0)
 {
     <div class="empty card">@(Tab switch
     {
-        "matching" => "No files to review.",
+        "matching" => "No files or imported songs to review.",
         "seems-lossy" => _spectra is { Lossless: > 0 } ? "No lossless files seem lossy." : "There are no lossless files in the library to check.",
         "couldnt-fetch" => "No requests need you: every one found a copy.",
-        "couldnt-match" => "No imported songs need you: every one was matched.",
         _ => "No upgrades to review.",
     })</div>
 }
@@ -96,7 +92,7 @@ else
     var some = _filter.Length > 0;
     @* One line where there's room: the filter box gives way first, to a button that opens it below, then the buttons
        lose their names. *@
-    <div class="library-bar review-bar">
+    <div class="library-bar review-bar @(Tab == "matching" && _items is { Count: > 0 } && _unmatched is { Count: > 0 } ? "crowded" : null)">
         <div class="toolbar one-line">
             <input class="filter" type="search" placeholder="@FilterHint" aria-label="@FilterHint" @bind="_filter" @bind:event="oninput" />
             <button class="icon-button filter-toggle @(_filterOpen || some ? "on" : "")" type="button" title="@FilterHint" aria-label="@FilterHint"
@@ -109,15 +105,24 @@ else
             @* The buttons for every item carry their names where there's room, which teaches the icons each item has below. *@
             @if (Tab == "matching")
             {
-                var approvable = Visible.Count(i => i.Suggestion is not null);
+                var approvable = Visible.Count(w => w.HasSuggestion);
                 <IconButton Icon="approve" Primary="true" Label="@(some ? "Approve these" : "Approve all")" Disabled="@(_busy || approvable == 0)"
-                            Title="@(some ? "Accept the suggestion for every file the filter shows" : "Accept the suggestion for every file that has one")"
+                            Title="@(some ? "Accept the suggestion for every one the filter shows" : "Accept the suggestion for every one that has one")"
                             OnClick="@(() => _confirm = "approve")" />
-                @foreach (var (aside, verb, icon) in Asides)
+                @if (_items is { Count: > 0 })
                 {
-                    <IconButton Icon="@icon" Label="@($"{verb} {(some ? "these" : "all")}")" Disabled="@(_busy || !Visible.Any())"
-                                Title="@($"{verb} every file {(some ? "the filter shows" : "waiting for review")}. {AsideHint(aside)}")"
-                                OnClick="() => _confirm = aside.ToString()" />
+                    @foreach (var (aside, verb, icon) in Asides)
+                    {
+                        <IconButton Icon="@icon" Label="@($"{verb} {(some ? "these" : "all")}")" Disabled="@(_busy || !VisibleFiles.Any())"
+                                    Title="@($"{verb} every file {(some ? "the filter shows" : "waiting for review")}. {AsideHint(aside)}")"
+                                    OnClick="() => _confirm = aside.ToString()" />
+                    }
+                }
+                @if (_unmatched is { Count: > 0 })
+                {
+                    <IconButton Icon="cancel" Label="@(some ? "Dismiss these" : "Dismiss all")" Disabled="@(_busy || !VisibleUnmatched.Any())"
+                                Title="@($"Take every imported song {(some ? "the filter shows" : "here")} off this list, without matching it")"
+                                OnClick="@(() => _confirm = "dismiss-unmatched")" />
                 }
             }
             else if (Tab == "seems-lossy")
@@ -140,12 +145,6 @@ else
                 <IconButton Icon="cancel" Label="@(some ? "Dismiss these" : "Dismiss all")" Disabled="@(_busy || !VisibleRequests.Any())"
                             Title="@($"Take every request {(some ? "the filter shows" : "here")} off this list, without fetching anything")"
                             OnClick="@(() => _confirm = "dismiss")" />
-            }
-            else if (Tab == "couldnt-match")
-            {
-                <IconButton Icon="cancel" Label="@(some ? "Dismiss these" : "Dismiss all")" Disabled="@(_busy || !VisibleUnmatched.Any())"
-                            Title="@($"Take every song {(some ? "the filter shows" : "here")} off this list, without matching it")"
-                            OnClick="@(() => _confirm = "dismiss-unmatched")" />
             }
             else if (Tab == "upgraded")
             {
@@ -170,14 +169,18 @@ else
     {
         @if (_confirm == "approve")
         {
-            var approvable = Visible.Count(i => i.Suggestion is not null);
-            var unsure = Visible.Count(i => i.Suggestion is not null && i.Confidence < 0.6);
+            var approvable = Visible.Count(w => w.HasSuggestion);
+            var unsure = Visible.Count(w => w.HasSuggestion && w.Confidence < 0.6);
             var without = Visible.Count() - approvable;
-            <Dialog Title="@($"Approve {Format.Count(approvable, "file", "files")}?")" OnClose="() => _confirm = null" Alert="true">
-                <p>Each is matched to the song suggested for it, and counts as owned.</p>
+            var files = VisibleFiles.Any(i => i.Suggestion is not null);
+            var songs = VisibleUnmatched.Any(s => s.Suggestion is not null);
+            <Dialog Title="@($"Approve {Format.Count(approvable, "suggestion", "suggestions")}?")" OnClose="() => _confirm = null" Alert="true">
+                <p>
+                    Each is matched to the song suggested for it. @(files ? "A file counts as owned. " : "")@(songs ? "An imported song goes into its playlist, and is asked for if its import asked for what's missing." : "")
+                </p>
                 @if (without > 0)
                 {
-                    <p class="muted">@Format.Count(without, "file has", "files have") no suggestion, so @(without == 1 ? "it stays" : "they stay") here.</p>
+                    <p class="muted">@Format.Count(without, "has", "have") no suggestion, so @(without == 1 ? "it stays" : "they stay") here.</p>
                 }
                 @if (unsure > 0)
                 {
@@ -192,7 +195,7 @@ else
         else if (_confirm is not null && Enum.TryParse<SetAside>(_confirm, out var bulk))
         {
             var verb = Asides.First(a => a.As == bulk).Verb;
-            <Dialog Title="@($"{verb} {Format.Count(Visible.Count(), "file", "files")}?")" OnClose="() => _confirm = null" Alert="true">
+            <Dialog Title="@($"{verb} {Format.Count(VisibleFiles.Count(), "file", "files")}?")" OnClose="() => _confirm = null" Alert="true">
                 <p>@AsideHint(bulk) You can put any of them back from the lists below.</p>
                 <div class="toolbar dialog-buttons">
                     <button @onclick="() => _confirm = null">Cancel</button>
@@ -200,9 +203,74 @@ else
                 </div>
             </Dialog>
         }
-        @foreach (var item in Visible)
+        else if (_confirm == "dismiss-unmatched")
         {
-            <div class="card review-item">
+            <Dialog Title="@($"Dismiss {Format.Count(VisibleUnmatched.Count(), "imported song", "imported songs")}?")" OnClose="() => _confirm = null" Alert="true">
+                <p>Each leaves this list without going into its playlist.</p>
+                <div class="toolbar dialog-buttons">
+                    <button @onclick="() => _confirm = null">Cancel</button>
+                    <button class="danger" disabled="@_busy" @onclick="DismissUnmatchedShownAsync">@if (_busy) { <span class="spinner"></span> }Dismiss</button>
+                </div>
+            </Dialog>
+        }
+        @foreach (var waiting in Visible)
+        {
+            @if (waiting.Song is { } song)
+            {
+                <div class="card review-item matching" @key="song.LineId">
+                    <div>
+                        <div class="label">Imported</div>
+                        <ReviewSong Title="@(song.Song.Title.Length > 0 ? song.Song.Title : "A YouTube video")" Artist="@song.Song.Artist" ArtistHref="@ArtistHref(song.Song.Artist)">
+                            <div class="muted small">
+                                <a class="muted" href="tools/import/@song.ImportId">@song.ImportName</a><span title="When it was imported">, @Format.Ago(song.ImportedAt)</span>
+                            </div>
+                            @if (string.Join(" · ", new[] { song.Song.Album, song.Song.DurationSeconds is null ? null : Format.Duration(song.Song.DurationSeconds) }.OfType<string>()) is { Length: > 0 } given)
+                            {
+                                <div class="muted small ellipsis">@given</div>
+                            }
+                        </ReviewSong>
+                    </div>
+                    <div>
+                        <div class="label">Suggestion</div>
+                        @if (song.Suggestion is { } hint)
+                        {
+                            <div class="suggestion-row">
+                                @if (hint.AlbumId is { } coverAlbum) { <a href="albums/@coverAlbum" tabindex="-1"><Cover Url="@hint.CoverUrl" /></a> }
+                                else { <Cover Url="@hint.CoverUrl" /> }
+                                <div class="suggestion-text">
+                                    <div class="suggestion">
+                                        <span class="suggestion-title" title="@hint.Title">@hint.Title</span>
+                                        @if (song.Confidence is { } confidence)
+                                        {
+                                            <span class="confidence @ConfidenceClass(confidence)" title="How sure the match is">@confidence.ToString("P0")</span>
+                                        }
+                                    </div>
+                                    <div class="muted small">
+                                        @if (hint.ArtistId is { } artistId) { <a href="artists/@artistId">@hint.Artist</a> } else { @hint.Artist }
+                                        @if (hint.AlbumId is { } albumId) { <span> · <a href="albums/@albumId">@hint.Album</a></span> }
+                                        @if (hint.DurationSeconds is not null) { <span> · @Format.Duration(hint.DurationSeconds)</span> }
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="muted">None found</div>
+                        }
+                    </div>
+                    <div class="review-actions">
+                        @if (song.Suggestion is { TrackId: { } suggested })
+                        {
+                            <IconButton Icon="approve" Primary="true" Title="Approve: match it to the suggestion" Disabled="_busy" OnClick="() => ApproveUnmatchedAsync(song, suggested)" />
+                        }
+                        <IconButton Icon="search" Title="Search for the song it is" OnClick="@(() => Nav.NavigateTo(UnmatchedSearchLink(song)))" />
+                        <IconButton Icon="cancel" Title="Dismiss: take it off this list" Disabled="_busy" OnClick="() => DismissUnmatchedAsync(song)" />
+                    </div>
+                </div>
+                continue;
+            }
+            var item = waiting.File!;
+            <div class="card review-item matching" @key="item.FileId">
                 <div>
                     <div class="label">File</div>
                     <ReviewSong CoverUrl="@item.CoverUrl" Title="@(item.Title ?? Path.GetFileNameWithoutExtension(item.Path))" Artist="@item.Artist" ArtistHref="@ArtistHref(item.Artist)">
@@ -347,41 +415,6 @@ else
             </div>
         }
     }
-    else if (Tab == "couldnt-match")
-    {
-        @if (_confirm == "dismiss-unmatched")
-        {
-            <Dialog Title="@($"Dismiss {Format.Count(VisibleUnmatched.Count(), "song", "songs")}?")" OnClose="() => _confirm = null" Alert="true">
-                <p>Each leaves this list without going into its playlist.</p>
-                <div class="toolbar dialog-buttons">
-                    <button @onclick="() => _confirm = null">Cancel</button>
-                    <button class="danger" disabled="@_busy" @onclick="DismissUnmatchedShownAsync">@if (_busy) { <span class="spinner"></span> }Dismiss</button>
-                </div>
-            </Dialog>
-        }
-        @foreach (var song in VisibleUnmatched)
-        {
-            <div class="card review-item">
-                <div>
-                    <div class="label">Imported</div>
-                    <ReviewSong Title="@song.Song.Title" Artist="@song.Song.Artist" ArtistHref="@ArtistHref(song.Song.Artist)">
-                        <div class="muted small">
-                            @(song.Song.Album is { } album ? $"{album} · " : "")@Format.Duration(song.Song.DurationSeconds)
-                        </div>
-                    </ReviewSong>
-                </div>
-                <div>
-                    <div class="label">From</div>
-                    <div class="small"><a href="tools/import/@song.ImportId">@song.ImportName</a>, imported @Format.Ago(song.ImportedAt)</div>
-                    @if (song.PlaylistId is { } playlist) { <div class="muted small">Goes into <a class="muted" href="playlists/@playlist">@song.PlaylistName</a></div> }
-                </div>
-                <div class="review-actions">
-                    <IconButton Icon="search" Primary="true" Title="Choose: search for the song it is" OnClick="@(() => Nav.NavigateTo(UnmatchedSearchLink(song)))" />
-                    <IconButton Icon="cancel" Title="Dismiss: take it off this list" Disabled="_busy" OnClick="() => DismissUnmatchedAsync(song)" />
-                </div>
-            </div>
-        }
-    }
     else
     {
         @if (_confirm is "approve-upgrades" or "rollback-upgrades")
@@ -483,65 +516,48 @@ else
     private IReadOnlyList<ReviewItem>? _items;
     private IReadOnlyList<HeldFileInfo>? _held;
 
-    // matching, seems-lossy, couldnt-fetch or upgraded, from the address.
+    // matching, seems-lossy, couldnt-fetch or upgraded, from the address; imported songs were once a tab of their own.
     private string Tab => new Uri(Nav.Uri).AbsolutePath.TrimEnd('/') switch
     {
         var path when path.EndsWith("/review/seems-lossy") => "seems-lossy",
         var path when path.EndsWith("/review/couldnt-fetch") => "couldnt-fetch",
-        var path when path.EndsWith("/review/couldnt-match") => "couldnt-match",
         var path when path.EndsWith("/review/upgraded") => "upgraded",
         _ => "matching",
     };
 
     private IEnumerable<(string Tab, string Label, int Count)> Tabs =>
     [
-        ("matching", "Matching", _items?.Count ?? 0),
+        ("matching", "Matching", (_items?.Count ?? 0) + (_unmatched?.Count ?? 0)),
         ("seems-lossy", "Seems lossy", _spectra?.Suspects.Count ?? 0),
         ("couldnt-fetch", "Couldn't fetch", Stuck.Count()),
-        ("couldnt-match", "Couldn't match", _unmatched?.Count ?? 0),
         ("upgraded", "Upgraded", _held?.Count ?? 0),
     ];
 
     // Why this tab can't be used, if it can't.
     private string? Denied => Tab switch
     {
-        "matching" when !Auth.May(UserPermissions.Review) => "You can't review files: that needs the Review and match permission, which the admin can give you.",
+        "matching" when !Auth.May(UserPermissions.Review) && !Auth.May(UserPermissions.Request) =>
+            "You can't match files or imported songs: that needs the Review and match or the Request permission, which the admin can give you.",
         "seems-lossy" when !Auth.May(UserPermissions.Review) && !Auth.May(UserPermissions.Request) =>
             "You can't review these files: that needs the Review and match or the Request permission, which the admin can give you.",
-        "couldnt-match" when !Auth.May(UserPermissions.Request) => "You can't match imported songs: that needs the Request permission, which the admin can give you.",
         "upgraded" when !Auth.May(UserPermissions.Request) => "You can't review upgrades: that needs the Request permission, which the admin can give you.",
         _ => null,
     };
 
-    private bool Loaded => Tab switch { "matching" => _items is not null, "seems-lossy" => _spectra is not null, "upgraded" => _held is not null, "couldnt-match" => _unmatched is not null, _ => true };
+    private bool Loaded => Tab switch { "matching" => _items is not null && _unmatched is not null, "seems-lossy" => _spectra is not null, "upgraded" => _held is not null, _ => true };
 
     private int Total => Tab switch
     {
-        "matching" => _items!.Count, "seems-lossy" => _spectra!.Suspects.Count, "upgraded" => _held!.Count, "couldnt-match" => _unmatched!.Count, _ => Stuck.Count(),
+        "matching" => _items!.Count + _unmatched!.Count, "seems-lossy" => _spectra!.Suspects.Count, "upgraded" => _held!.Count, _ => Stuck.Count(),
     };
 
     private int Shown => Tab switch
     {
-        "matching" => Visible.Count(), "seems-lossy" => VisibleSuspects.Count(), "upgraded" => VisibleHeld.Count(), "couldnt-match" => VisibleUnmatched.Count(), _ => VisibleRequests.Count(),
+        "matching" => Visible.Count(), "seems-lossy" => VisibleSuspects.Count(), "upgraded" => VisibleHeld.Count(), _ => VisibleRequests.Count(),
     };
 
-    // Imported songs nothing was found for, newest import first; each import's in its list's order.
+    // Imported songs that couldn't be matched, newest import first; each import's in its list's order.
     private IReadOnlyList<UnmatchedImportSong>? _unmatched;
-
-    private IEnumerable<UnmatchedImportSong> VisibleUnmatched
-    {
-        get
-        {
-            var shown = (_unmatched ?? []).Where(s => Matches(s.Song.Title, s.Song.Artist, s.Song.Album, s.ImportName, s.PlaylistName));
-            var text = StringComparer.CurrentCultureIgnoreCase;
-            return Sort switch
-            {
-                ("name", var d) => d ? shown.OrderByDescending(s => s.Song.Title, text) : shown.OrderBy(s => s.Song.Title, text),
-                (_, true) => shown.OrderByDescending(s => s.ImportedAt),
-                _ => shown.OrderBy(s => s.ImportedAt),
-            };
-        }
-    }
 
     private async Task LoadUnmatchedAsync()
     {
@@ -557,6 +573,20 @@ else
 
     private static string UnmatchedSearchLink(UnmatchedImportSong song) =>
         $"search?q={Uri.EscapeDataString($"{song.Song.Title} {song.Song.Artist}".Trim())}&unmatched={song.LineId}";
+
+    private async Task ApproveUnmatchedAsync(UnmatchedImportSong song, Guid trackId)
+    {
+        _busy = true;
+        try
+        {
+            await Api.MatchUnmatchedImportSongAsync(song.LineId, new MatchImportSong(trackId));
+            await LoadUnmatchedAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
 
     private async Task DismissUnmatchedAsync(UnmatchedImportSong song)
     {
@@ -862,15 +892,14 @@ else
 
     private string FilterHint => Tab switch
     {
-        "matching" => "Filter, for example a title, artist or folder",
+        "matching" => "Filter, for example a title, artist, folder or import",
         "couldnt-fetch" => "Filter, for example a title, artist or reason",
-        "couldnt-match" => "Filter, for example a title, artist or import",
         _ => "Filter, for example a title, artist or folder",
     };
 
     private IReadOnlyList<(string Key, string Label)> Sorts => Tab switch
     {
-        "matching" => [("match", "How sure the match is"), ("name", "Name"), ("path", "Path"), ("date", "Date changed")],
+        "matching" => [("match", "How sure the match is"), ("name", "Name"), ("path", "Path or import"), ("date", "Date changed or imported")],
         "seems-lossy" => [("name", "Name"), ("path", "Path"), ("date", "Date changed")],
         "upgraded" => [("date", "Date upgraded"), ("name", "Name")],
         _ => [("date", "Date"), ("name", "Name")],
@@ -882,7 +911,7 @@ else
     // Each tab's own, kept between visits.
     private readonly Dictionary<string, (string Key, bool Descending)> _sorts = new()
     {
-        ["matching"] = ("path", false), ["seems-lossy"] = ("path", false), ["couldnt-fetch"] = ("date", true), ["couldnt-match"] = ("date", true), ["upgraded"] = ("date", true),
+        ["matching"] = ("path", false), ["seems-lossy"] = ("path", false), ["couldnt-fetch"] = ("date", true), ["upgraded"] = ("date", true),
     };
 
     private (string Key, bool Descending) Sort => _sorts[Tab];
@@ -901,27 +930,42 @@ else
     // The bulk action waiting to be confirmed: approve or exclude.
     private string? _confirm;
 
-    private IEnumerable<ReviewItem> Visible => Sorted((_items ?? []).Where(i => Matches(i.Path, i.Title, i.Artist, i.Album, i.Suggestion?.Title, i.Suggestion?.AlbumTitle)));
+    // A file, or an imported song, waiting to be matched: sorted together, a song's import standing for a file's path.
+    private sealed record Waiting(ReviewItem? File, UnmatchedImportSong? Song)
+    {
+        public double? Confidence => File is not null ? File.Confidence : Song!.Confidence;
+        public bool HasSuggestion => File is not null ? File.Suggestion is not null : Song!.Suggestion is not null;
+        public DateTime? Date => File is not null ? File.ModifiedAt : Song!.ImportedAt;
+        public string Name => File is not null ? File.Title ?? Path.GetFileNameWithoutExtension(File.Path) : Song!.Song.Title;
+        public string Where => File?.Path ?? Song!.ImportName;
+    }
 
-    // Files without a match % go last either way; the path settles ties.
-    private IEnumerable<ReviewItem> Sorted(IEnumerable<ReviewItem> items)
+    private IEnumerable<Waiting> Visible => Sorted(
+        (_items ?? []).Where(i => Matches(i.Path, i.Title, i.Artist, i.Album, i.Suggestion?.Title, i.Suggestion?.AlbumTitle)).Select(i => new Waiting(i, null))
+        .Concat((_unmatched ?? []).Where(s => Matches(s.Song.Title, s.Song.Artist, s.Song.Album, s.ImportName, s.PlaylistName, s.Suggestion?.Title, s.Suggestion?.Album))
+            .Select(s => new Waiting(null, s))));
+
+    private IEnumerable<ReviewItem> VisibleFiles => Visible.Select(w => w.File).OfType<ReviewItem>();
+
+    private IEnumerable<UnmatchedImportSong> VisibleUnmatched => Visible.Select(w => w.Song).OfType<UnmatchedImportSong>();
+
+    // Those without a match % go last either way; the path settles ties, and an import's songs keep their list's order.
+    private IEnumerable<Waiting> Sorted(IEnumerable<Waiting> items)
     {
         var text = StringComparer.CurrentCultureIgnoreCase;
         var sorted = Sort switch
         {
             ("match", true) => items.OrderBy(i => i.Confidence is null).ThenByDescending(i => i.Confidence),
             ("match", false) => items.OrderBy(i => i.Confidence is null).ThenBy(i => i.Confidence),
-            ("date", true) => items.OrderByDescending(i => i.ModifiedAt),
-            ("date", false) => items.OrderBy(i => i.ModifiedAt),
-            ("name", true) => items.OrderByDescending(NameOf, text),
-            ("name", false) => items.OrderBy(NameOf, text),
-            (_, true) => items.OrderByDescending(i => i.Path, text),
-            _ => items.OrderBy(i => i.Path, text),
+            ("date", true) => items.OrderByDescending(i => i.Date),
+            ("date", false) => items.OrderBy(i => i.Date),
+            ("name", true) => items.OrderByDescending(i => i.Name, text),
+            ("name", false) => items.OrderBy(i => i.Name, text),
+            (_, true) => items.OrderByDescending(i => i.Where, text),
+            _ => items.OrderBy(i => i.Where, text),
         };
-        return sorted.ThenBy(i => i.Path, StringComparer.Ordinal);
+        return sorted.ThenBy(i => i.Where, StringComparer.Ordinal);
     }
-
-    private static string NameOf(ReviewItem item) => item.Title ?? Path.GetFileNameWithoutExtension(item.Path);
 
     private static string Changed(DateTime modified) =>
         DateTime.SpecifyKind(modified, DateTimeKind.Utc).ToLocalTime().ToString("d MMM yyyy");
@@ -1014,9 +1058,17 @@ else
         ScanStatus.RaiseLibraryChanged();
     }
 
-    private Task SetShownAsideAsync(SetAside aside) => BulkAsync(() => Api.SetFilesAsideAsync(Visible.Select(i => i.FileId).ToList(), aside));
+    private Task SetShownAsideAsync(SetAside aside) => BulkAsync(() => Api.SetFilesAsideAsync(VisibleFiles.Select(i => i.FileId).ToList(), aside));
 
-    private Task ApproveShownAsync() => BulkAsync(() => Api.ApproveFilesAsync(Visible.Where(i => i.Suggestion is not null).Select(i => i.FileId).ToList()));
+    private Task ApproveShownAsync() => BulkAsync(async () =>
+    {
+        var songs = VisibleUnmatched.Where(s => s.Suggestion?.TrackId is not null).ToList();
+        if (VisibleFiles.Where(i => i.Suggestion is not null).Select(i => i.FileId).ToList() is { Count: > 0 } files)
+            await Api.ApproveFilesAsync(files);
+        foreach (var song in songs)
+            await Api.MatchUnmatchedImportSongAsync(song.LineId, new MatchImportSong(song.Suggestion!.TrackId!.Value));
+        await LoadUnmatchedAsync();
+    });
 
     private async Task BulkAsync(Func<Task> action)
     {

@@ -55,16 +55,57 @@ public sealed class MusicBrainzIndex : IIndexPlugin, IIsrcLookup, IRecordingAlbu
             ? _query.FindArtistsAsync(text, query.Limit, simple: true, cancellationToken: cancellationToken)
             : null;
         var albums = Wants(SearchKind.Album)
-            ? _query.FindReleaseGroupsAsync(text, query.Limit, simple: true, cancellationToken: cancellationToken)
+            ? query.Fields is { } album ? FieldedAlbumsAsync(album, query.Limit, text, cancellationToken)
+            : FreeAlbumsAsync(text, query.Limit, cancellationToken)
             : null;
         var tracks = Wants(SearchKind.Track)
-            ? _query.FindRecordingsAsync(text, query.Limit, simple: true, cancellationToken: cancellationToken)
+            ? query.Fields is { } song ? FieldedTracksAsync(song, query.Limit, text, cancellationToken)
+            : FreeTracksAsync(text, query.Limit, cancellationToken)
             : null;
         return new IndexSearchResults(
             artists is null ? [] : (await artists).Results.Select(r => MapArtist(r.Item)).ToList(),
-            albums is null ? [] : (await albums).Results.Select(r => MapAlbum(r.Item, null)).ToList(),
-            tracks is null ? [] : (await tracks).Results.Select(r => MapTrack(r.Item) with { Album = BestKnownAlbum(r.Item) }).ToList());
+            albums is null ? [] : await albums,
+            tracks is null ? [] : await tracks);
     }
+
+    private async Task<IReadOnlyList<IndexAlbum>> FreeAlbumsAsync(string text, int limit, CancellationToken ct) =>
+        (await _query.FindReleaseGroupsAsync(text, limit, simple: true, cancellationToken: ct)).Results.Select(r => MapAlbum(r.Item, null)).ToList();
+
+    private async Task<IReadOnlyList<IndexTrack>> FreeTracksAsync(string text, int limit, CancellationToken ct) =>
+        (await _query.FindRecordingsAsync(text, limit, simple: true, cancellationToken: ct)).Results.Select(r => MapTrack(r.Item) with { Album = BestKnownAlbum(r.Item) }).ToList();
+
+    // An album by its title and artist; the free text if that finds nothing.
+    private async Task<IReadOnlyList<IndexAlbum>> FieldedAlbumsAsync(IndexSearchFields fields, int limit, string text, CancellationToken ct)
+    {
+        var found = (await _query.FindReleaseGroupsAsync(Fielded(("releasegroup", fields.Title), ("artist", fields.Artist)), limit, cancellationToken: ct))
+            .Results.Select(r => MapAlbum(r.Item, null)).ToList();
+        return found.Count > 0 ? found : await FreeAlbumsAsync(text, limit, ct);
+    }
+
+    /// <summary>
+    /// A song by its title and artist, its album favoured when it's known; the free text if that finds nothing. A free
+    /// search for a well-known song finds covers, mashups and live bootlegs before the song itself, and even a search by
+    /// field ranks the song's many live recordings level with it. So more are asked for, and they're put in order: plain
+    /// recordings first (not ones MusicBrainz tells apart with a comment, such as live or a mix, nor videos, nor stubs
+    /// with no length), then those on the most releases, which the song everyone means is.
+    /// </summary>
+    private async Task<IReadOnlyList<IndexTrack>> FieldedTracksAsync(IndexSearchFields fields, int limit, string text, CancellationToken ct)
+    {
+        var required = Fielded(("recording", fields.Title), ("artist", fields.Artist));
+        var lucene = fields.Album is { Length: > 0 } album ? $"({required}) OR ({required} AND release:{Phrase(album)})" : required;
+        var found = (await _query.FindRecordingsAsync(lucene, Math.Max(limit, 25), cancellationToken: ct)).Results
+            .Select(r => r.Item)
+            .OrderBy(r => string.IsNullOrEmpty(r.Disambiguation) && r.Video != true && r.Length is not null ? 0 : 1)
+            .ThenByDescending(r => r.Releases?.Count ?? 0)
+            .Select(r => MapTrack(r) with { Album = BestKnownAlbum(r) })
+            .ToList();
+        return found.Count > 0 ? found : await FreeTracksAsync(text, limit, ct);
+    }
+
+    private static string Fielded(params (string Field, string? Value)[] parts) =>
+        string.Join(" AND ", parts.Where(p => !string.IsNullOrWhiteSpace(p.Value)).Select(p => $"{p.Field}:{Phrase(p.Value!)}"));
+
+    private static string Phrase(string value) => $"\"{value.Replace("\\", "\\\\").Replace("\"", "\\\"")}\"";
 
     public Task<IndexArtist?> GetArtistAsync(string artistId, CancellationToken cancellationToken) =>
         Guarded(() => GetArtistAsyncCore(artistId, cancellationToken));

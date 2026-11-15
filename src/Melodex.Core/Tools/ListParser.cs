@@ -353,7 +353,7 @@ public static partial class ListParser
         return best;
     }
 
-    private static IEnumerable<IReadOnlyList<string>> CsvRows(string text)
+    internal static IEnumerable<IReadOnlyList<string>> CsvRows(string text)
     {
         var first = Lines(text).FirstOrDefault();
         if (first is null)
