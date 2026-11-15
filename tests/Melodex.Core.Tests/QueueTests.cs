@@ -51,6 +51,29 @@ public sealed class QueueTests : IDisposable
     }
 
     [Fact]
+    public async Task Requests_list_past_500_while_going_and_page_back_from_the_oldest_shown()
+    {
+        var ids = await AddRequestsAsync(Enumerable.Range(0, 520).Select(i => $"Song {i}").ToArray());
+        using (var scope = _factory.Services.CreateScope())
+        {
+            // A second apart, oldest first, so pages fall in a known order.
+            var db = scope.ServiceProvider.GetRequiredService<MelodexDbContext>();
+            var start = DateTime.UtcNow.AddHours(-1);
+            foreach (var (request, i) in (await db.Requests.ToListAsync()).OrderBy(r => ids.IndexOf(r.Id)).Select((r, i) => (r, i)))
+                request.CreatedAt = start.AddSeconds(i);
+            await db.SaveChangesAsync();
+        }
+
+        Assert.Equal(520, (await _api.ListRequestsAsync(activeOnly: true, limit: 10_000)).Count);
+        var newest = await _api.ListRequestsAsync(limit: 200);
+        Assert.Equal("Song 519", newest[0].Title);
+        var earlier = await _api.ListRequestsAsync(limit: 200, before: newest[^1].CreatedAt);
+        Assert.Equal(["Song 319", "Song 120"], [earlier[0].Title, earlier[^1].Title]);
+        var last = await _api.ListRequestsAsync(limit: 200, before: earlier[^1].CreatedAt);
+        Assert.Equal(120, last.Count);
+    }
+
+    [Fact]
     public async Task Requests_move_before_another_or_to_the_end()
     {
         var ids = await AddRequestsAsync("A", "B", "C");

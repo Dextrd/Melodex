@@ -312,11 +312,13 @@ public sealed class RequestService(MelodexDbContext db, RequestSignal signal, Re
     }
 
     /// <summary>Requests asked for directly (not parts of others), newest first.</summary>
-    public async Task<IReadOnlyList<RequestInfo>> ListAsync(bool activeOnly, int limit, CancellationToken ct)
+    public async Task<IReadOnlyList<RequestInfo>> ListAsync(bool activeOnly, int limit, CancellationToken ct, DateTime? before = null)
     {
         var query = db.Requests.Where(r => r.ParentRequestId == null);
         if (activeOnly)
             query = query.Where(r => !Finished.Contains(r.Status));
+        if (before is { } cursor)
+            query = query.Where(r => r.CreatedAt < cursor);
         var requests = await query.OrderByDescending(r => r.CreatedAt).Take(limit).ToListAsync(ct);
         return await ToInfosAsync(requests, ct);
     }

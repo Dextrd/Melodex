@@ -4,13 +4,18 @@ using Melodex.Web.Components;
 namespace Melodex.Web;
 
 /// <summary>
-/// Recent requests, shared by every page so fetch buttons can show what's already on its way. Reloads when the server
-/// says requests changed, polling only as a fallback, and tells library pages to reload when a request lands in the library.
+/// Requests, shared by every page so fetch buttons can show what's already on its way: every one still going, however
+/// many, and the newest of the rest, with earlier ones loaded as they're wanted (Activity's Earlier). Reloads when the
+/// server says requests changed, polling only as a fallback, and tells library pages to reload when a request lands in
+/// the library.
 /// </summary>
 public sealed class RequestTracker : IDisposable
 {
     private static readonly TimeSpan Busy = TimeSpan.FromSeconds(3);
     private static readonly TimeSpan Idle = TimeSpan.FromSeconds(30);
+
+    // How many finished ones come with each load, and each page of earlier ones.
+    private const int Page = 200;
 
     private readonly MelodexClient api;
     private readonly ServerEvents events;
@@ -36,11 +41,47 @@ public sealed class RequestTracker : IDisposable
     // Kept current once anything has asked for the list, whether through EnsureLoadedAsync or RefreshAsync.
     private bool _used;
 
+    // Earlier ones loaded on top of the newest, kept across reloads; and whether there are more before them.
+    private IReadOnlyList<RequestInfo> _earlier = [];
+    private bool _more = true;
+    private Task? _loadingEarlier;
+
     /// <summary>Raised whenever the list is refreshed.</summary>
     public event Action? Changed;
 
-    /// <summary>Top-level requests, newest first.</summary>
+    /// <summary>Top-level requests, newest first: all of those still going, and the newest and any earlier loaded of the rest.</summary>
     public IReadOnlyList<RequestInfo> Requests => _requests;
+
+    /// <summary>Whether there are requests before the earliest loaded, for <see cref="LoadEarlierAsync"/>.</summary>
+    public bool HasEarlier => _more;
+
+    /// <summary>Loads the page of requests before the earliest loaded.</summary>
+    public Task LoadEarlierAsync() => _loadingEarlier ??= LoadEarlierCoreAsync();
+
+    private async Task LoadEarlierCoreAsync()
+    {
+        try
+        {
+            if (!_more || _requests.Count == 0)
+                return;
+            var page = await api.ListRequestsAsync(limit: Page, before: _requests.Min(r => r.CreatedAt));
+            _more = page.Count == Page;
+            _earlier = _earlier.Concat(page).DistinctBy(r => r.Id).ToList();
+            _requests = Merge(_requests, page);
+            Changed?.Invoke();
+        }
+        catch (HttpRequestException)
+        {
+        }
+        finally
+        {
+            _loadingEarlier = null;
+        }
+    }
+
+    // Newest first, each once: the later list's copy wins.
+    private static List<RequestInfo> Merge(IEnumerable<RequestInfo> first, IEnumerable<RequestInfo> later) =>
+        later.Concat(first).DistinctBy(r => r.Id).OrderByDescending(r => r.CreatedAt).ToList();
 
     public Task EnsureLoadedAsync() => _loading ??= RefreshAsync();
 
@@ -66,7 +107,12 @@ public sealed class RequestTracker : IDisposable
         IReadOnlyList<RequestInfo> latest;
         try
         {
-            latest = await api.ListRequestsAsync(limit: 200);
+            var going = api.ListRequestsAsync(activeOnly: true, limit: 10_000);
+            var newest = await api.ListRequestsAsync(limit: Page);
+            if (_earlier.Count == 0)
+                _more = newest.Count == Page;
+            // Earlier ones loaded before stay, as they were unless they're among those just loaded.
+            latest = Merge(_earlier, newest.Concat(await going).DistinctBy(r => r.Id));
         }
         catch (HttpRequestException)
         {
