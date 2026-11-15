@@ -255,6 +255,8 @@ label { display: inline-flex; align-items: center; gap: .4rem; }
 .table tr:last-child td { border-bottom: none; }
 .table td.num, .table th.num { text-align: right; font-variant-numeric: tabular-nums; }
 .table tr.dim td, .table tr.played td { opacity: .6; }
+/* A greyed-out row's open menu isn't: the cell it opened from shows in full while it's open. */
+.table tr:is(.dim, .played) td:has(.menu) { opacity: 1; }
 
 /* Status badges */
 .badge {
@@ -740,6 +742,7 @@ button.icon.play .spinner { margin: 0; vertical-align: middle; }
 .queue-list li.now { background: var(--bg); }
 .queue-list li.now .queue-title > span:first-child { font-weight: 700; color: var(--accent); }
 .queue-list li.dim, .queue-list li.played { opacity: .55; }
+.queue-list li:is(.dim, .played):has(.menu) { opacity: 1; }
 .queue-list .queue-title { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; text-align: left; color: var(--text); }
 .queue-list .queue-title > span { max-width: 100%; }
 .queue-list .queue-cover { width: 2.25rem; flex: none; border-radius: 4px; }
@@ -1738,6 +1741,8 @@ label.check { cursor: pointer; }
 /* A greyed row in a table of slots greys what's in its cells, not the cells, so the slots behind don't show through. */
 table.slots > tbody > tr.dim > td { opacity: 1; color: color-mix(in srgb, var(--text) 60%, transparent); }
 table.slots > tbody > tr.dim > td > * { opacity: .6; }
+table.slots > tbody > tr.dim > td:has(.menu) { color: var(--text); }
+table.slots > tbody > tr.dim > td > :has(.menu) { opacity: 1; }
 
 /* Export: which playlists, as what; the library's columns. */
 a.button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
