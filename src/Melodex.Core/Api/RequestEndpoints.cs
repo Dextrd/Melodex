@@ -35,9 +35,10 @@ public static class RequestEndpoints
             .WithSummary("Fetch an artist, album or track into the library. Asking for something already queued returns that request (200) instead of a new one (202). Refused (409) while a scan is reading the library.")
             .Produces<RequestInfo>(StatusCodes.Status202Accepted).Produces<RequestInfo>().Produces(StatusCodes.Status404NotFound).ProducesProblem(StatusCodes.Status409Conflict);
 
-        requests.MapGet("", (RequestService service, bool? active, int? limit, CancellationToken ct) =>
-                service.ListAsync(active ?? false, Math.Clamp(limit ?? 100, 1, 500), ct))
-            .WithName("ListRequests").WithSummary("Requests asked for directly, newest first; parts of artist and album requests are under each one.");
+        requests.MapGet("", (RequestService service, bool? active, int? limit, DateTime? before, CancellationToken ct) =>
+                service.ListAsync(active ?? false, Math.Clamp(limit ?? 100, 1, active == true ? 10_000 : 500), ct, before?.ToUniversalTime()))
+            .WithName("ListRequests")
+            .WithSummary("Requests asked for directly, newest first; parts of artist and album requests are under each one. Up to 500 at a time, or 10,000 of those still going; `before` (the oldest one's createdAt) pages back.");
 
         requests.MapGet("/{id:guid}", async (Guid id, RequestService service, CancellationToken ct) =>
                 await service.GetAsync(id, ct) is { } info ? Results.Ok(info) : Results.NotFound())

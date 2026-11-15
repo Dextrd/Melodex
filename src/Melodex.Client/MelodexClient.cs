@@ -229,8 +229,9 @@ public sealed class MelodexClient(HttpClient http)
         return (await response.Content.ReadFromJsonAsync<RequestInfo>(MelodexJson.Options, ct))!;
     }
 
-    public async Task<IReadOnlyList<RequestInfo>> ListRequestsAsync(bool activeOnly = false, int limit = 100, CancellationToken ct = default) =>
-        await http.GetFromJsonAsync<List<RequestInfo>>($"{Api}/requests?active={activeOnly.ToString().ToLowerInvariant()}&limit={limit}", MelodexJson.Options, ct) ?? [];
+    public async Task<IReadOnlyList<RequestInfo>> ListRequestsAsync(bool activeOnly = false, int limit = 100, DateTime? before = null, CancellationToken ct = default) =>
+        await http.GetFromJsonAsync<List<RequestInfo>>($"{Api}/requests?active={activeOnly.ToString().ToLowerInvariant()}&limit={limit}"
+                                                       + (before is { } b ? $"&before={Uri.EscapeDataString(b.ToUniversalTime().ToString("O"))}" : ""), MelodexJson.Options, ct) ?? [];
 
     public Task<RequestInfo?> GetRequestAsync(Guid id, CancellationToken ct = default) =>
         GetOrNullAsync<RequestInfo>($"{Api}/requests/{id}", ct);

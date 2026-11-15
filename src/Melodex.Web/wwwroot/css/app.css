@@ -507,6 +507,9 @@ a.button:hover { text-decoration: none; border-color: var(--accent); }
     .review-item.matching .review-actions { min-width: 0; }
 }
 
+/* A long list's end, while more is coming. */
+.list-end { display: flex; align-items: center; justify-content: center; gap: .5rem; padding: 1rem; }
+
 /* Activity: one row per request, opening to its parts and attempts. */
 .request { padding: .75rem 1rem; }
 .request + .request { border-top: 1px solid var(--border); }

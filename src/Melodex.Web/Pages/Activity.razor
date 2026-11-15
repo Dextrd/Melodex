@@ -6,6 +6,8 @@
 @inject ServerEvents Events
 @inject Preferences Prefs
 @inject NavigationManager Nav
+@inject IJSRuntime Js
+@using Microsoft.JSInterop
 
 <PageTitle>Activity · Melodex</PageTitle>
 
@@ -46,10 +48,12 @@
 
 @if (!_loaded)
 {
+    _hasEnd = false;
     <Loading />
 }
 else if (!Visible.Any())
 {
+    _hasEnd = false;
     <div class="empty card">
         @if (_filter.Length > 0) { <span>Nothing matches.</span> }
         else if (_recent)
@@ -63,8 +67,9 @@ else if (!Visible.Any())
 }
 else
 {
+    var visible = Visible.ToList();
     <div class="card">
-        @foreach (var item in Visible)
+        @foreach (var item in visible.Take(_shown))
         {
             @if (item.Task is { } task)
             {
@@ -134,6 +139,12 @@ else
             </div>
         }
     </div>
+    @* The rest come as it's scrolled to: those already loaded, then, among earlier downloads, the ones before them. *@
+    _hasEnd = visible.Count > _shown || (Shown == "downloads" && !_recent && Tracker.HasEarlier);
+    @if (_hasEnd)
+    {
+        <div class="list-end muted small" @ref="_end"><span class="spinner"></span> Loading more…</div>
+    }
 }
 
 @code {
@@ -190,6 +201,39 @@ else
     ];
 
     private bool _loaded;
+
+    // How many rows are drawn; more as the list's end is scrolled to, so a long one stays quick.
+    private const int Step = 100;
+    private int _shown = Step;
+    private ElementReference _end;
+    private DotNetObjectReference<Activity>? _self;
+    private bool _hasEnd;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!_hasEnd)
+            return;
+        _self ??= DotNetObjectReference.Create(this);
+        await Js.InvokeVoidAsync("melodexScroll.atEnd", _end, _self);
+    }
+
+    /// <summary>The list's end has come into view: draws more, loading earlier downloads once all loaded are drawn.</summary>
+    [JSInvokable]
+    public async Task MoreAsync()
+    {
+        if (Visible.Count() > _shown)
+            _shown += Step;
+        else if (Shown == "downloads" && !_recent && Tracker.HasEarlier)
+        {
+            var had = Tracker.Requests.Count;
+            await Tracker.LoadEarlierAsync();
+            if (Tracker.Requests.Count == had)
+                return;
+        }
+        else
+            return;
+        StateHasChanged();
+    }
 
     // The newest scan opens while it runs; a click overrides that.
     // Tasks opened or closed here; the rest are open while they run.
@@ -388,6 +432,7 @@ else
 
     public void Dispose()
     {
+        _self?.Dispose();
         Tracker.Changed -= Refresh;
         Events.Received -= OnEvent;
         _timer?.Dispose();

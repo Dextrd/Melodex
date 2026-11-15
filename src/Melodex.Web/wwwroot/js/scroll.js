@@ -7,6 +7,21 @@ window.melodexScroll = {
         return box && getComputedStyle(box).overflowY === 'auto' ? box : document.scrollingElement;
     },
     get: () => window.melodexScroll.scroller().scrollTop,
+    // Calls MoreAsync on the page when a long list's end comes near the screen. The page watches its end again each
+    // time it's drawn, so while the end stays near and more keeps coming, more is asked for.
+    atEnd: (end, page) => {
+        window.melodexScroll.endObserver?.disconnect();
+        if (!end)
+            return;
+        const observer = new IntersectionObserver(entries => {
+            if (!entries.some(e => e.isIntersecting))
+                return;
+            observer.disconnect();
+            page.invokeMethodAsync('MoreAsync').catch(() => { });
+        }, { rootMargin: '0px 0px 600px 0px' });
+        window.melodexScroll.endObserver = observer;
+        observer.observe(end);
+    },
     to: y => {
         let tries = 0;
         const go = () => {
