@@ -57,6 +57,21 @@ the install stays small until you want them:
 For example `COMPOSE_PROFILES=archive,bandcamp`. Once it's running, add it under **Settings → Plugins**, where it's
 among the templates under **Add**: see [plugins](plugins.md).
 
+### Prowlarr's save folder, from both sides
+
+qBittorrent and the Prowlarr plugin each see qBittorrent's downloads at their own path, and the plugin's settings take
+both. Say qBittorrent's container mounts your pool at `/data` (as the TRaSH guides lay it out), and Melodex's
+`DOWNLOADS_PATH` is that pool's torrents folder, mounted in the plugin at `/downloads`:
+
+| Setting | Is | As seen by |
+| --- | --- | --- |
+| **Save folder** | `/data/torrents/melodex` | qBittorrent |
+| **Save folder for this plugin** | `/downloads/melodex` | the plugin |
+
+If **Save folder** isn't somewhere qBittorrent has, it can't write the files: every fetch fails with qBittorrent's
+"Permission denied". The plugin's health check warns when the save folder isn't under qBittorrent's own default save
+path, and names that path; a failed fetch says what to change.
+
 ## The folders Melodex keeps
 
 | Volume | Holds |
