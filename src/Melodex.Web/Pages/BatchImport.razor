@@ -82,10 +82,14 @@ else
                     else { <span>a new playlist</span> }
                     @if (ImportCounts.Summary(import) is { Length: > 0 } counts) { <span> · @counts</span> }
                 </div>
-                @if (open)
+                @if (open || _closing.Contains(import.Id))
                 {
-                    <div class="request-body" @onpointerdown="() => Touch(import.Id)" @onwheel="() => Touch(import.Id)" @onfocusin="() => Touch(import.Id)">
-                        <ImportSongs @key="(import.Id, import.State)" Import="import.Id" OnChanged="LoadAsync" />
+                    @* It grows open and shrinks shut rather than appearing and vanishing, so what's below moves smoothly. *@
+                    <div class="request-body import-body @(open ? "" : "closing")" @onpointerdown="() => Touch(import.Id)" @onwheel="() => Touch(import.Id)"
+                         @onfocusin="() => Touch(import.Id)">
+                        <div class="import-body-inner">
+                            <ImportSongs Import="import.Id" State="import.State" Total="import.Total" OnChanged="LoadAsync" />
+                        </div>
                     </div>
                 }
             </div>
@@ -139,6 +143,10 @@ else
     // The lists open now; those you opened or closed yourself are left as you had them.
     private readonly HashSet<Guid> _open = [];
     private readonly HashSet<Guid> _yours = [];
+    private readonly HashSet<Guid> _closing = [];
+
+    // As long as the shrinking shut takes (.import-body.closing).
+    private static readonly TimeSpan Closing = TimeSpan.FromMilliseconds(250);
     private readonly Dictionary<Guid, DateTime> _touched = [];
     private Guid? _following;
 
@@ -208,9 +216,10 @@ else
         var before = _following;
         _following = underway;
         if (before is { } last && !_yours.Contains(last) && !InUse(last))
-            _open.Remove(last);
+            _ = CloseAsync(last);
         if (_yours.Contains(underway))
             return;
+        _closing.Remove(underway);
         _open.Add(underway);
         StateHasChanged();
         await Js.InvokeVoidAsync("melodexScroll.follow", $"import-{underway}");
@@ -223,8 +232,25 @@ else
     private void Toggle(Guid import)
     {
         _yours.Add(import);
-        if (!_open.Remove(import))
+        if (_open.Contains(import))
+            _ = CloseAsync(import);
+        else
+        {
+            _closing.Remove(import);
             _open.Add(import);
+        }
+    }
+
+    // Shut, once it's had time to shrink.
+    private async Task CloseAsync(Guid import)
+    {
+        if (!_open.Remove(import))
+            return;
+        _closing.Add(import);
+        StateHasChanged();
+        await Task.Delay(Closing);
+        if (_closing.Remove(import))
+            await InvokeAsync(StateHasChanged);
     }
 
     private async Task PollAsync()

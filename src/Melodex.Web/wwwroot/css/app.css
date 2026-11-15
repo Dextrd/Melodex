@@ -934,8 +934,21 @@ tr.playing td:nth-child(2) { color: var(--accent); font-weight: 600; }
 .scan-file-text { min-width: 0; }
 .scan-file.matched.fresh, .task-row.done.fresh { animation: matched .6s ease-out; }
 .task-row.waiting .scan-file-text { opacity: .55; }
-/* An import's songs before it's applied: a tick for each, to go in or be left out. */
+/* An import's songs before it's applied: a tick for each, to go in or be left out, sliding in as matching finishes. */
 .scan-file.choosable { grid-template-columns: auto 2.25rem minmax(0, 1fr) auto; }
+.scan-file.choosable > input[type=checkbox] { margin: 0; width: 1rem; }
+.ticks-arriving .scan-file.choosable > input[type=checkbox] { animation: tick-in .3s ease-out; }
+@keyframes tick-in { from { width: 0; margin-right: -.6rem; opacity: 0; } to { width: 1rem; margin-right: 0; opacity: 1; } }
+/* A list on an import's page grows open and shrinks shut. */
+.import-body { display: grid; grid-template-rows: 1fr; animation: grow-open .25s ease-out; }
+.import-body.closing { grid-template-rows: 0fr; margin-top: 0; animation: shrink-shut .25s ease-in; }
+.import-body-inner { min-height: 0; overflow: hidden; }
+@keyframes grow-open { from { grid-template-rows: 0fr; margin-top: 0; opacity: 0; } to { grid-template-rows: 1fr; opacity: 1; } }
+@keyframes shrink-shut { from { grid-template-rows: 1fr; margin-top: .6rem; opacity: 1; } to { grid-template-rows: 0fr; margin-top: 0; opacity: 0; } }
+.import-songs-waiting { background: var(--surface); }
+@media (prefers-reduced-motion: reduce) {
+    .ticks-arriving .scan-file.choosable > input[type=checkbox], .import-body, .import-body.closing { animation: none; }
+}
 .scan-file.dim > :not(input) { opacity: .5; }
 .task-row.failed .scan-file-text .small { color: var(--missing); }
 @keyframes matched { from { background: var(--owned-bg); } to { background: transparent; } }

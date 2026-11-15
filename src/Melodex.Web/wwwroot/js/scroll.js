@@ -36,10 +36,14 @@ window.melodexScroll = {
     // Something the page is getting on with, such as the list an import is matching: brought into view, unless the
     // page has been scrolled by hand in the last little while.
     follow: id => {
-        const element = document.getElementById(id);
-        if (!element || Date.now() - window.melodexScroll.touched < 8000)
-            return;
-        element.scrollIntoView({ block: 'start', behavior: 'smooth' });
+        // After the list before has had time to shrink shut, so it isn't aimed at a moving target.
+        setTimeout(() => {
+            const element = document.getElementById(id);
+            if (!element || Date.now() - window.melodexScroll.touched < 8000)
+                return;
+            const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+            element.scrollIntoView({ block: 'start', behavior: reduce ? 'instant' : 'smooth' });
+        }, 280);
     },
     touched: 0,
     // A row of tabs that scrolls sideways on a phone: the open tab, centred where it can be.
@@ -85,7 +89,7 @@ window.melodexScanList = {
         const row = 52;
         const top = Math.max(0, index * row - (list.clientHeight - row) / 2);
         if (Math.abs(list.scrollTop - top) > 2)
-            list.scrollTo({ top, behavior: opening ? 'instant' : 'smooth' });
+            list.scrollTo({ top, behavior: opening || matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' });
     },
 };
 
