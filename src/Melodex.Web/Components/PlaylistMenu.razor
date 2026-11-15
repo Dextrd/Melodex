@@ -1,0 +1,92 @@
+@*
+    Everything for one playlist or folder, behind a "more" button: pin it, edit or rename it, change its picture, or
+    remove it. Right-clicking its row or tile, or pressing and holding it on a phone, opens it too (see songmenu.js).
+    Each item shows only where it's given something to do.
+*@
+<span class="song-menu @Class">
+    <IconButton Icon="more" On="_open" Large="Large" Class="@(Small ? "small" : null)" Title="@($"More for this {What}")" OnClick="() => _open = !_open" />
+    @if (_open)
+    {
+        <div class="menu-backdrop" @onclick="() => _open = false"></div>
+        <div class="menu right" role="menu" @onkeydown="Key">
+            @if (OnPlay.HasDelegate)
+            {
+                <button type="button" role="menuitem" @onclick="() => Do(OnPlay)"><Icon Name="play" />Play</button>
+            }
+            @if (OnPin.HasDelegate)
+            {
+                <button type="button" role="menuitem" @onclick="() => Do(OnPin)"><Icon Name="pin" />@(Pinned ? "Unpin" : "Pin, to show it first")</button>
+            }
+            @if (OnNew.HasDelegate)
+            {
+                <button type="button" role="menuitem" @onclick="() => Do(OnNew)"><Icon Name="plus" />New playlist in it…</button>
+            }
+            @if (OnEdit.HasDelegate)
+            {
+                <button type="button" role="menuitem" @onclick="() => Do(OnEdit)"><Icon Name="rename" />@EditLabel</button>
+            }
+            @if (OnPicture.HasDelegate)
+            {
+                <button type="button" role="menuitem" @onclick="() => Do(OnPicture)"><Icon Name="image" />Change its picture…</button>
+            }
+            @if (OnExport.HasDelegate)
+            {
+                <button type="button" role="menuitem" @onclick="() => Do(OnExport)"><Icon Name="export" />Export…</button>
+            }
+            @if (OnRemove.HasDelegate)
+            {
+                <hr />
+                <button type="button" role="menuitem" class="menu-danger menu-red" @onclick="() => Do(OnRemove)"><Icon Name="remove" />@RemoveLabel</button>
+            }
+        </div>
+    }
+</span>
+
+@code {
+    /// <summary>playlist or folder, for the button's title.</summary>
+    [Parameter] public string What { get; set; } = "playlist";
+
+    [Parameter] public string? Class { get; set; }
+
+    /// <summary>Its button's size: large among a page's big buttons, small among a row's.</summary>
+    [Parameter] public bool Large { get; set; }
+
+    [Parameter] public bool Small { get; set; }
+
+    [Parameter] public EventCallback OnPlay { get; set; }
+
+    /// <summary>Pins it, or unpins it if <see cref="Pinned"/>.</summary>
+    [Parameter] public EventCallback OnPin { get; set; }
+
+    [Parameter] public bool Pinned { get; set; }
+
+    /// <summary>Makes a playlist in it, for a folder.</summary>
+    [Parameter] public EventCallback OnNew { get; set; }
+
+    [Parameter] public EventCallback OnEdit { get; set; }
+
+    [Parameter] public string EditLabel { get; set; } = "Edit…";
+
+    [Parameter] public EventCallback OnPicture { get; set; }
+
+    [Parameter] public EventCallback OnExport { get; set; }
+
+    /// <summary>Removes it, after asking.</summary>
+    [Parameter] public EventCallback OnRemove { get; set; }
+
+    [Parameter] public string RemoveLabel { get; set; } = "Remove…";
+
+    private bool _open;
+
+    private void Key(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape")
+            _open = false;
+    }
+
+    private async Task Do(EventCallback action)
+    {
+        _open = false;
+        await action.InvokeAsync();
+    }
+}

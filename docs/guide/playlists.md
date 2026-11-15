@@ -28,18 +28,22 @@ come first: click one to see what's in it, and the names above the squares to go
 sort them by name, when they last changed, how many songs they have or how long they are. Melodex remembers your
 choices in that browser.
 
-**Pin** the ones you play most, from the pin beside each or on its page: they show in a row at the top, which the pin
-button in the toolbar hides and shows again. Pins are yours alone and stay in Melodex.
+Each playlist and folder has a **⋯** menu, in the list, on its square and on its page; right-click one, or press and
+hold it on a phone, to open it there. A playlist's has **Pin**, **Edit**, **Change its picture** and **Delete**; a
+folder's has **New playlist in it**, **Rename**, **Change its picture** and **Remove the folder**, which deletes every
+playlist in it, saying how many first.
+
+**Pin** the ones you play most, from the pin beside each or its menu: they show in a row at the top, which the pin button
+in the toolbar hides and shows again. Pins are yours alone and stay in Melodex.
 
 ## Pictures
 
 A playlist shows the covers of the albums in it, or four of them in a square once it has that many, which appear
 together once all four are in. Give it a
-picture of its own with **Picture** on its page (a JPEG, PNG, WebP or GIF, up to 10 MB), and take it away the same way
+picture of its own with **Change its picture** in its menu (a JPEG, PNG, WebP or GIF, up to 10 MB), and take it away the same way
 to have its albums' covers back.
 
-A folder shows a folder icon. Give it a picture of its own with the picture button beside it in the list, or on its
-square. Folders' pictures stay in Melodex, as media servers have no folders, and go with a folder when it's renamed.
+A folder shows a folder icon. Give it a picture of its own with **Change its picture** in its menu. Folders' pictures stay in Melodex, as media servers have no folders, and go with a folder when it's renamed.
 
 ## Folders
 

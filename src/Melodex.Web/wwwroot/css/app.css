@@ -1112,6 +1112,8 @@ button .spinner { width: .85rem; height: .85rem; vertical-align: -2px; margin-ri
 .tile-wrap > .tile-menu > .menu { top: 2.6rem; left: auto; right: .4rem; width: max-content; }
 .tile-wrap:hover > .tile-menu, .tile-wrap:focus-within > .tile-menu, .tile-wrap > .tile-menu:has(.menu) { opacity: 1; }
 @media (hover: none) { .tile-menu { display: none; } .tile-wrap:has(.tile-menu) { -webkit-touch-callout: none; } }
+/* Opened by a press, its menu shows though its button doesn't. */
+@media (hover: none) { .tile-wrap > .tile-menu:has(.menu) { display: block; } .tile-wrap > .tile-menu:has(.menu) > .icon-button { visibility: hidden; } }
 .icon-button.remove:hover:not(:disabled) { color: var(--missing); border-color: var(--missing); }
 
 /* The library's sort: what by, and which way. */
@@ -1549,6 +1551,8 @@ input[type=search]:disabled { opacity: .6; }
 .page-tabs .tab-count { margin-left: .35rem; padding: 0 .4rem; border-radius: 999px; font-size: .75rem; background: var(--border); color: var(--text); }
 
 /* Pins: on a square, shown on hover like other tile buttons, and always once pinned; in a list, faint until wanted. */
+/* A playlist's pin sits in its tile's top left; its menu has the top right. */
+.tile-pin { left: .4rem; right: auto; }
 .tile-pin.pinned, .row-pin.pinned { opacity: 1; color: var(--accent); }
 .row-pin { opacity: .45; }
 .playlist-row:hover .row-pin, .row-pin:focus-visible { opacity: 1; }
@@ -1616,6 +1620,7 @@ input[type=search]:disabled { opacity: .6; }
 /* What can't be undone without asking: red as it's pointed at. */
 .menu button.menu-danger:hover:not(:disabled) { color: var(--missing); background: var(--missing-bg); }
 .menu button.menu-danger:hover:not(:disabled) .glyph { color: inherit; }
+.menu button.menu-red, .menu button.menu-red .glyph { color: var(--missing); }
 
 /* Shuffle and repeat: quieter than the transport until they're on, then in the accent, with a dot beneath. */
 button.icon.mode { color: var(--muted); position: relative; }

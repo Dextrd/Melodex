@@ -58,10 +58,9 @@ else
                                 OnClick="GetAwaitingAsync" />
                 }
                 <IconButton Icon="rename" Large="true" Label="Edit" Title="Rename it, move it to another folder, change its comment, or choose where songs you add go" OnClick="StartRename" />
-                <IconButton Icon="image" Large="true" Label="Picture" Title="Give it a picture of its own, or take it away" OnClick="() => _choosingCover = true" />
                 <IconButton Icon="export" Large="true" Title="Export it, as an M3U8 playlist or a CSV" OnClick="@(() => Nav.NavigateTo($"tools/export?playlist={Id}"))" />
-                <IconButton Icon="pin" Large="true" On="summary.Pinned" Title="@(summary.Pinned ? "Unpin it" : "Pin it, to show it first among your playlists")" OnClick="PinAsync" />
-                <IconButton Icon="remove" Large="true" Title="Delete the playlist" OnClick="() => _deleting = true" />
+                <PlaylistMenu Large="true" Pinned="summary.Pinned" OnPin="PinAsync" OnEdit="StartRename" OnPicture="() => _choosingCover = true"
+                              OnRemove="() => _deleting = true" RemoveLabel="Delete the playlist…" />
             </div>
         </div>
     </div>
@@ -211,6 +210,9 @@ else
 
     [Parameter] public Guid Id { get; set; }
 
+    /// <summary>What a playlist's menu elsewhere asked to do here: edit, picture or delete.</summary>
+    [SupplyParameterFromQuery(Name = "do")] public string? Do { get; set; }
+
     private PlaylistDetail? _playlist;
     private bool _notFound, _busy, _renaming, _deleting;
 
@@ -233,6 +235,17 @@ else
         Tracker.Changed -= Redraw;
         Tracker.Changed += Redraw;
         await Task.WhenAll(LoadAsync(), Tracker.EnsureLoadedAsync());
+        if (Do is { } asked && _playlist is not null)
+        {
+            switch (asked)
+            {
+                case "edit": StartRename(); break;
+                case "picture": _choosingCover = true; break;
+                case "delete": _deleting = true; break;
+            }
+            // Done once: back or a reload doesn't ask again.
+            Nav.NavigateTo($"playlists/{Id}", replace: true);
+        }
     }
 
     private void Redraw() => InvokeAsync(StateHasChanged);

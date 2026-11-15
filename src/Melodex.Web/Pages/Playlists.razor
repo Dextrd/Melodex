@@ -97,6 +97,7 @@ else
                         @if (path == here.Path) { <strong aria-current="page">@name</strong> }
                         else { <a href="@FolderHref(path)">@name</a> }
                     }
+                    @FolderMenu(here.Path, null)
                 </nav>
             }
             <div class="tiles">
@@ -159,8 +160,87 @@ else
     </PictureDialog>
 }
 
+@if (_removing is { } removing)
+{
+    var inIt = removing.Playlist is { } one ? [one] : PlaylistsIn(removing.Folder!);
+    var synced = inIt.Count(p => p.Sync != PlaylistSyncState.Off);
+    <Dialog Title="@(removing.Playlist is { } single ? $"Delete {PlaylistNames.Leaf(single.Name, Delimiter)}?" : $"Remove the folder {removing.Folder!.Split(Delimiter)[^1]}?")"
+            Alert="true" OnClose="() => _removing = null">
+        <p>
+            @if (removing.Folder is not null)
+            {
+                <text>
+                    @(inIt.Count == 0 ? "There are no playlists in it." : $"This deletes the {Format.Count(inIt.Count, "playlist", "playlists")} in it, in its folders too.")
+                </text>
+            }
+            The songs stay in your library.
+            @if (synced > 0) { <text>@(synced == 1 && removing.Playlist is not null ? "It's" : $"{Format.Count(synced, "synced playlist is", "synced playlists are")}") deleted from the media server too.</text> }
+        </p>
+        @if (_removeError is not null) { <p class="error small">@_removeError</p> }
+        <div class="toolbar">
+            <span class="spacer"></span>
+            <button @onclick="() => _removing = null">Keep @(removing.Playlist is null ? "them" : "it")</button>
+            <button class="danger" disabled="@_busy" @onclick="RemoveAsync">@if (_busy) { <span class="spinner"></span> }@(removing.Playlist is null ? "Remove" : "Delete")</button>
+        </div>
+    </Dialog>
+}
+
 @code {
     [SupplyParameterFromQuery(Name = "folder")] public string? InFolder { get; set; }
+
+    // A playlist or folder to remove, once it's confirmed.
+    private sealed record Removing(PlaylistSummary? Playlist, string? Folder);
+    private Removing? _removing;
+    private string? _removeError;
+
+    // A playlist's menu: pin, edit and its picture on its own page, delete here.
+    private RenderFragment Menu(PlaylistSummary playlist, string? tileClass) =>
+        @<PlaylistMenu Class="@tileClass" Small="tileClass is null" Pinned="playlist.Pinned" OnPin="() => PinAsync(playlist)"
+                       OnEdit="@(() => Nav.NavigateTo($"playlists/{playlist.Id}?do=edit"))" OnPicture="@(() => Nav.NavigateTo($"playlists/{playlist.Id}?do=picture"))"
+                       OnRemove="() => StartRemove(new Removing(playlist, null))" RemoveLabel="Delete…" />;
+
+    private RenderFragment FolderMenu(string path, string? tileClass) =>
+        @<PlaylistMenu What="folder" Class="@tileClass" Small="tileClass is null" OnNew="() => StartNew(path)" OnEdit="() => StartRename(path)" EditLabel="Rename…"
+                       OnPicture="() => _picturing = path" OnRemove="() => StartRemove(new Removing(null, path))" RemoveLabel="Remove the folder…" />;
+
+    // Every playlist in the folder, in its folders too.
+    private List<PlaylistSummary> PlaylistsIn(string folder) =>
+        (_playlists ?? []).Where(p => PlaylistNames.Folders(p.Name, Delimiter) is var folders
+                                      && IsWithin(string.Join(Delimiter, folders), folder)).ToList();
+
+    private void StartRemove(Removing removing)
+    {
+        _removeError = null;
+        _removing = removing;
+    }
+
+    private async Task RemoveAsync()
+    {
+        if (_removing is not { } removing)
+            return;
+        _busy = true;
+        _removeError = null;
+        try
+        {
+            foreach (var playlist in removing.Playlist is { } one ? [one] : PlaylistsIn(removing.Folder!))
+                await Api.DeletePlaylistAsync(playlist.Id);
+            if (removing.Folder is { } folder)
+            {
+                foreach (var path in _folders.Keys.Where(p => IsWithin(p, folder)).ToList())
+                    await Api.SetPlaylistFolderCoverAsync(path, null);
+                // Out of a folder that's gone, to all of them.
+                if (InFolder is { } inside && IsWithin(inside, folder))
+                    Nav.NavigateTo("playlists");
+            }
+            _removing = null;
+            await LoadAsync();
+        }
+        catch (Exception e) when (e is HttpRequestException or MelodexApiException)
+        {
+            _removeError = e.Message;
+        }
+        _busy = false;
+    }
 
     private IReadOnlyList<PlaylistSummary>? _playlists;
     private Dictionary<string, PlaylistFolderInfo> _folders = [];
@@ -324,7 +404,7 @@ else
             <div class="tile-name">@folder.Name</div>
             <div class="muted small tile-sub">Folder · @Format.Count(folder.Count, "playlist", "playlists")</div>
         </a>
-        <IconButton Icon="image" Class="small tile-corner" Title="@($"Give {folder.Name} a picture")" OnClick="() => _picturing = folder.Path" />
+        @FolderMenu(folder.Path, "tile-menu")
     </div>;
 
     private RenderFragment Tile(PlaylistSummary playlist, bool withFolders) => @<div class="tile-wrap" @key="playlist.Id">
@@ -337,10 +417,11 @@ else
         </a>
         <IconButton Icon="pin" Class="@($"small tile-corner tile-pin {(playlist.Pinned ? "pinned" : "")}")" On="playlist.Pinned"
                     Title="@(playlist.Pinned ? "Unpin it" : "Pin it, to show it first")" OnClick="() => PinAsync(playlist)" />
+        @Menu(playlist, "tile-menu")
     </div>;
 
     private RenderFragment Row(PlaylistSummary playlist, bool withFolders) => @<li @key="playlist.Id">
-        <div class="playlist-row">
+        <div class="playlist-row menu-row">
             <a class="plain playlist-link" href="playlists/@playlist.Id">
                 <PlaylistCover Covers="playlist.Covers" Class="small" />
                 <span class="playlist-text">
@@ -354,6 +435,7 @@ else
             <IconButton Icon="pin" Class="@($"small row-pin {(playlist.Pinned ? "pinned" : "")}")" On="playlist.Pinned"
                         Title="@(playlist.Pinned ? "Unpin it" : "Pin it, to show it first")" OnClick="() => PinAsync(playlist)" />
             <IconButton Icon="play" Requires="@UserPermissions.Listen" Class="small" Title="Play" Disabled="playlist.Count == 0" OnClick="() => PlayAsync(playlist.Id)" />
+            @Menu(playlist, null)
         </div>
     </li>;
 
@@ -371,8 +453,7 @@ else
                     </button>
                     <span class="spacer"></span>
                     <IconButton Icon="plus" Class="small" Title="@($"Make a playlist in {folder.Name}")" OnClick="() => StartNew(folder.Path)" />
-                    <IconButton Icon="rename" Class="small" Title="@($"Rename {folder.Name}")" OnClick="() => StartRename(folder.Path)" />
-                    <IconButton Icon="image" Class="small" Title="@($"Give {folder.Name} a picture")" OnClick="() => _picturing = folder.Path" />
+                    @FolderMenu(folder.Path, null)
                 </div>
                 @if (open)
                 {
