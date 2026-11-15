@@ -56,19 +56,20 @@ public sealed class ImportMatcher(MelodexDbContext db, CatalogueService catalogu
         var plugin = await catalogue.PluginAsync(ct);
         if (line.Isrc is { } isrc && plugin is IIsrcLookup lookup && (await lookup.LookupIsrcAsync(isrc, ct)).FirstOrDefault() is { } byIsrc)
         {
-            await SetAsync(line, (await ImportAsync(byIsrc, ct)).Id, 1, ct);
+            await SetAsync(line, (await ImportAsync(byIsrc, ct)).Track.Id, 1, ct);
             return;
         }
 
         // Each catalogue in order, the core one first: a later one is only asked when nothing sure was found before it.
-        (IndexTrack Track, double Score)? best = null;
+        var hits = new List<(IndexTrack Track, double Score)>();
         var indexes = await catalogue.IndexesAsync(ct);
-        for (var i = 0; i < indexes.Count && best is not { Score: >= Sure }; i++)
+        for (var i = 0; i < indexes.Count && !hits.Any(h => h.Score >= Sure); i++)
         {
             IndexSearchResults results;
             try
             {
-                results = await indexes[i].Plugin.SearchAsync(new IndexSearchQuery($"{line.Title} {line.Artist}".Trim(), new HashSet<SearchKind> { SearchKind.Track }, SearchSize), ct);
+                results = await indexes[i].Plugin.SearchAsync(new IndexSearchQuery($"{line.Title} {line.Artist}".Trim(), new HashSet<SearchKind> { SearchKind.Track }, SearchSize,
+                    new IndexSearchFields(line.Title, line.Artist, line.Album)), ct);
             }
             catch (Exception e) when (i > 0 && LibraryMatcher.IsUnavailable(e, ct))
             {
@@ -81,17 +82,30 @@ public sealed class ImportMatcher(MelodexDbContext db, CatalogueService catalogu
                 var score = line.MusicBrainzId is { } mbid && hit.Id.Provider == Providers.MusicBrainz && string.Equals(hit.Id.Value, mbid, StringComparison.OrdinalIgnoreCase)
                     ? 1
                     : Score(line, hit);
-                if (best is null || score > best.Value.Score)
-                    best = (hit, score);
+                hits.Add((hit, score));
             }
         }
 
-        if (best is not { Score: >= Close } found)
+        // The closest, in the catalogues' order where they're as close; but one on no edition can't be asked for, so the
+        // next closest few are tried before settling for it.
+        var close = hits.Where(h => h.Score >= Close).OrderByDescending(h => h.Score).Take(3).ToList();
+        if (close.Count == 0)
         {
             line.Outcome = ImportOutcome.NotFound;
             return;
         }
-        await SetAsync(line, (await ImportAsync(found.Track, ct)).Id, found.Score, ct);
+        (Guid Id, double Score)? first = null;
+        foreach (var (hit, score) in close)
+        {
+            var (track, placed) = await ImportAsync(hit, ct);
+            if (placed)
+            {
+                await SetAsync(line, track.Id, score, ct);
+                return;
+            }
+            first ??= (track.Id, score);
+        }
+        await SetAsync(line, first!.Value.Id, first.Value.Score, ct);
     }
 
     /// <summary>
@@ -123,7 +137,8 @@ public sealed class ImportMatcher(MelodexDbContext db, CatalogueService catalogu
             IndexSearchResults results;
             try
             {
-                results = await indexes[i].Plugin.SearchAsync(new IndexSearchQuery($"{line.Title} {line.Artist}".Trim(), new HashSet<SearchKind> { SearchKind.Album }, SearchSize), ct);
+                results = await indexes[i].Plugin.SearchAsync(new IndexSearchQuery($"{line.Title} {line.Artist}".Trim(), new HashSet<SearchKind> { SearchKind.Album }, SearchSize,
+                    new IndexSearchFields(line.Title, line.Artist)), ct);
             }
             catch (Exception e) when (i > 0 && LibraryMatcher.IsUnavailable(e, ct))
             {
@@ -194,14 +209,29 @@ public sealed class ImportMatcher(MelodexDbContext db, CatalogueService catalogu
             yield return new ProviderId(Providers.Isrc, isrc);
     }
 
-    // The track, with the album it's best known from, so it has a page and a cover.
-    private async Task<Track> ImportAsync(IndexTrack hit, CancellationToken ct)
+    // The track, with the album it's best known from, so it has a page and a cover. Unless it's owned, that album's
+    // editions are fetched too, so asking for the track has an edition to file it under; placed says whether it has one
+    // (or is owned).
+    private async Task<(Track Track, bool Placed)> ImportAsync(IndexTrack hit, CancellationToken ct)
     {
         var track = await catalogue.ImportTrackAsync(hit, ct);
-        if (hit.Album is { } album)
-            await catalogue.ImportAlbumUnlessKnownAsync(album, ct);
+        var album = hit.Album is { } source ? await catalogue.ImportAlbumUnlessKnownAsync(source, ct) : null;
         await db.SaveChangesAsync(ct);
-        return track;
+        if (await db.LibraryFiles.AnyAsync(f => f.TrackId == track.Id && f.HiddenAt == null, ct) || await db.EditionTracks.AnyAsync(et => et.TrackId == track.Id, ct))
+            return (track, true);
+        if (album is null)
+            return (track, false);
+        try
+        {
+            await catalogue.RefreshEditionsAsync(album, false, ct);
+        }
+        catch (Exception e) when (LibraryMatcher.IsUnavailable(e, ct))
+        {
+            // Not known yet, rather than on none: it's tried again when it's asked for.
+            logger.LogDebug(e, "Couldn't fetch the editions of {Album}", album.Title);
+            return (track, true);
+        }
+        return (track, await db.EditionTracks.AnyAsync(et => et.TrackId == track.Id, ct));
     }
 
     private async Task SetAsync(ImportLine line, Guid trackId, double confidence, CancellationToken ct)

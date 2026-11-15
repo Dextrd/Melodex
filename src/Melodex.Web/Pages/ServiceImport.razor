@@ -1,42 +1,57 @@
-@page "/tools/import/service"
+@page "/tools/import/{Slug}"
 @inject MelodexClient Api
 @inject AuthState Auth
 @inject NavigationManager Nav
 
-<PageTitle>Import from a music service · Melodex</PageTitle>
+<PageTitle>Import from @Name · Melodex</PageTitle>
 
 @* A music service's export of your data: what's in it, then which lists to import, each matched as a list import is. *@
 <p class="small"><a href="tools">← Tools</a></p>
-<h1>Import from a music service</h1>
+<h1>Import from @Name</h1>
 
-@if (!Auth.May(UserPermissions.Request))
+@if (Service is null)
+{
+    <div class="empty card">Melodex doesn't import from that service.</div>
+}
+else if (!Auth.May(UserPermissions.Request))
 {
     <div class="empty card">Importing needs the Request permission.</div>
 }
 else
 {
-    <p class="muted">
-        Music services give you a copy of your data. Choose the zip one sent you, or the files from it, and then which of its
-        playlists, liked songs and saved albums to import.
-    </p>
-    <ul class="muted small service-steps">
-        <li>
-            <strong>Spotify</strong>: on Spotify's website, open <strong>Account → Privacy settings</strong>, tick <strong>Account
-            data</strong> and ask for it. An email brings a zip within a few days.
-        </li>
-        <li>
-            <strong>YouTube Music</strong>: at <a href="https://takeout.google.com" target="_blank" rel="noopener">Google Takeout</a>,
-            choose <strong>Deselect all</strong>, tick <strong>YouTube and YouTube Music</strong>, and under its data keep
-            <strong>music library songs</strong> and <strong>playlists</strong>. It usually comes within the hour.
-        </li>
-    </ul>
-    <p class="muted small"><a href="settings/help/tools#importing-from-a-music-service">More in the guide</a>.</p>
+    @if (Service == ImportFormat.Spotify)
+    {
+        <p class="muted">
+            Spotify gives you a copy of your data. Choose the zip it sends, or the files from it, and then which of your playlists, liked
+            songs and saved albums to import.
+        </p>
+        <p class="muted small service-steps">
+            To ask for it: on Spotify's website, open <strong>Account → Privacy settings</strong>, tick <strong>Account data</strong> and
+            ask for it. An email brings a zip within a few days.
+        </p>
+    }
+    else
+    {
+        <p class="muted">
+            Google Takeout gives you a copy of your YouTube Music data. Choose the zip it sends, or the files from it, and then which of
+            your library songs and playlists to import.
+        </p>
+        <p class="muted small service-steps">
+            To ask for it: at <a href="https://takeout.google.com" target="_blank" rel="noopener">Google Takeout</a>, choose
+            <strong>Deselect all</strong>, tick <strong>YouTube and YouTube Music</strong>, and under its data keep <strong>music library
+            songs</strong> and <strong>playlists</strong>. It usually comes within the hour.
+        </p>
+    }
+    <p class="muted small"><a href="settings/help/tools#@Anchor">More in the guide</a>.</p>
     <div class="field">
         <label class="field-label" for="service-files">The export's zip, or its files</label>
         <InputFile id="service-files" OnChange="ReadAsync" multiple accept=".zip,.json,.csv,application/zip,application/json,text/csv" />
     </div>
     @if (_busy && _peek is null) { <Loading /> }
-    @if (_error is not null) { <p class="error">@_error</p> }
+    @if (_error is not null)
+    {
+        <p class="error">@_error@if (_otherService is { } other) { <text> </text><a href="@Link(other)">Import it from there</a><text>.</text> }</p>
+    }
 
     @if (_peek is not null)
     {
@@ -89,8 +104,24 @@ else
 @code {
     private const long MaxExport = 30 * 1024 * 1024;
 
+    private static readonly Dictionary<string, ImportFormat> Services = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["spotify"] = ImportFormat.Spotify,
+        ["youtube-music"] = ImportFormat.YouTubeMusic,
+    };
+
+    [Parameter] public string Slug { get; set; } = "";
+
+    private ImportFormat? Service => Services.TryGetValue(Slug, out var service) ? service : null;
+    private string Name => Service is { } service ? ServiceNames.Of(service) : "a music service";
+    private string Anchor => Service == ImportFormat.Spotify ? "importing-from-spotify" : "importing-from-youtube-music";
+
+    /// <summary>The page for importing a service's export.</summary>
+    public static string Link(ImportFormat service) => $"tools/import/{Services.First(s => s.Value == service).Key}";
+
     private bool _busy, _folderEdited;
     private string? _error;
+    private ImportFormat? _otherService;
     private List<(string Name, byte[] Bytes)> _files = [];
     private ServicePeek? _peek;
     private HashSet<string> _chosen = [];
@@ -101,12 +132,15 @@ else
     private async Task ReadAsync(InputFileChangeEventArgs e)
     {
         _error = null;
+        _otherService = null;
         _peek = null;
         _files = [];
         var chosen = e.GetMultipleFiles(500);
         if (chosen.Sum(f => f.Size) > MaxExport)
         {
-            _error = "That's more than 30 MB. Choose only the files with your library and playlists in, such as Spotify's YourLibrary.json and Playlist files, or Takeout's playlists folder.";
+            _error = Service == ImportFormat.Spotify
+                ? "That's more than 30 MB. Choose only the files with your library and playlists in: YourLibrary.json and the Playlist files."
+                : "That's more than 30 MB. Choose only the files with your library and playlists in: music library songs.csv and the playlists folder.";
             return;
         }
         _busy = true;
@@ -119,9 +153,17 @@ else
                 await stream.CopyToAsync(copy);
                 _files.Add((file.Name, copy.ToArray()));
             }
-            _peek = await Api.PeekServiceImportAsync(Streams());
+            var peek = await Api.PeekServiceImportAsync(Streams());
+            if (peek.Service != Service)
+            {
+                _error = $"That's {ServiceNames.Of(peek.Service)}'s, not {Name}'s.";
+                _otherService = peek.Service;
+                _busy = false;
+                return;
+            }
+            _peek = peek;
             if (!_folderEdited)
-                _folder = $"{ServiceNames.Of(_peek.Service)}{PlaylistNames.Delimiter(Auth)}";
+                _folder = Name;
             _chosen = Choosable.Select(l => l.Key).ToHashSet();
         }
         catch (MelodexApiException ex)
@@ -137,9 +179,19 @@ else
     {
         { New: 0 } => "· nothing new since you last imported it",
         { UpdatesPlaylistName: { } playlist } => $"· {list.New} new, to add to {playlist}",
-        { Kind: ServiceListKind.Albums } => "· to ask for those you don't have",
+        { Kind: ServiceListKind.Albums } => "· to ask for the missing ones",
         _ => "",
     };
+
+    // The folder as the start of each playlist's name: "YouTube Music/" for a delimiter of "/", or nothing.
+    private string Folder()
+    {
+        var delimiter = PlaylistNames.Delimiter(Auth);
+        var folder = _folder.Trim();
+        while (delimiter.Length > 0 && folder.EndsWith(delimiter))
+            folder = folder[..^delimiter.Length].TrimEnd();
+        return folder.Length == 0 || delimiter.Length == 0 ? "" : folder + delimiter;
+    }
 
     private void SetFolder(ChangeEventArgs e)
     {
@@ -163,7 +215,7 @@ else
         _error = null;
         try
         {
-            var batch = await Api.CreateServiceImportAsync(Streams(), new CreateServiceImport(_chosen.ToList(), _folder, _likedName));
+            var batch = await Api.CreateServiceImportAsync(Streams(), new CreateServiceImport(_chosen.ToList(), Folder(), _likedName));
             Nav.NavigateTo($"tools/import/batch/{batch.Id}");
         }
         catch (MelodexApiException ex)

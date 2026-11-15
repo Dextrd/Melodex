@@ -2,6 +2,7 @@
 @implements IDisposable
 @inject MelodexClient Api
 @inject AuthState Auth
+@inject NavigationManager Nav
 
 <PageTitle>Import from @Service · Melodex</PageTitle>
 
@@ -26,7 +27,7 @@ else
         var total = _batch.Imports.Sum(i => i.Total);
         var done = _batch.Imports.Sum(i => i.Total - i.Counts.GetValueOrDefault(ImportOutcome.Pending));
         <div class="notice">
-            Matching: @done of @total. <a href="activity/tasks">Watch it in Activity</a>
+            Matching: @done of @total. Open a list to watch its songs matched.
             <div class="progress"><span style="width: @(total == 0 ? 0 : 100 * done / total)%"></span></div>
         </div>
     }
@@ -34,7 +35,7 @@ else
     {
         <div class="notice">
             Applied @Format.Count(applied.Imports, "list", "lists"): @Format.Count(applied.Added, "song", "songs") in playlists@(applied.Requested > 0 ? $", {applied.Requested} asked for" : "").
-            @if (applied.ToReview > 0) { <text> @Format.Count(applied.ToReview, "song waits", "songs wait") in </text><a href="review/couldnt-match">Review</a><text> to be matched.</text> }
+            @if (applied.ToReview > 0) { <text> @Format.Count(applied.ToReview, "song waits", "songs wait") in </text><a href="review/imports">Review</a><text> to be matched.</text> }
         </div>
     }
     else
@@ -43,29 +44,32 @@ else
     }
 
     <div class="card">
-        <table class="table imports-table">
-            <colgroup><col /><col class="hide-narrow" /><col class="import-state-col" /></colgroup>
-            <tbody>
-                @foreach (var import in _batch.Imports)
+        @foreach (var import in _batch.Imports)
+        {
+            var open = _open.GetValueOrDefault(import.Id);
+            <div class="request" @key="import.Id">
+                <div class="request-head import-head">
+                    <button class="request-toggle" aria-expanded="@(open ? "true" : "false")" @onclick="() => _open[import.Id] = !open">
+                        <span class="chevron @(open ? "open" : "")" aria-hidden="true"></span>
+                        <span class="request-title">@import.Name</span>
+                    </button>
+                    <span class="request-state"><span class="badge @(import.State switch { ImportState.Matching => "neutral", ImportState.Ready => "partial", _ => "owned" })">
+                        @(import.State switch { ImportState.Matching => "Matching", ImportState.Ready => "Ready to check", _ => "Done" })</span></span>
+                </div>
+                <div class="muted small request-detail">
+                    @Format.Count(import.Total, import.Albums ? "album" : "song", import.Albums ? "albums" : "songs") ·
+                    @if (import.PlaylistId is { } made) { <span>in <a class="muted" href="playlists/@made">@import.PlaylistName</a></span> }
+                    else if (import.Albums) { <span>@(import.State == ImportState.Applied ? "missing ones asked for, if chosen" : "to ask for the missing ones")</span> }
+                    else if (import.UpdatesPlaylistId is { } updates) { <span>new, to add to <a class="muted" href="playlists/@updates">@import.UpdatesPlaylistName</a></span> }
+                    else { <span>a new playlist</span> }
+                    @if (ImportCounts.Summary(import) is { Length: > 0 } counts) { <span> · @counts</span> }
+                </div>
+                @if (open)
                 {
-                    <tr @key="import.Id">
-                        <td>
-                            <div class="ellipsis"><a href="tools/import/@import.Id">@import.Name</a></div>
-                            <div class="muted small ellipsis">
-                                @Format.Count(import.Total, import.Albums ? "album" : "song", import.Albums ? "albums" : "songs") ·
-                                @if (import.PlaylistId is { } made) { <span>in <a class="muted" href="playlists/@made">@import.PlaylistName</a></span> }
-                                else if (import.Albums) { <span>@(import.State == ImportState.Applied ? "you don't have asked for, if chosen" : "to ask for those you don't have")</span> }
-                                else if (import.UpdatesPlaylistId is { } updates) { <span>new, to add to <a class="muted" href="playlists/@updates">@import.UpdatesPlaylistName</a></span> }
-                                else { <span>a new playlist</span> }
-                            </div>
-                        </td>
-                        <td class="hide-narrow muted small">@ImportCounts.Summary(import)</td>
-                        <td><span class="badge @(import.State switch { ImportState.Matching => "neutral", ImportState.Ready => "partial", _ => "owned" })">
-                            @(import.State switch { ImportState.Matching => "Matching", ImportState.Ready => "Ready to check", _ => "Done" })</span></td>
-                    </tr>
+                    <div class="request-body"><ImportSongs Import="import.Id" /></div>
                 }
-            </tbody>
-        </table>
+            </div>
+        }
     </div>
 
     @if (matching == 0 && ready.Count > 0)
@@ -79,13 +83,13 @@ else
         <div class="import-apply">
             @if (!Auth.May(UserPermissions.Listen))
             {
-                <p class="muted small">Making playlists needs the Listen permission, so only what you don't have can be asked for.</p>
+                <p class="muted small">Making playlists needs the Listen permission, so only what's missing can be asked for.</p>
             }
             @if (missing > 0)
             {
                 <label class="check">
                     <input type="checkbox" checked="@_request" @onchange="e => _request = (bool)e.Value!" />
-                    Ask for the @what you don't have, to add to your library
+                    Ask for the missing @what, to add to your library
                 </label>
                 <p class="muted small indent">In the playlists, songs hold their places until they arrive@(_request ? "" : "; a Get button on each asks for them later").</p>
             }
@@ -93,7 +97,7 @@ else
             {
                 <label class="check">
                     <input type="checkbox" checked="@_toReview" @onchange="e => _toReview = (bool)e.Value!" />
-                    Send the @Format.Count(notFound, "song", "songs") not found to Review, to match there; otherwise they're left out
+                    Send the @Format.Count(notFound, "song", "songs") that couldn't be matched to Review, to match there; otherwise they're left out
                 </label>
             }
             <div class="toolbar">
@@ -101,6 +105,13 @@ else
                 @if (_error is not null) { <span class="error small">@_error</span> }
             </div>
         </div>
+    }
+    @if (_batch.Imports.All(i => i.State != ImportState.Applied))
+    {
+        <p class="small import-forget">
+            <button class="link" disabled="@_busy" @onclick="DeleteAsync">Delete these imports</button>
+            <span class="muted">Nothing they would have made is made.</span>
+        </p>
     }
 }
 
@@ -111,6 +122,11 @@ else
 
     private string Service => _batch?.Imports.FirstOrDefault() is { } first ? ServiceNames.Of(first.Format) : "a music service";
     private ImportBatchApplied? _applied;
+    private readonly Dictionary<Guid, bool> _open = [];
+
+    // The list being matched now, so it can be watched.
+    private static bool Underway(ImportSummary import) =>
+        import.State == ImportState.Matching && import.Counts.GetValueOrDefault(ImportOutcome.Pending) is var pending && pending > 0 && pending < import.Total;
     private bool _busy, _request = true, _toReview = true;
     private string? _error;
     private Timer? _timer;
@@ -129,6 +145,9 @@ else
             _batch = await Api.GetImportBatchAsync(Id);
             if (_batch is null)
                 _error = "Those imports aren't there any more.";
+            // The list being matched opens, and stays open once it's done.
+            foreach (var import in _batch?.Imports.Where(Underway) ?? [])
+                _open.TryAdd(import.Id, true);
         }
         catch (Exception e)
         {
@@ -161,6 +180,22 @@ else
             _error = e.Message;
         }
         _busy = false;
+    }
+
+    private async Task DeleteAsync()
+    {
+        _busy = true;
+        try
+        {
+            foreach (var import in _batch!.Imports)
+                await Api.DeleteImportAsync(import.Id);
+            Nav.NavigateTo("tools");
+        }
+        catch (MelodexApiException e)
+        {
+            _error = e.Message;
+            _busy = false;
+        }
     }
 
     public void Dispose() => _timer?.Dispose();

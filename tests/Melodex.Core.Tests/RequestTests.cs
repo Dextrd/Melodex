@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Melodex.Client;
+using Melodex.Core.Data;
 using Melodex.Core.Import;
 using Melodex.Core.Library;
 using Melodex.Core.Plugins;
@@ -205,6 +206,28 @@ public sealed class RequestTests(RequestFixture fixture, ITestOutputHelper outpu
             Assert.Contains("scan", refused.Message);
         }
         Assert.False((await Api.GetLibraryStatusAsync())!.Reading);
+    }
+
+    [TestLibraryFact]
+    public async Task A_track_on_no_edition_fails_rather_than_showing_as_in_the_library()
+    {
+        await fixture.AddSourceAsync(new FakeSource("tracks"));
+        Guid trackId;
+        using (var scope = fixture.Factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<MelodexDbContext>();
+            var artist = await db.Artists.FirstAsync();
+            var track = new Track { ArtistId = artist.Id, Title = "On No Album", ArtistCredit = artist.Name };
+            db.Tracks.Add(track);
+            await db.SaveChangesAsync();
+            trackId = track.Id;
+        }
+
+        var request = await Api.CreateRequestAsync(new CreateRequest(RequestKind.Track, trackId));
+        var done = await fixture.WaitAsync(request.Id);
+
+        Assert.Equal(RequestState.Failed, done.State);
+        Assert.Contains("isn't on any edition", done.Detail);
     }
 
     [TestLibraryFact]

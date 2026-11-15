@@ -129,7 +129,7 @@ else
         <div class="notice">
             <text>Applied @Format.Ago(summary.AppliedAt ?? summary.CreatedAt)</text>@if (summary.PlaylistId is { } playlistId)
             {<text>, into </text><a href="playlists/@playlistId">@summary.PlaylistName</a>}<text>.</text>
-            @if (summary.InReview > 0) { <text> @Format.Count(summary.InReview, "song waits", "songs wait") in </text><a href="review/couldnt-match">Review</a><text> to be matched.</text> }
+            @if (summary.InReview > 0) { <text> @Format.Count(summary.InReview, "song waits", "songs wait") in </text><a href="review/imports">Review</a><text> to be matched.</text> }
         </div>
     }
 
@@ -170,16 +170,16 @@ else
                                 <div class="muted small ellipsis">
                                     @if (match.ArtistId is { } artistId) { <a class="muted" href="artists/@artistId">@match.Artist</a> } else { @match.Artist }
                                     @if (match.Album is { } album) { <span> · @album</span> }
-                                    <span class="show-narrow"> · @Label(line)</span>
+                                    <span class="show-narrow"> · @ImportCounts.Label(line)</span>
                                 </div>
                             }
                             else
                             {
-                                <div class="ellipsis muted">@(line.Outcome == ImportOutcome.Pending ? "Matching…" : "Nothing found")</div>
+                                <div class="ellipsis muted">@(line.Outcome == ImportOutcome.Pending ? "Matching…" : "Couldn't match")</div>
                                 <div class="muted small ellipsis show-narrow">@(line.Song.Title.Length > 0 ? line.Song.Title : "A YouTube video") · @Given(line.Song)</div>
                             }
                         </td>
-                        <td class="hide-narrow"><span class="badge @BadgeClass(line)" title="@(line.Confidence is { } c && line.Outcome == ImportOutcome.Unsure ? $"{c:P0} alike" : null)">@Label(line)</span></td>
+                        <td class="hide-narrow"><span class="badge @ImportCounts.BadgeClass(line)" title="@(line.Confidence is { } c && line.Outcome == ImportOutcome.Unsure ? $"{c:P0} alike" : null)">@ImportCounts.Label(line)</span></td>
                         <td class="num actions">
                             @if (summary.State == ImportState.Ready)
                             {
@@ -239,14 +239,14 @@ else
                 </label>
                 <label class="dialog-choice">
                     <input type="radio" name="import-playlist" checked="@(_mode == ImportPlaylistMode.None)" @onchange="() => _mode = ImportPlaylistMode.None" />
-                    <span><strong>No playlist</strong> <span class="muted small">Only ask for the songs you don't have.</span></span>
+                    <span><strong>No playlist</strong> <span class="muted small">Only ask for the missing songs.</span></span>
                 </label>
             }
             @if (missing > 0)
             {
                 <label class="check">
                     <input type="checkbox" checked="@_request" @onchange="e => _request = (bool)e.Value!" />
-                    Ask for the @Format.Count(missing, "song", "songs") you don't have, to add to your library
+                    Ask for the missing @Format.Count(missing, "song", "songs"), to add to your library
                 </label>
                 @if (_mode != ImportPlaylistMode.None)
                 {
@@ -257,7 +257,7 @@ else
             {
                 <label class="check">
                     <input type="checkbox" checked="@_toReview" @onchange="e => _toReview = (bool)e.Value!" />
-                    Send the @Format.Count(notFound, "song", "songs") not found to Review, to match there; otherwise they're left out
+                    Send the @Format.Count(notFound, "song", "songs") that couldn't be matched to Review, to match there; otherwise they're left out
                 </label>
             }
             <div class="toolbar">
@@ -265,6 +265,13 @@ else
                 @if (_applyError is not null) { <span class="error small">@_applyError</span> }
             </div>
         </div>
+    }
+    @if (summary.BatchId is null)
+    {
+        <p class="small import-forget">
+            <button class="link" @onclick="DeleteAsync">@(summary.State == ImportState.Applied ? "Forget this import" : "Delete this import")</button>
+            <span class="muted">@(summary.State == ImportState.Applied ? "Its playlist and requests stay." : "Nothing it would have made is made.")</span>
+        </p>
     }
 }
 
@@ -325,6 +332,19 @@ else
         // While its songs are being matched, they're shown as they are.
         if (_import?.Import.State == ImportState.Matching)
             _timer = new Timer(_ => InvokeAsync(PollAsync), null, 1500, 1500);
+    }
+
+    private async Task DeleteAsync()
+    {
+        try
+        {
+            await Api.DeleteImportAsync(_import!.Import.Id);
+            Nav.NavigateTo("tools");
+        }
+        catch (MelodexApiException e)
+        {
+            _applyError = e.Message;
+        }
     }
 
     private async Task LoadAsync(Guid id)
@@ -453,25 +473,6 @@ else
 
     private static string Given(ImportSong song) =>
         string.Join(" · ", new[] { song.Artist ?? "unknown artist", song.Album, song.DurationSeconds is { } length ? Format.Duration(length) : null }.OfType<string>());
-
-    private static string Label(ImportLineInfo line) => line.Outcome switch
-    {
-        ImportOutcome.Owned => "In your library",
-        ImportOutcome.Found => line.Chosen ? "Chosen, to get" : "To get",
-        ImportOutcome.Unsure => "Check it",
-        ImportOutcome.NotFound => line.InReview ? "In Review" : "Not found",
-        ImportOutcome.Dropped => "Left out",
-        _ => "Matching",
-    };
-
-    private static string BadgeClass(ImportLineInfo line) => line.Outcome switch
-    {
-        ImportOutcome.Owned => "owned",
-        ImportOutcome.Found => "covered",
-        ImportOutcome.Unsure => "partial",
-        ImportOutcome.NotFound => "missing",
-        _ => "neutral",
-    };
 
     private static string Capital(string text) => text.Length == 0 ? text : char.ToUpperInvariant(text[0]) + text[1..];
 
