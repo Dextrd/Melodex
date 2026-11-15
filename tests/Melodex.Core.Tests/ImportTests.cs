@@ -134,6 +134,7 @@ public sealed class ImportTests : IDisposable
         var unmatched = Assert.Single(await _api.GetUnmatchedImportSongsAsync());
         Assert.Equal("Qwxyz Never A Song", unmatched.Song.Title);
         Assert.Equal("Imported/Evening", unmatched.PlaylistName);
+        Assert.True(unmatched.Suggestion is null || unmatched.Confidence < Melodex.Core.Tools.ImportMatcher.Close);
         await _api.MatchUnmatchedImportSongAsync(unmatched.LineId, new MatchImportSong(detail.Lines[3].Match!.TrackId!.Value));
         playlist = (await _api.GetPlaylistAsync(applied.PlaylistId.Value))!;
         Assert.Equal(["Glory Box", digitalLove, "Hunter", digitalLove], playlist.Songs.Select(s => s.Title));

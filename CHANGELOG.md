@@ -10,8 +10,9 @@ What changed in each release of Melodex. Versions follow [semantic versioning](h
   or lines of "Artist – Title" you paste. Each song is matched to your library and the catalogue, and you check the
   matches, choosing another song or leaving one out, before making a playlist of them, adding them to one, or neither.
   Missing songs can be asked for; in the playlist they hold their places, greyed out, until they arrive, and a **Get**
-  button asks for them later. Songs that couldn't be matched wait in Review, under **Imports**, where matching one puts
-  it in the playlist where it was in the list (#21).
+  button asks for them later. Songs that couldn't be matched wait in Review, under **Matching** with the files that
+  couldn't be, each with the import it came from and the closest song found, to approve or search for; matching one
+  puts it in the playlist where it was in the list (#21).
 - **Import from Spotify** on the Tools page, from the copy of your data Spotify sends you (no Spotify account linked):
   choose its playlists, liked songs and saved albums, check the matches, and apply them. Each playlist and your liked
   songs become playlists, in a folder of your choice, and missing saved albums can be asked for. Each list can be opened

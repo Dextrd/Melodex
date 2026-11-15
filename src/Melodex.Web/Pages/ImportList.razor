@@ -129,7 +129,7 @@ else
         <div class="notice">
             <text>Applied @Format.Ago(summary.AppliedAt ?? summary.CreatedAt)</text>@if (summary.PlaylistId is { } playlistId)
             {<text>, into </text><a href="playlists/@playlistId">@summary.PlaylistName</a>}<text>.</text>
-            @if (summary.InReview > 0) { <text> @Format.Count(summary.InReview, "song waits", "songs wait") in </text><a href="review/imports">Review</a><text> to be matched.</text> }
+            @if (summary.InReview > 0) { <text> @Format.Count(summary.InReview, "song waits", "songs wait") in </text><a href="review">Review</a><text> to be matched.</text> }
         </div>
     }
 

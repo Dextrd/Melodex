@@ -316,8 +316,12 @@ public sealed class ImportService(MelodexDbContext db, TaskQueue queue, Playlist
             .ToListAsync(ct);
         var playlistIds = lines.Select(l => l.PlaylistId).OfType<Guid>().Distinct().ToList();
         var names = await db.Playlists.Where(p => playlistIds.Contains(p.Id) && p.DeletedAt == null).ToDictionaryAsync(p => p.Id, p => p.Name, ct);
+        // Each suggestion as a match would be, from a line standing for it.
+        var suggestions = await MatchesAsync(lines.Where(l => l.Line.SuggestedTrackId is not null)
+            .Select(l => new ImportLine { Id = l.Line.Id, TrackId = l.Line.SuggestedTrackId }).ToList(), ct);
         return lines.Select(l => new UnmatchedImportSong(l.Line.Id, l.Line.ImportId, l.Name, l.PlaylistId is { } p && names.ContainsKey(p) ? p : null,
-            l.PlaylistId is { } q ? names.GetValueOrDefault(q) : null, Song(l.Line), l.AppliedAt ?? l.CreatedAt)).ToList();
+            l.PlaylistId is { } q ? names.GetValueOrDefault(q) : null, Song(l.Line), l.AppliedAt ?? l.CreatedAt,
+            suggestions.GetValueOrDefault(l.Line.Id), suggestions.ContainsKey(l.Line.Id) ? l.Line.Confidence : null)).ToList();
     }
 
     /// <summary>
@@ -362,7 +366,7 @@ public sealed class ImportService(MelodexDbContext db, TaskQueue queue, Playlist
     {
         if (!await db.Tracks.AnyAsync(t => t.Id == trackId, ct))
             throw new ImportRefusedException("trackId", "That song isn't in the catalogue.");
-        (line.TrackId, line.FileId, line.Confidence, line.Chosen) = (trackId, null, 1, true);
+        (line.TrackId, line.FileId, line.Confidence, line.Chosen, line.SuggestedTrackId) = (trackId, null, 1, true, null);
         line.Outcome = await OutcomeAsync(line, ct);
     }
 

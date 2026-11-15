@@ -37,9 +37,10 @@ Then say what to do with them:
 - **Ask for the missing songs**, as requests, to add to your library. In the playlist, missing songs hold their places,
   greyed out, until they arrive: "missing", or "on its way" once they're asked for. A playlist with missing songs has a
   **Get** button, to ask for them all later, and each has **Get it into your library** in its menu.
-- **Send the songs that couldn't be matched to Review**, under **Imports**. There, **Choose** searches for the song it is,
-  and it goes into the playlist where it was in the list, asked for too if the import asked for the rest. **Dismiss**
-  takes one off the list.
+- **Send the songs that couldn't be matched to Review**, under **Matching**, beside the files that couldn't be. Each
+  shows the import it came from and the closest song the catalogues had, with how sure that is. **Approve** takes the
+  suggestion, and the search button looks for the song it is; either way it goes into the playlist where it was in the
+  list, asked for too if the import asked for the rest. **Dismiss** takes one off the list.
 
 Each import shows in **Activity** as it's matched, and opens from there. The bottom of an import's page deletes it, or
 once it's applied forgets it, leaving its playlist and requests as they are.

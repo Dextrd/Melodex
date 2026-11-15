@@ -35,7 +35,7 @@ else
     {
         <div class="notice">
             Applied @Format.Count(applied.Imports, "list", "lists"): @Format.Count(applied.Added, "song", "songs") in playlists@(applied.Requested > 0 ? $", {applied.Requested} asked for" : "").
-            @if (applied.ToReview > 0) { <text> @Format.Count(applied.ToReview, "song waits", "songs wait") in </text><a href="review/imports">Review</a><text> to be matched.</text> }
+            @if (applied.ToReview > 0) { <text> @Format.Count(applied.ToReview, "song waits", "songs wait") in </text><a href="review">Review</a><text> to be matched.</text> }
         </div>
     }
     else

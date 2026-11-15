@@ -21,6 +21,9 @@ public sealed class ImportMatcher(MelodexDbContext db, CatalogueService catalogu
     /// <summary>Closer than this, it's offered as the closest, to check; further, nothing was found.</summary>
     public const double Close = 0.55;
 
+    /// <summary>Not found, but as close as this, it's suggested in Review.</summary>
+    public const double Suggest = 0.35;
+
     private const int SearchSize = 10;
 
     private Library? _library;
@@ -30,7 +33,7 @@ public sealed class ImportMatcher(MelodexDbContext db, CatalogueService catalogu
     {
         if (line.Chosen || line.Outcome == ImportOutcome.Dropped)
             return;
-        (line.TrackId, line.FileId, line.Confidence) = (null, null, null);
+        (line.TrackId, line.FileId, line.Confidence, line.SuggestedTrackId) = (null, null, null, null);
 
         if (await OwnedAsync(line, ct) is { } owned)
         {
@@ -92,6 +95,9 @@ public sealed class ImportMatcher(MelodexDbContext db, CatalogueService catalogu
         if (close.Count == 0)
         {
             line.Outcome = ImportOutcome.NotFound;
+            // The closest there was, to suggest when it's matched in Review.
+            if (hits.MaxBy(h => h.Score) is { Score: >= Suggest } closest)
+                (line.SuggestedTrackId, line.Confidence) = ((await ImportAsync(closest.Track, ct)).Track.Id, Math.Round(closest.Score, 3));
             return;
         }
         (Guid Id, double Score)? first = null;
