@@ -203,11 +203,13 @@ public sealed class ListenNowService(
     {
         if (!Directory.Exists(Store))
             return;
-        var known = db.ListenNowItems.Where(i => i.FilePath != null && !Gone.Contains(i.State)).Select(i => i.FilePath!).ToHashSet();
+        // By name without extension, so a song's lyrics beside it count as its.
+        var known = db.ListenNowItems.Where(i => i.FilePath != null && !Gone.Contains(i.State)).Select(i => i.FilePath!).AsEnumerable()
+            .Select(Path.GetFileNameWithoutExtension).ToHashSet();
         foreach (var file in Directory.EnumerateFiles(Store))
         {
             // A file being stored is written before its item is saved; leave anything recent alone.
-            if (!known.Contains(Path.GetFileName(file)) && File.GetLastWriteTimeUtc(file) < DateTime.UtcNow - TimeSpan.FromHours(1))
+            if (!known.Contains(Path.GetFileNameWithoutExtension(file)) && File.GetLastWriteTimeUtc(file) < DateTime.UtcNow - TimeSpan.FromHours(1))
                 TryDelete(file);
         }
     }
@@ -221,6 +223,8 @@ public sealed class ListenNowService(
 
     public void DeleteFile(ListenNowItem item)
     {
+        if (LyricsPath(item) is { } lyrics && File.Exists(lyrics))
+            TryDelete(lyrics);
         if (FullPath(item) is { } file)
             TryDelete(file);
         item.FilePath = null;
@@ -242,6 +246,9 @@ public sealed class ListenNowService(
     // A file stored before lengths were measured (#93) is measured as it's listed: it's gone within hours anyway.
     private TimeSpan? MeasuredDuration(ListenNowItem item, bool playable) =>
         item.Duration ?? (playable && FullPath(item) is { } file && File.Exists(file) ? MediaTypes.Probe(file).Duration : null);
+
+    /// <summary>Where the item's lyrics go, if any are found: an .lrc file beside it.</summary>
+    public string? LyricsPath(ListenNowItem item) => FullPath(item) is { } file ? LyricsFiles.SidecarOf(file) : null;
 
     public string? FullPath(ListenNowItem item)
     {

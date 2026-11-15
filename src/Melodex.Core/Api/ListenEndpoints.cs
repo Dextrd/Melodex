@@ -75,6 +75,21 @@ public static class ListenEndpoints
             .Produces(StatusCodes.Status200OK, contentType: "application/octet-stream").Produces(StatusCodes.Status202Accepted)
             .Produces(StatusCodes.Status403Forbidden).Produces(StatusCodes.Status404NotFound).ProducesProblem(StatusCodes.Status503ServiceUnavailable);
 
+        listen.MapGet("/{id:guid}/lyrics", async (Guid id, MelodexDbContext db, ListenNowService service, ListenNowLyrics lyrics, CancellationToken ct) =>
+            {
+                if (await db.ListenNowItems.FindAsync([id], ct) is not { } item)
+                    return Results.NotFound();
+                if (lyrics.IsLooking(id))
+                    return Results.Accepted();
+                // Found beside it, or in its own tags.
+                return Results.Ok(service.FullPath(item) is { } file && File.Exists(file)
+                    ? LyricsFiles.Lyrics(file)
+                    : new TrackLyrics(LyricsKind.None, [], null));
+            })
+            .WithName("GetListeningLyrics")
+            .WithSummary("A song's lyrics while it's fetched to listen to: 202 while they're still being looked for, after it's ready to play.")
+            .Produces<TrackLyrics>().Produces(StatusCodes.Status202Accepted).Produces(StatusCodes.Status404NotFound);
+
         listen.MapPost("/{id:guid}/add", async (Guid id, MelodexDbContext db, ListenNowService service, CancellationToken ct) =>
             {
                 if (await db.ListenNowItems.FindAsync([id], ct) is not { } item)

@@ -208,7 +208,8 @@ public sealed class Player : IAsyncDisposable
     /// <summary>
     /// The lyrics of what's playing, as its file in the library has them; none for a song only fetched to listen to.
     /// </summary>
-    public async Task<TrackLyrics> LyricsAsync(PlayerEntry entry, bool fresh = false)
+    /// <returns>Null while a song fetched to listen to is still having its lyrics looked for, or isn't ready yet.</returns>
+    public async Task<TrackLyrics?> LyricsAsync(PlayerEntry entry, bool fresh = false)
     {
         var key = (entry.TrackId, entry.FileId);
         if (!fresh && _lyrics.TryGetValue(key, out var known))
@@ -217,9 +218,17 @@ public sealed class Player : IAsyncDisposable
         TrackLyrics lyrics;
         try
         {
-            lyrics = entry.FileId is { } file ? await _api.GetFileLyricsAsync(file)
-                : entry.ListenState is null or ListenNowState.InLibrary ? await _api.GetTrackLyricsAsync(entry.TrackId)
-                : none;
+            if (entry.FileId is { } file)
+                lyrics = await _api.GetFileLyricsAsync(file);
+            else if (entry.ListenState is null or ListenNowState.InLibrary)
+                lyrics = await _api.GetTrackLyricsAsync(entry.TrackId);
+            // Looked for once it's ready to play: until then, and while they're looked for, they're on their way.
+            else if (entry.ListenId is not { } listen || entry.ListenState is not (ListenNowState.Playable or ListenNowState.Importing))
+                return entry.ListenState is ListenNowState.Failed or ListenNowState.Expired ? none : null;
+            else if (await _api.GetListeningLyricsAsync(listen) is { } found)
+                lyrics = found;
+            else
+                return null;
         }
         catch (HttpRequestException e) when (e.StatusCode == System.Net.HttpStatusCode.NotFound)
         {

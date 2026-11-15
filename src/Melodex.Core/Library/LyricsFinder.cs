@@ -220,20 +220,39 @@ public sealed class LyricsFinder(
         return (written.Count, failed, problem);
     }
 
-    private async Task<LyricsQuery> QueryAsync(LibraryFile file, CancellationToken ct)
+    private Task<LyricsQuery> QueryAsync(LibraryFile file, CancellationToken ct) =>
+        QueryAsync(file.Track!, file.Edition?.Album.Title, file.Duration ?? file.Track!.Duration, ct);
+
+    private async Task<LyricsQuery> QueryAsync(Track track, string? album, TimeSpan? duration, CancellationToken ct)
     {
-        var track = file.Track!;
         var ids = await db.Crosswalk.Where(m => m.EntityKind == EntityKind.Track && m.EntityId == track.Id)
             .Select(m => new ProviderId(m.Provider, m.Value)).ToListAsync(ct);
-        return new LyricsQuery(track.Title, track.ArtistCredit, file.Edition?.Album.Title, file.Duration ?? track.Duration, ids);
+        return new LyricsQuery(track.Title, track.ArtistCredit, album, duration ?? track.Duration, ids);
+    }
+
+    /// <summary>
+    /// The lyrics the sources have for a song that isn't a library file, such as one fetched to listen to: the first
+    /// found, in the user's order of sources. Null when lyrics aren't looked for (the setting's off, or there are no
+    /// sources) or none are found.
+    /// </summary>
+    public async Task<(FoundLyrics Lyrics, string Source)?> LookUpAsync(Track track, string? album, TimeSpan? duration, CancellationToken ct)
+    {
+        if (!(await settings.GetLibraryAsync(ct)).FetchLyrics)
+            return null;
+        var sources = await plugins.GetAsync(ct);
+        if (sources.Count == 0)
+            return null;
+        var answer = await AskAsync(sources, await QueryAsync(track, album, duration, ct), ct);
+        return answer.Lyrics is { } lyrics ? (lyrics, answer.Source!) : null;
     }
 
     // The first lyrics a source has, in the user's order. A failure is only reported if no source had any.
     private async Task<(FoundLyrics? Lyrics, bool Failed, string? Source)> AskAsync(IReadOnlyList<(PluginInstance Instance, ILyricsPlugin Plugin)> sources,
-        LibraryFile file, CancellationToken ct)
+        LibraryFile file, CancellationToken ct) => await AskAsync(sources, await QueryAsync(file, ct), ct);
+
+    private async Task<(FoundLyrics? Lyrics, bool Failed, string? Source)> AskAsync(IReadOnlyList<(PluginInstance Instance, ILyricsPlugin Plugin)> sources,
+        LyricsQuery query, CancellationToken ct)
     {
-        var track = file.Track!;
-        var query = await QueryAsync(file, ct);
         var failed = false;
         foreach (var (instance, plugin) in sources)
         {
@@ -256,7 +275,7 @@ public sealed class LyricsFinder(
                     logger.LogWarning("{Plugin} failed {Count} times in a row, so it isn't asked again until next time: {Message}",
                         instance.Name, FailuresBeforeGivingUp, e.Message);
                 else
-                    logger.LogWarning("{Plugin} couldn't look for the lyrics of {Title}: {Message}", instance.Name, track.Title, e.Message);
+                    logger.LogWarning("{Plugin} couldn't look for the lyrics of {Title}: {Message}", instance.Name, query.Title, e.Message);
             }
         }
         return (null, failed, null);

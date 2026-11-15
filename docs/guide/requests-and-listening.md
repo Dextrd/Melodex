@@ -148,6 +148,8 @@ blur of itself, with a visualiser that moves with the music, and beside it, eith
 - **Lyrics**: synced lyrics light up line by line as they're sung, and stay in view. Click a line to play from it.
   Scroll them yourself and they wait a few seconds before following again. Plain lyrics are shown as they are. A song
   without lyrics can be looked up from here, if you may format; see [lyrics](library.md#lyrics).
+  A song fetched to listen to has its lyrics looked for once it's ready to play, when lyrics are fetched for the
+  library; they come a moment later, and go into the library with it if you add it.
 - **The queue**.
 
 The visualiser can be hidden, the browser's own full screen turned on, and playing stopped, from the buttons at the

@@ -34,6 +34,8 @@ public sealed class RequestPipeline(
     SettingsService settings,
     RequestService requests,
     ListenNowService listen,
+    ListenNowLyrics listenLyrics,
+    LyricsFinder lyricsFinder,
     Upgrades upgrades,
     IOptions<MelodexOptions> options,
     IOptions<RequestPipelineOptions> pipelineOptions,
@@ -425,6 +427,21 @@ public sealed class RequestPipeline(
         // Added from listen now: the library has it now, so the listen-now copy goes.
         if (await db.ListenNowItems.FirstOrDefaultAsync(i => i.RequestId == request.Id && i.State == Data.ListenNowState.Importing, ct) is { } added)
         {
+            // Its lyrics go with it, rather than being looked for again.
+            if (listen.LyricsPath(added) is { } lyrics && File.Exists(lyrics))
+            {
+                string? problem;
+                try
+                {
+                    problem = await lyricsFinder.SaveAsync(files, await File.ReadAllTextAsync(lyrics, ct), ct);
+                }
+                catch (HttpRequestException e)
+                {
+                    problem = e.Message;
+                }
+                if (problem is not null)
+                    logger.LogWarning("[{Request}] Its lyrics couldn't go with it: {Reason}", request.Title, problem);
+            }
             listen.DeleteFile(added);
             added.State = Data.ListenNowState.InLibrary;
             await db.SaveChangesAsync(ct);
@@ -498,6 +515,8 @@ public sealed class RequestPipeline(
         await FinishJobAsync(job, JobStatus.Succeeded, $"Ready to play ({item.Codec ?? "unknown codec"}{(item.BitrateKbps is { } kbps ? $", {kbps} kbps" : "")})", ct);
         DeleteStaging(job);
         await DeleteOtherStagingAsync(request.Id, job.Id, ct);
+        // Looked for alongside, so they never hold it up; started first, so the player knows they're coming.
+        listenLyrics.Start(item.Id);
         await SetAsync(request, RequestStatus.Playable, "Ready to play", ct);
         logger.LogInformation(Diagnostics.LogEvents.Success, "[{Request}] Ready to listen to", request.Title);
     }

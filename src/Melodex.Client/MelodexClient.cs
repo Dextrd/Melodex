@@ -272,6 +272,16 @@ public sealed class MelodexClient(HttpClient http)
 
     public Task<ListenNowInfo?> GetListeningAsync(Guid id, CancellationToken ct = default) => GetOrNullAsync<ListenNowInfo>($"{Api}/listen/{id}", ct);
 
+    /// <summary>A listen-now song's lyrics; null while they're still being looked for.</summary>
+    public async Task<TrackLyrics?> GetListeningLyricsAsync(Guid id, CancellationToken ct = default)
+    {
+        using var response = await http.GetAsync($"{Api}/listen/{id}/lyrics", ct);
+        if (response.StatusCode == System.Net.HttpStatusCode.Accepted)
+            return null;
+        await EnsureAsync(response, ct);
+        return await response.Content.ReadFromJsonAsync<TrackLyrics>(MelodexJson.Options, ct);
+    }
+
     /// <summary>Adds a playable listen-now track to the library.</summary>
     public async Task<ListenNowInfo> AddListeningAsync(Guid id, CancellationToken ct = default)
     {
