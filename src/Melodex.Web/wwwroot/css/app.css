@@ -1757,3 +1757,6 @@ a.button.primary:hover { filter: brightness(1.1); }
 .fetch-note { margin-left: .4rem; font-size: .75rem; color: var(--partial); white-space: nowrap; }
 .icon-button.review-flag { border-color: var(--partial); color: var(--partial); text-decoration: none; }
 .icon-button.review-flag:hover { background: var(--partial-bg); text-decoration: none; }
+
+/* Use the default, under the qualities it puts back. */
+.toolbar.quality-reset { margin-top: .6rem; }

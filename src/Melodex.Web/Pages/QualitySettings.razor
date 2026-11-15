@@ -83,6 +83,10 @@ else
             }
         </ol>
     }
+    <div class="toolbar quality-reset">
+        <button @onclick="Reset">Use the default</button>
+        @if (_saveError is not null) { <span class="error small" title="@_saveError">@_saveError</span> }
+    </div>
 
     <h2>Lossless that seems lossy</h2>
     <p class="muted small">
@@ -99,11 +103,6 @@ else
                 <span><strong>@label</strong><span class="muted small">@help</span></span>
             </label>
         }
-    </div>
-
-    <div class="toolbar">
-        <button @onclick="Reset">Use the default</button>
-        @if (_saveError is not null) { <span class="error small" title="@_saveError">@_saveError</span> }
     </div>
 
     <h3>The library's lossless files</h3>
