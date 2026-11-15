@@ -234,6 +234,35 @@ button, .button {
 button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
 button:disabled { opacity: .55; cursor: default; }
 button.link { border: none; background: none; color: var(--accent); padding: 0; }
+
+/* Checkboxes are round, in the theme's colours, with a tick that pops in; --check colours one differently. */
+input[type=checkbox] {
+    appearance: none; -webkit-appearance: none; flex: none; box-sizing: border-box; width: 1.1rem; height: 1.1rem; margin: 0 .1rem;
+    display: inline-grid; place-content: center; vertical-align: -.2rem; cursor: pointer;
+    border: 2px solid color-mix(in srgb, var(--muted) 70%, var(--border)); border-radius: 50%; background: var(--surface);
+    transition: background-color .15s, border-color .15s;
+}
+input[type=checkbox]::before {
+    content: ""; width: .28rem; height: .52rem; margin-top: -.12rem; border: solid var(--accent-text); border-width: 0 2px 2px 0;
+    transform: rotate(45deg) scale(0); transition: transform .15s cubic-bezier(.2, .8, .2, 1.4);
+}
+input[type=checkbox]:checked { background: var(--check, var(--accent)); border-color: var(--check, var(--accent)); }
+input[type=checkbox]:checked::before { transform: rotate(45deg) scale(1); }
+input[type=checkbox]:hover:not(:disabled) { border-color: var(--check, var(--accent)); }
+input[type=checkbox]:focus-visible { outline: 2px solid var(--check, var(--accent)); outline-offset: 2px; }
+input[type=checkbox]:disabled { opacity: .45; cursor: default; }
+input[type=radio] { accent-color: var(--accent); }
+@media (prefers-reduced-motion: reduce) { input[type=checkbox], input[type=checkbox]::before { transition: none; } }
+
+/* A file input is a button like the others, with the file chosen beside it. */
+input[type=file] { font: inherit; color: var(--muted); max-width: 100%; }
+input[type=file]::file-selector-button {
+    font: inherit; padding: .4rem .8rem; margin-right: .6rem; border-radius: 6px; cursor: pointer;
+    border: 1px solid var(--border); background: var(--surface); color: var(--text);
+}
+input[type=file]::file-selector-button:hover { border-color: var(--accent); }
+input[type=file]:focus-visible { outline: none; }
+input[type=file]:focus-visible::file-selector-button { outline: 2px solid var(--accent); outline-offset: 2px; }
 input[type=search], input[type=text], input[type=number], select, textarea {
     font: inherit; padding: .4rem .6rem; border: 1px solid var(--border); border-radius: 6px;
     background: var(--surface); color: var(--text);
@@ -900,9 +929,9 @@ tr.playing td:nth-child(2) { color: var(--accent); font-weight: 600; }
 /* The Log page's level toggles, in the colours of the entries they show. */
 /* Each tick box is given its colour: currentColor leaves them black. The warning's edge is the meter's brighter amber,
    as the darker text colour looks brown against the light tint. */
-.toggle.level.information input { accent-color: var(--accent); }
-.toggle.level.warning input { accent-color: var(--partial); }
-.toggle.level.error input { accent-color: var(--missing); }
+.toggle.level.information input { --check: var(--accent); }
+.toggle.level.warning input { --check: var(--partial); }
+.toggle.level.error input { --check: var(--missing); }
 .toggle.level.information:has(input:checked) { border-color: var(--border); color: var(--text); background: var(--surface); }
 .toggle.level.warning:has(input:checked) { border-color: var(--partial-fill); color: var(--partial); background: var(--partial-bg); }
 .toggle.level.error:has(input:checked) { border-color: var(--missing); color: var(--missing); background: var(--missing-bg); }
@@ -945,9 +974,9 @@ tr.playing td:nth-child(2) { color: var(--accent); font-weight: 600; }
 .task-row.waiting .scan-file-text { opacity: .55; }
 /* An import's songs before it's applied: a tick for each, to go in or be left out, sliding in as matching finishes. */
 .scan-file.choosable { grid-template-columns: auto 2.25rem minmax(0, 1fr) auto; }
-.scan-file.choosable > input[type=checkbox] { margin: 0; width: 1rem; }
+.scan-file.choosable > input[type=checkbox] { margin: 0; }
 .ticks-arriving .scan-file.choosable > input[type=checkbox] { animation: tick-in .3s ease-out; }
-@keyframes tick-in { from { width: 0; margin-right: -.6rem; opacity: 0; } to { width: 1rem; margin-right: 0; opacity: 1; } }
+@keyframes tick-in { from { width: 0; margin-right: -.6rem; opacity: 0; } to { width: 1.1rem; margin-right: 0; opacity: 1; } }
 /* A list on an import's page grows open and shrinks shut. */
 .import-body { display: grid; grid-template-rows: 1fr; animation: grow-open .25s ease-out; }
 .import-body.closing { grid-template-rows: 0fr; margin-top: 0; animation: shrink-shut .25s ease-in; }
