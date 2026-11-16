@@ -4,6 +4,10 @@ What changed in each release of Melodex. Versions follow [semantic versioning](h
 
 ## [Unreleased]
 
+## [1.5.1] - 2026-11-16
+
+The Soulseek plugin can be added. The Soulseek plugin's image changes.
+
 ### Fixed
 
 - The Soulseek plugin couldn't be added: it said **Required.** before its settings could be filled in. It's added
