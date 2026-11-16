@@ -510,7 +510,6 @@ public sealed class RequestPipeline(
         item.BitrateKbps = said?.BitrateKbps ?? probed.BitrateKbps;
         item.Duration = probed.Duration;
         item.EditionId = request.EditionId;
-        item.State = Data.ListenNowState.Playable;
         item.ExpiresAt = DateTime.UtcNow + await listen.ExpiryAsync(ct);
         await FinishJobAsync(job, JobStatus.Succeeded, $"Ready to play ({item.Codec ?? "unknown codec"}{(item.BitrateKbps is { } kbps ? $", {kbps} kbps" : "")})", ct);
         DeleteStaging(job);
@@ -518,6 +517,10 @@ public sealed class RequestPipeline(
         // Looked for alongside, so they never hold it up; started first, so the player knows they're coming.
         listenLyrics.Start(item.Id);
         await SetAsync(request, RequestStatus.Playable, "Ready to play", ct);
+        // Playable once its request is, not before: added to the library in between, the request's Playable would
+        // overwrite the add's Queued and leave it Importing for good. Nor over an add or discard made since.
+        await db.ListenNowItems.Where(i => i.Id == item.Id && (i.State == Data.ListenNowState.Requested || i.State == Data.ListenNowState.Fetching))
+            .ExecuteUpdateAsync(s => s.SetProperty(i => i.State, Data.ListenNowState.Playable), CancellationToken.None);
         logger.LogInformation(Diagnostics.LogEvents.Success, "[{Request}] Ready to listen to", request.Title);
     }
 
@@ -694,6 +697,8 @@ public sealed class RequestPipeline(
 
     private async Task SplitIntoTracksAsync(Request request, FetchTarget target, string why, CancellationToken ct)
     {
+        // Only if it wasn't cancelled meanwhile, as RequestWorker splits: else the parts would be fetched all the same.
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
         foreach (var track in target.Tracks)
             db.Requests.Add(new Request
             {
@@ -708,6 +713,11 @@ public sealed class RequestPipeline(
                 Paused = request.Paused,
             });
         await db.SaveChangesAsync(ct);
+        if (await db.Requests.Where(r => r.Id == request.Id && r.Status != RequestStatus.Cancelled)
+                .ExecuteUpdateAsync(s => s.SetProperty(r => r.Status, RequestStatus.InProgress).SetProperty(r => r.Detail, why)
+                    .SetProperty(r => r.UpdatedAt, DateTime.UtcNow), ct) == 0)
+            return;
+        await transaction.CommitAsync(ct);
         logger.LogInformation("[{Request}] {Why}", request.Title, why);
         await SetAsync(request, RequestStatus.InProgress, why, ct);
     }

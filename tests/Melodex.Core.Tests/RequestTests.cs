@@ -90,6 +90,44 @@ public sealed class RequestFixture : IAsyncLifetime
     /// <summary>The albums of library artists that were missing just after the scan, by title.</summary>
     public IReadOnlyList<AlbumSummary> MissingAlbums { get; private set; } = [];
 
+    /// <summary>
+    /// The albums tests ask for by name, with <see cref="AlbumAsync"/>. <see cref="TakeMissingAlbumAsync"/> keeps clear
+    /// of them, and asking for one not listed here fails, so the list can't fall behind the tests.
+    /// </summary>
+    public static readonly string[] Named =
+        ["Discovery", "Homework", "Human After All", "Random Access Memories", "Dummy", "Portishead", "Roseland NYC Live", "Third", "Magic Doors"];
+
+    private readonly HashSet<Guid> _takenAlbums = [];
+    private readonly HashSet<Guid> _takenTracks = [];
+    private readonly SemaphoreSlim _taking = new(1, 1);
+
+    /// <summary>
+    /// A missing album no other test asks for: not named, with <paramref name="songs"/> or more still missing now,
+    /// whatever tests before this one fetched (a single can have an album's song), and none of those in common with an
+    /// album taken before. Tests use only its missing songs.
+    /// </summary>
+    public async Task<AlbumSummary> TakeMissingAlbumAsync(int songs = 3)
+    {
+        await _taking.WaitAsync();
+        try
+        {
+            foreach (var album in MissingAlbums.Where(a => !Named.Contains(a.Title) && a.TotalTracks >= songs && !_takenAlbums.Contains(a.Id)))
+            {
+                _takenAlbums.Add(album.Id);
+                var missing = (await Api.GetAlbumAsync(album.Id))!.Tracks.Where(t => t.Status == TrackStatus.Missing).Select(t => t.TrackId).ToList();
+                if (missing.Count < songs || missing.Any(_takenTracks.Contains))
+                    continue;
+                _takenTracks.UnionWith(missing);
+                return album;
+            }
+            throw new InvalidOperationException("No missing album is left that no other test asks for.");
+        }
+        finally
+        {
+            _taking.Release();
+        }
+    }
+
     public async Task DisposeAsync()
     {
         if (Factory is not null)
@@ -153,6 +191,8 @@ public sealed class RequestFixture : IAsyncLifetime
 
     public async Task<AlbumSummary> AlbumAsync(string artist, string title)
     {
+        if (!Named.Contains(title))
+            throw new ArgumentException($"Add {title} to {nameof(Named)}, so no test takes it as an album no other test touches.", nameof(title));
         var id = (await Api.GetLibraryArtistsAsync()).Single(a => a.Name == artist).Id;
         return (await Api.GetArtistAsync(id))!.Albums.First(a => a.Title == title);
     }

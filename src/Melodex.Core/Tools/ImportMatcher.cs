@@ -251,7 +251,7 @@ public sealed class ImportMatcher(MelodexDbContext db, CatalogueService catalogu
 
     // ---- The library ----
 
-    private sealed record Song(Guid Id, Guid? TrackId, string Path, TimeSpan? Duration, string? Album, HashSet<string> Titles, HashSet<string> Artists);
+    private sealed record Song(Guid Id, Guid? TrackId, string Path, TimeSpan? Duration, string? Album, string? Released, HashSet<string> Titles, HashSet<string> Artists);
 
     private sealed record Library(List<Song> Songs, ILookup<string, Song> ByTitle);
 
@@ -273,6 +273,9 @@ public sealed class ImportMatcher(MelodexDbContext db, CatalogueService catalogu
             .Where(s => s.Duration is null || line.DurationSeconds is not { } length || Math.Abs(s.Duration.Value.TotalSeconds - length) <= 3)
             .OrderBy(s => album is not null && s.Album is not null && SongNames.TitleKey(s.Album) == album ? 0 : 1)
             .ThenBy(s => s.TrackId is null ? 1 : 0)
+            // Otherwise the song as it first came out, such as Glory Box on Dummy, not a later live album's.
+            .ThenBy(s => s.Released ?? "9999", StringComparer.Ordinal)
+            .ThenBy(s => s.Path, StringComparer.Ordinal)
             .FirstOrDefault();
         return named is null ? null : Of(named);
 
@@ -283,12 +286,12 @@ public sealed class ImportMatcher(MelodexDbContext db, CatalogueService catalogu
     {
         var songs = (await db.LibraryFiles.AsNoTracking().Where(f => f.HiddenAt == null && (f.TrackId != null || f.ExcludedAt != null))
                 .Select(f => new { f.Id, f.TrackId, f.Path, f.TagsJson, Title = f.Track == null ? null : f.Track.Title, Artist = f.Track == null ? null : f.Track.ArtistCredit,
-                    Duration = f.Duration ?? (f.Track == null ? null : f.Track.Duration) })
+                    Duration = f.Duration ?? (f.Track == null ? null : f.Track.Duration), Released = f.Edition == null ? null : f.Edition.Album.FirstReleaseDate })
                 .ToListAsync(ct))
             .Select(f =>
             {
                 var tags = FileTags.Parse(f.TagsJson);
-                return new Song(f.Id, f.TrackId, f.Path, f.Duration, tags.Album,
+                return new Song(f.Id, f.TrackId, f.Path, f.Duration, tags.Album, f.Released,
                     new[] { f.Title, tags.Title }.OfType<string>().Select(SongNames.TitleKey).Where(k => k.Length > 0).ToHashSet(),
                     new[] { f.Artist, tags.Artist, tags.AlbumArtist }.OfType<string>().SelectMany(SongNames.ArtistKeys).ToHashSet());
             })

@@ -16,7 +16,6 @@ namespace Melodex.Core.Tests;
 public sealed class ListenNowTests(RequestFixture fixture, ITestOutputHelper output) : IAsyncLifetime
 {
     // Albums the request tests fetch, so these tests stay out of their way.
-    private static readonly string[] Taken = ["Human After All", "Third", "Homework", "Dummy", "Portishead", "Roseland NYC Live", "Magic Doors", "Random Access Memories"];
 
     private MelodexClient Api => fixture.Api;
 
@@ -35,7 +34,7 @@ public sealed class ListenNowTests(RequestFixture fixture, ITestOutputHelper out
     {
         var source = new FakeSource("listen");
         await fixture.AddSourceAsync(source);
-        var album = await MissingAlbumAsync(0);
+        var album = await fixture.TakeMissingAlbumAsync();
 
         // The album's editions are refreshed when it's asked for, so compare with the edition it chose.
         var started = await Api.StartListeningAsync(new StartListen(RequestKind.Album, album.Id));
@@ -115,7 +114,7 @@ public sealed class ListenNowTests(RequestFixture fixture, ITestOutputHelper out
     public async Task Unplayed_tracks_expire_and_their_files_are_deleted()
     {
         await fixture.AddSourceAsync(new FakeSource("expiry"));
-        var album = await MissingAlbumAsync(1);
+        var album = await fixture.TakeMissingAlbumAsync();
         var track = (await Api.GetAlbumAsync(album.Id))!.Tracks.First(t => t.Status == TrackStatus.Missing);
         var item = (await WaitAsync(await Api.StartListeningAsync(new StartListen(RequestKind.Track, track.TrackId)), ListenNowState.Playable))[0];
         var file = Directory.GetFiles(fixture.ListenNow, item.Id.ToString("N") + ".*").Single();
@@ -135,7 +134,7 @@ public sealed class ListenNowTests(RequestFixture fixture, ITestOutputHelper out
     public async Task Events_say_when_listen_now_tracks_change()
     {
         await fixture.AddSourceAsync(new FakeSource("events"));
-        var album = await MissingAlbumAsync(2);
+        var album = await fixture.TakeMissingAlbumAsync();
         var track = (await Api.GetAlbumAsync(album.Id))!.Tracks.First(t => t.Status == TrackStatus.Missing);
 
         using var events = await fixture.Factory.CreateSignedInClient().GetAsync("api/v1/events", HttpCompletionOption.ResponseHeadersRead);
@@ -160,7 +159,7 @@ public sealed class ListenNowTests(RequestFixture fixture, ITestOutputHelper out
     public async Task An_album_played_from_a_track_fetches_from_that_track_on_first()
     {
         await fixture.AddSourceAsync(new FakeSource("from"));
-        var album = await MissingAlbumAsync(3);
+        var album = await fixture.TakeMissingAlbumAsync();
         var edition = (await Api.GetAlbumAsync(album.Id))!.ShownEditionId;
         var tracks = (await Api.GetAlbumAsync(album.Id, edition))!.Tracks.Where(t => t.Status == TrackStatus.Missing).Select(t => t.TrackId).ToList();
         Assert.True(tracks.Count >= 3);
@@ -176,10 +175,7 @@ public sealed class ListenNowTests(RequestFixture fixture, ITestOutputHelper out
     public async Task Lyrics_are_found_once_a_song_plays_and_go_with_it_to_the_library_or_away()
     {
         await fixture.AddSourceAsync(new FakeSource("lyrics"));
-        // An album past the other tests' with two songs still missing: other tests may have got some since the scan.
-        var tracks = new List<TrackRow>();
-        for (var index = 4; tracks.Count < 2; index++)
-            tracks = (await Api.GetAlbumAsync((await MissingAlbumAsync(index)).Id))!.Tracks.Where(t => t.Status == TrackStatus.Missing).Take(2).ToList();
+        var tracks = (await Api.GetAlbumAsync((await fixture.TakeMissingAlbumAsync(2)).Id))!.Tracks.Where(t => t.Status == TrackStatus.Missing).Take(2).ToList();
         // Looked for by the recording's own title, which an album can call otherwise.
         List<string> titles;
         using (var scope = fixture.Factory.Services.CreateScope())
@@ -242,14 +238,6 @@ public sealed class ListenNowTests(RequestFixture fixture, ITestOutputHelper out
         using var scope = fixture.Factory.Services.CreateScope();
         await scope.ServiceProvider.GetRequiredService<Melodex.Core.Library.SettingsService>().SaveLibraryAsync(new LibrarySettings { FetchLyrics = fetch }, default);
     }
-
-    /// <summary>
-    /// A missing album of a library artist that no other test fetches, with a few tracks to play; <paramref name="index"/>
-    /// picks another for each test. They're listed as they were after the fixture's scan, so what other tests add since
-    /// can't make two tests pick the same one.
-    /// </summary>
-    private Task<AlbumSummary> MissingAlbumAsync(int index) =>
-        Task.FromResult(fixture.MissingAlbums.Where(a => !Taken.Contains(a.Title) && a.TotalTracks >= 3).ElementAt(index));
 
     /// <summary>The album's status now. Looked up by its ID, as an artist can have several albums of one title.</summary>
     private async Task<AlbumStatus> StatusAsync(AlbumSummary album) =>
