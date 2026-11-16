@@ -756,6 +756,8 @@ public sealed class RequestTests(RequestFixture fixture, ITestOutputHelper outpu
         var (fileId, trackId, oldPath) = (file.Id, file.TrackId!.Value, file.Path);
         try
         {
+            // The fake source's copies are WAV, which the main profile's FLAC cutoff ranks below: this song's own cutoff takes them.
+            await Api.SaveQualityOverrideAsync("tracks", trackId, new QualityOverride(QualityOverrideKind.Cutoff, new QualityStep(CodecFamily.Uncompressed, QualityLevel.Lossless).Key));
             var done = await UpgradeAsync(fileId, trackId);
 
             Assert.Equal(RequestState.InLibrary, done.State);
@@ -805,6 +807,16 @@ public sealed class RequestTests(RequestFixture fixture, ITestOutputHelper outpu
         Assert.Matches("^Nothing better found: worse found nothing better than the MP3 [0-9]+ you have", done.Detail!);
         Assert.Equal(0, worse.Fetches);
         await fixture.RemoveSourcesAsync();
+
+        // Said to be better, but short of the cutoff, as all yt-dlp can get is: not fetched either (#146).
+        var lossy = new FakeSource("lossy") { Format = "mp3", BitrateKbps = 320, Candidates = 1 };
+        await fixture.AddSourceAsync(lossy);
+        done = await UpgradeAsync(fileId, trackId);
+        Assert.Equal(RequestState.InLibrary, done.State);
+        Assert.Matches("^Nothing better found: lossy found nothing that reaches the FLAC [A-Za-z]+ cutoff", done.Detail!);
+        Assert.Equal(0, lossy.Fetches);
+        await fixture.RemoveSourcesAsync();
+
 
         // Said to be lossless, but it seems to be as low as what's there: fetched, checked and not kept.
         var profile = await Api.GetQualityProfileAsync();

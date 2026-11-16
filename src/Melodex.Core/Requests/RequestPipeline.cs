@@ -57,6 +57,7 @@ public sealed class RequestPipeline(
 
         // An upgrade whose file has gone, or become good enough meanwhile, has nothing to do.
         FileQuality? upgrading = null;
+        string? cutoff = null;
         if (request.UpgradesFileId is { } fileId)
         {
             if (await db.LibraryFiles.FindAsync([fileId], ct) is not { } old)
@@ -64,12 +65,13 @@ public sealed class RequestPipeline(
                 await SetAsync(request, RequestStatus.Failed, "The file it would upgrade isn't in the library any more", ct);
                 return;
             }
-            if ((await upgrades.UpgradableAsync(db.LibraryFiles.Where(f => f.Id == fileId), ct)).Count == 0)
+            if (await upgrades.UpgradableAsync(db.LibraryFiles.Where(f => f.Id == fileId), ct) is not [var upgradable])
             {
                 await SetAsync(request, RequestStatus.InLibrary, $"It's {old.Quality.Label} now, which is good enough", ct);
                 return;
             }
             upgrading = old.Quality;
+            cutoff = upgradable.Cutoff;
         }
 
         var whole = request.TargetKind == EntityKind.Album;
@@ -157,12 +159,15 @@ public sealed class RequestPipeline(
                 continue;
             }
             var fitting = Rank(candidates, target, fetch).Select(c => (plugin, c)).ToList();
-            // An upgrade only fetches what may be better: said to be, or not saying.
+            // An upgrade only fetches what may be better, and reach the cutoff: said to, or not saying. A plugin that can
+            // only get lossy copies, such as yt-dlp, is passed over this way when the cutoff is lossless.
             var better = upgrading is null ? fitting : fitting.Where(f => Better(profile, CandidateRanking.QualityOf(f.c), upgrading) != false).ToList();
-            var wanted = CandidateRanking.Order(better, profile, listenNow, c => LengthOff(c, target)).Take(fetch.CandidatesPerPlugin).ToList();
+            var reaching = upgrading is null ? better : better.Where(f => Reaches(profile, CandidateRanking.QualityOf(f.c), cutoff)).ToList();
+            var wanted = CandidateRanking.Order(reaching, profile, listenNow, c => LengthOff(c, target)).Take(fetch.CandidatesPerPlugin).ToList();
             if (wanted.Count == 0)
             {
-                var why = better.Count < fitting.Count ? $"found nothing better than the {upgrading!.Label} you have"
+                var why = reaching.Count < better.Count ? $"found nothing that reaches the {CutoffName(profile, cutoff)} cutoff"
+                    : better.Count < fitting.Count ? $"found nothing better than the {upgrading!.Label} you have"
                     : fitting.Count > 0 ? "found nothing in a quality the profile allows" : "found nothing that fits";
                 logger.LogInformation("[{Request}] {Plugin} {Why}", request.Title, plugin.Instance.Name, why);
                 tried.Add($"{plugin.Instance.Name} {why}");
@@ -385,12 +390,15 @@ public sealed class RequestPipeline(
                 return Outcome.Stop;
             }
             var profile = await settings.GetQualityAsync(ct);
-            if (verified.Files.Count != 1 || Better(profile, actual, old.Quality) != true)
+            var cutoff = (await upgrades.UpgradableAsync(db.LibraryFiles.Where(f => f.Id == upgradesId), ct)).FirstOrDefault()?.Cutoff;
+            if (verified.Files.Count != 1 || Better(profile, actual, old.Quality) != true || !profile.Meets(actual, cutoff))
             {
                 job.Verification = VerificationResult.NotBetter;
                 job.VerificationDetail = actual is null
                     ? $"Its quality couldn't be told, so it may be no better than the {old.Quality.Label} you have"
-                    : $"It's {actual.Label}, no better than the {old.Quality.Label} you have";
+                    : Better(profile, actual, old.Quality) == true
+                        ? $"It's {actual.Label}: better than the {old.Quality.Label} you have, but short of the {CutoffName(profile, cutoff)} cutoff"
+                        : $"It's {actual.Label}, no better than the {old.Quality.Label} you have";
                 await FinishJobAsync(job, JobStatus.Failed, $"Didn't pass: {job.VerificationDetail}", ct);
                 DeleteStaging(job);
                 return Outcome.NextCandidate;
@@ -455,6 +463,13 @@ public sealed class RequestPipeline(
     }
 
     /// <summary>Whether a quality is better than another by the profile; null when it isn't known.</summary>
+    /// <summary>Whether a candidate may reach an upgrade's cutoff: it says it does, or doesn't say.</summary>
+    private static bool Reaches(QualityProfile profile, FileQuality? quality, string? cutoff) =>
+        profile.Position(quality) is null || profile.Meets(quality, cutoff);
+
+    private static string CutoffName(QualityProfile profile, string? cutoff) =>
+        QualityStep.Parse(cutoff ?? profile.Cutoff) is { } step ? step.Name : "quality";
+
     private static bool? Better(QualityProfile profile, FileQuality? quality, FileQuality than) =>
         profile.Position(quality) is { } at && profile.Position(than) is { } old ? at < old : null;
 
