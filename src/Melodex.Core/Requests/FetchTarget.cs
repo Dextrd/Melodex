@@ -64,7 +64,12 @@ public sealed record FetchTarget(
         var editionIds = await db.Crosswalk.Where(m => m.EntityKind == EntityKind.Edition && m.EntityId == edition.Id)
             .Select(m => new ProviderId(m.Provider, m.Value)).ToListAsync(ct);
 
-        var tracks = wanted.Select(w => new WantedTrack(w.TrackId, w.Disc, w.Position, w.Title, w.ArtistCredit, w.ArtistId, w.Duration,
+        // An upgrade replaces the recording you have, so its copy has to be as long as your file, which is the length to
+        // match: the catalogue may not know one (a live bootleg, say), and a studio take of a live song is the same title (#177).
+        var upgrading = request.UpgradesFileId is { } fileId
+            ? await db.LibraryFiles.Where(f => f.Id == fileId).Select(f => f.Duration).FirstOrDefaultAsync(ct)
+            : null;
+        var tracks = wanted.Select(w => new WantedTrack(w.TrackId, w.Disc, w.Position, w.Title, w.ArtistCredit, w.ArtistId, upgrading ?? w.Duration,
             ids[w.TrackId].FirstOrDefault(i => i.Provider == Providers.MusicBrainz)?.Value, ids[w.TrackId].ToList())).ToList();
 
         return new FetchTarget(request, whole, edition, edition.Album, editionIds.FirstOrDefault(i => i.Provider == Providers.MusicBrainz)?.Value,

@@ -829,6 +829,40 @@ public sealed class RequestTests(RequestFixture fixture, ITestOutputHelper outpu
     }
 
     [TestLibraryFact]
+    public async Task An_upgrade_is_as_long_as_the_file_it_replaces_not_just_another_take_of_the_title()
+    {
+        var (file, scope) = await OwnedAsync("Discovery (2001)/12 Short Circuit.mp3");
+        using var owned = scope;
+        var (fileId, trackId, oldPath) = (file.Id, file.TrackId!.Value, file.Path);
+        var db = scope.ServiceProvider.GetRequiredService<Melodex.Core.Data.MelodexDbContext>();
+        // As a live bootleg's songs often are: no length in the catalogue, so only the file you have says how long it is.
+        var track = await db.Tracks.AsNoTracking().SingleAsync(t => t.Id == trackId);
+        var listed = await db.EditionTracks.AsNoTracking().Where(et => et.TrackId == trackId).Select(et => new { et.EditionId, et.Duration }).ToListAsync();
+        await db.Tracks.Where(t => t.Id == trackId).ExecuteUpdateAsync(u => u.SetProperty(t => t.Duration, (TimeSpan?)null));
+        await db.EditionTracks.Where(et => et.TrackId == trackId).ExecuteUpdateAsync(u => u.SetProperty(et => et.Duration, (TimeSpan?)null));
+        try
+        {
+            // WAV reaches this song's own cutoff, so only its length can stop it.
+            await Api.SaveQualityOverrideAsync("tracks", trackId, new QualityOverride(QualityOverrideKind.Cutoff, new QualityStep(CodecFamily.Uncompressed, QualityLevel.Lossless).Key));
+            // Another take of the same title, 25 seconds longer than your file: refused (#177).
+            await fixture.AddSourceAsync(new FakeSource("othertake") { Candidates = 1, BitrateKbps = null, OffBySeconds = _ => 25 });
+            var done = await UpgradeAsync(fileId, trackId);
+            Assert.Equal(RequestState.InLibrary, done.State);
+            Assert.Equal(Verification.DurationMismatch, done.Jobs!.Single().Verification);
+            Assert.True(File.Exists(Path.Combine(fixture.Music, oldPath)));
+            Assert.Empty(await Api.GetHeldFilesAsync(trackId));
+        }
+        finally
+        {
+            await fixture.RemoveSourcesAsync();
+            await Api.SaveQualityOverrideAsync("tracks", trackId, new QualityOverride(QualityOverrideKind.Inherit));
+            await db.Tracks.Where(t => t.Id == trackId).ExecuteUpdateAsync(u => u.SetProperty(t => t.Duration, track.Duration));
+            foreach (var et in listed)
+                await db.EditionTracks.Where(x => x.TrackId == trackId && x.EditionId == et.EditionId).ExecuteUpdateAsync(u => u.SetProperty(x => x.Duration, et.Duration));
+        }
+    }
+
+    [TestLibraryFact]
     public async Task Songs_never_to_be_upgraded_and_songs_set_aside_are_not_upgradable()
     {
         var album = await fixture.AlbumAsync("Daft Punk", "Discovery");
