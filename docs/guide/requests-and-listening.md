@@ -117,6 +117,10 @@ in the player at the bottom of the page beside the music you have, and is delete
 hour by default; change it under **Settings → Playback**). **Add to library** files the same file without fetching it
 again.
 
+Playing an album you don't have all of puts the whole album in the queue, but only the songs you don't have near the
+one playing are fetched: by default the one playing, the three after it and the two before it. The rest show **To
+fetch** in the queue, and are fetched as the queue comes near them. Change how many under **Settings → Playback**.
+
 **Library → Listen now** has the songs fetched to listen to that are still here, each once, grouped by album: play
 them, or add them to your library or delete them now from their ⋯ menus. Every fetch, and any that couldn't be found,
 is under **Activity → Downloads**.

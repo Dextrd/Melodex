@@ -133,6 +133,10 @@ public static class RequestEndpoints
                     errors["candidatesPerPlugin"] = ["Must be between 1 and 5."];
                 if (value.ListenNowExpiryMinutes is < 5 or > 7 * 24 * 60)
                     errors["listenNowExpiryMinutes"] = ["Must be between 5 minutes and a week."];
+                if (value.ListenNowAhead is < 0 or > 20)
+                    errors["listenNowAhead"] = ["Must be between 0 and 20."];
+                if (value.ListenNowBehind is < 0 or > 20)
+                    errors["listenNowBehind"] = ["Must be between 0 and 20."];
                 if (errors.Count > 0)
                     return Results.ValidationProblem(errors);
                 await s.SaveFetchAsync(value, ct);

@@ -21,7 +21,16 @@ public sealed class PlayerEntry
     public Guid? FileId { get; init; }
 
     /// <summary>The listen-now track, for a track you don't have.</summary>
-    public Guid? ListenId { get; init; }
+    public Guid? ListenId { get; set; }
+
+    /// <summary>
+    /// A track you don't have, put in the queue with its album: it's only fetched to listen to once it's near the song
+    /// playing, so playing one song of a long album doesn't fetch all of it (#174).
+    /// </summary>
+    public bool Missing { get; init; }
+
+    /// <summary>Being asked for now, so it isn't asked for twice.</summary>
+    internal bool Asking { get; set; }
 
     public ListenNowState? ListenState { get; set; }
 
@@ -31,12 +40,21 @@ public sealed class PlayerEntry
     /// <summary>It failed, expired or the browser can't play it, so the queue skips it.</summary>
     public bool Unplayable { get; set; }
 
-    public bool Waiting => ListenState is ListenNowState.Requested or ListenNowState.Fetching;
+    public bool Waiting => ListenState is ListenNowState.Requested or ListenNowState.Fetching || Missing && ListenId is null && !Unplayable;
+
+    /// <summary>A track you don't have, not asked for yet.</summary>
+    public bool Unfetched => Missing && ListenId is null && !Unplayable;
 
     public static PlayerEntry Owned(TrackRow track, AlbumSummary album, Guid? editionId) => new()
     {
         TrackId = track.TrackId, EditionId = editionId, Title = track.Title, ArtistCredit = track.ArtistCredit, ArtistId = album.ArtistId,
         AlbumId = album.Id, AlbumTitle = album.Title, CoverUrl = album.CoverUrl, DurationSeconds = track.DurationSeconds,
+    };
+
+    public static PlayerEntry ToFetch(TrackRow track, AlbumSummary album, Guid? editionId) => new()
+    {
+        TrackId = track.TrackId, EditionId = editionId, Title = track.Title, ArtistCredit = track.ArtistCredit, ArtistId = album.ArtistId,
+        AlbumId = album.Id, AlbumTitle = album.Title, CoverUrl = album.CoverUrl, DurationSeconds = track.DurationSeconds, Missing = true,
     };
 
     public static PlayerEntry Owned(SearchTrack track) => new()
@@ -60,7 +78,7 @@ public sealed class PlayerEntry
 
     /// <summary>Where its album's page is.</summary>
     /// <summary>What a playlist keeps of it: the song, or a file of your own; nothing for one only listened to.</summary>
-    public IReadOnlyList<PlaylistItem>? Keep => ListenId is not null ? null : FileId is { } file ? [new PlaylistItem(FileId: file)] : [new PlaylistItem(TrackId)];
+    public IReadOnlyList<PlaylistItem>? Keep => ListenId is not null || Missing ? null : FileId is { } file ? [new PlaylistItem(FileId: file)] : [new PlaylistItem(TrackId)];
 
     public string? ArtistHref => ArtistId is { } artist ? $"artists/{artist}" : null;
 
@@ -133,6 +151,7 @@ public sealed class Player : IAsyncDisposable
         Changed += () => _ = SaveAsync();
         Changed += () => _ = PrepareNextAsync();
         Changed += () => _ = WarmAroundAsync();
+        Changed += () => _ = FetchAroundAsync();
     }
 
     /// <summary>The queue changed, or what's playing did.</summary>
@@ -267,36 +286,96 @@ public sealed class Player : IAsyncDisposable
             await AddAsync(own.Tracks.Select(t => PlayerEntry.Owned(t, own)).ToList(), next);
     }
 
-    /// <summary>The album's tracks in order: tracks you have, and the missing ones fetched to listen to.</summary>
-    private async Task<(List<PlayerEntry> Entries, int Start)> AlbumEntriesAsync(AlbumDetail album, Guid? fromTrack)
+    /// <summary>
+    /// The album's tracks in order: tracks you have, and the missing ones, fetched to listen to as they come near the
+    /// song playing.
+    /// </summary>
+    private Task<(List<PlayerEntry> Entries, int Start)> AlbumEntriesAsync(AlbumDetail album, Guid? fromTrack)
     {
         Error = null;
         var tracks = album.Tracks.Where(t => t.Status is TrackStatus.Owned or TrackStatus.OwnedElsewhere or TrackStatus.Missing).ToList();
-        var listening = new Dictionary<Guid, ListenNowInfo>();
-        if (tracks.Any(t => t.Status == TrackStatus.Missing))
-        {
-            try
-            {
-                foreach (var item in await _api.StartListeningAsync(new StartListen(RequestKind.Album, album.Album.Id, album.ShownEditionId, fromTrack)))
-                    listening[item.TrackId] = item;
-            }
-            catch (MelodexApiException e)
-            {
-                Error = e.Message;
-            }
-        }
         var entries = new List<PlayerEntry>();
         var start = 0;
         foreach (var track in tracks)
         {
             if (track.TrackId == fromTrack)
                 start = entries.Count;
-            if (track.Status != TrackStatus.Missing)
-                entries.Add(PlayerEntry.Owned(track, album.Album, album.ShownEditionId));
-            else if (listening.TryGetValue(track.TrackId, out var item))
-                entries.Add(PlayerEntry.Listening(item));
+            entries.Add(track.Status == TrackStatus.Missing
+                ? PlayerEntry.ToFetch(track, album.Album, album.ShownEditionId)
+                : PlayerEntry.Owned(track, album.Album, album.ShownEditionId));
         }
-        return (entries, start);
+        return Task.FromResult((entries, start));
+    }
+
+    // How far either side of the song playing missing songs are fetched to listen to, from the fetch settings.
+    private (int Ahead, int Behind)? _window;
+    private DateTime _windowAt;
+
+    /// <summary>
+    /// Asks for the missing songs near the one playing to be fetched to listen to: the one playing first, then the few
+    /// after and before it, as the fetch settings say. Others wait until the queue comes near them.
+    /// </summary>
+    private async Task FetchAroundAsync()
+    {
+        if (Current < 0 || !_queue.Any(e => e.Unfetched))
+            return;
+        if (_window is null || DateTime.UtcNow - _windowAt > TimeSpan.FromMinutes(10))
+        {
+            _windowAt = DateTime.UtcNow;
+            try
+            {
+                var fetch = await _api.GetFetchSettingsAsync();
+                _window = (fetch.ListenNowAhead, fetch.ListenNowBehind);
+            }
+            catch (Exception e) when (e is HttpRequestException or MelodexApiException)
+            {
+                _window ??= (3, 2);
+            }
+        }
+        var (ahead, behind) = _window.Value;
+        var near = Enumerable.Range(0, ahead + 1).Select(i => Current + i)
+            .Concat(Enumerable.Range(1, behind).Select(i => Current - i))
+            .Where(i => i >= 0 && i < _queue.Count)
+            .Select(i => _queue[i])
+            .Where(e => e.Unfetched && !e.Asking)
+            .ToList();
+        if (near.Count == 0)
+            return;
+        foreach (var entry in near)
+            entry.Asking = true;
+        foreach (var entry in near)
+            await AskAsync(entry);
+        Changed?.Invoke();
+        // The song playing may have been waiting on this.
+        if (Now is { } now && near.Contains(now))
+            await StartAsync();
+    }
+
+    private async Task AskAsync(PlayerEntry entry)
+    {
+        try
+        {
+            var items = await _api.StartListeningAsync(new StartListen(RequestKind.Track, entry.TrackId, entry.EditionId));
+            if (items.FirstOrDefault(i => i.TrackId == entry.TrackId) is { } item)
+            {
+                entry.ListenId = item.Id;
+                entry.Update(item);
+            }
+            else
+            {
+                entry.Unplayable = true;
+                entry.Detail = "It couldn't be fetched.";
+            }
+        }
+        catch (Exception e) when (e is HttpRequestException or MelodexApiException)
+        {
+            entry.Unplayable = true;
+            entry.Detail = e.Message;
+        }
+        finally
+        {
+            entry.Asking = false;
+        }
     }
 
     /// <summary>Plays an album from a list, loading its tracks first. Albums of your own files are found too.</summary>
@@ -767,6 +846,9 @@ public sealed class Player : IAsyncDisposable
 
     private async Task<(string? Url, string? MediaType, double? Length)> FetchSourceAsync(PlayerEntry entry)
     {
+        // Asked for when it's near the song playing, and played once it's fetched.
+        if (entry.Unfetched)
+            return (null, null, null);
         try
         {
             if (entry.ListenId is { } id)
@@ -855,7 +937,7 @@ public sealed class Player : IAsyncDisposable
         foreach (var entry in _queue)
             if (entry.ListenId is { } id && byId.TryGetValue(id, out var item))
                 entry.Update(item);
-        if (!_queue.Any(e => e.Waiting))
+        if (!_queue.Any(e => e.ListenId is not null && e.Waiting))
             StopPolling();
         if (wasWaiting && Now is { Waiting: false })
             await StartAsync();
