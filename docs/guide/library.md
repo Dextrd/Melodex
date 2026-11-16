@@ -36,7 +36,8 @@ scan.
   library this takes a while.
 - **Format the whole library**: see [Formatting](#formatting).
 
-Scans and other long jobs show on **Activity**, where they can be paused, cancelled or moved in the queue.
+Scans and other long jobs show on **Activity**, where they can be paused, cancelled or moved in the queue, one by one
+or all at once.
 
 ## Review
 

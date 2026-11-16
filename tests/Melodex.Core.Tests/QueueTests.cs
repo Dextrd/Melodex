@@ -156,6 +156,31 @@ public sealed class QueueTests : IDisposable
     }
 
     [Fact]
+    public async Task Many_requests_and_tasks_are_cancelled_at_once_and_finished_ones_left_be()
+    {
+        var ids = await AddRequestsAsync("A", "B", "C");
+        Assert.Equal(2, (await _api.ChangeRequestsAsync(new BulkChange(BulkAction.Cancel, [ids[0], ids[1]]))).Changed);
+        var requests = await _api.ListRequestsAsync();
+        Assert.Equal([RequestState.Cancelled, RequestState.Cancelled], requests.Where(r => r.Id != ids[2]).Select(r => r.State));
+        Assert.True(requests.Single(r => r.Id == ids[2]).Active);
+        // Already cancelled: nothing more to do.
+        Assert.Equal(0, (await _api.ChangeRequestsAsync(new BulkChange(BulkAction.Cancel, [ids[0], ids[1]]))).Changed);
+
+        List<Guid> tasks;
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<MelodexDbContext>();
+            var added = new[] { "first", "second" }.Select((kind, i) => new BackgroundTask { Kind = kind, Paused = true, QueueOrder = i }).ToList();
+            db.BackgroundTasks.AddRange(added);
+            await db.SaveChangesAsync();
+            tasks = added.Select(t => t.Id).ToList();
+        }
+        Assert.Equal(2, (await _api.ChangeTasksAsync(new BulkChange(BulkAction.Cancel, tasks))).Changed);
+        Assert.All(tasks, id => Assert.Equal(TaskState.Cancelled, _api.GetTaskAsync(id).Result!.State));
+        Assert.Equal(0, (await _api.ChangeTasksAsync(new BulkChange(BulkAction.Resume, tasks))).Changed);
+    }
+
+    [Fact]
     public async Task Tasks_can_be_moved_paused_resumed_and_cancelled()
     {
         List<Guid> ids;

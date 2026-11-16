@@ -16,7 +16,8 @@ The **Activity** page shows every request and each attempt. A request that ended
 **Look again** later or after adding another plugin, open its **Details** to pick one of the candidates found, or, when
 a copy was turned away only for its quality, **Keep it anyway**, as it is.
 
-Requests run one at a time, in order. Move them up and down the queue, pause them or cancel them from Activity.
+Requests run one at a time, in order. Move them up and down the queue, pause them or cancel them from Activity, one by
+one or with **Pause all** and **Cancel all** (with a filter, **Pause these** and **Cancel these** act on what's shown).
 
 **Ignore** an album or song to stop counting it as missing.
 

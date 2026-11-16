@@ -569,6 +569,21 @@ public static class LibraryEndpoints
                 TaskActionAsync(id, db, ct, task => queue.CancelAsync(task, ct)))
             .WithTags("Library").RequireScope(Scopes.Scan).WithName("CancelTask").WithSummary("Stop a queued or running task for good.")
             .Produces<TaskInfo>().Produces(StatusCodes.Status404NotFound).Produces(StatusCodes.Status409Conflict);
+        api.MapPost("/tasks/bulk", async (BulkChange body, MelodexDbContext db, TaskQueue queue, CancellationToken ct) =>
+            {
+                var changed = 0;
+                foreach (var task in await db.BackgroundTasks.Where(t => body.Ids.Contains(t.Id)).ToListAsync(ct))
+                    if (await (body.Action switch
+                        {
+                            BulkAction.Pause => queue.PauseAsync(task, ct),
+                            BulkAction.Resume => queue.ResumeAsync(task, ct),
+                            _ => queue.CancelAsync(task, ct),
+                        }))
+                        changed++;
+                return new BulkChanged(changed);
+            })
+            .WithTags("Library").RequireScope(Scopes.Scan).WithName("ChangeTasks")
+            .WithSummary("Pause, resume or cancel many tasks at once, as each one's own action does. Any already past it are left as they are.");
         api.MapPost("/tasks/{id:guid}/pause", (Guid id, MelodexDbContext db, TaskQueue queue, CancellationToken ct) =>
                 TaskActionAsync(id, db, ct, task => queue.PauseAsync(task, ct)))
             .WithTags("Library").RequireScope(Scopes.Scan).WithName("PauseTask")
