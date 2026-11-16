@@ -4,6 +4,10 @@ What changed in each release of Melodex. Versions follow [semantic versioning](h
 
 ## [Unreleased]
 
+### Fixed
+
+- In Activity, a download that's open as it finishes no longer keeps its last attempt showing **Running** (#171).
+
 ## [1.5.1] - 2026-11-16
 
 The Soulseek plugin can be added. The Soulseek plugin's image changes.

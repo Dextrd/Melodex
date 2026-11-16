@@ -457,9 +457,11 @@ else
 
     private void Refresh() => InvokeAsync(async () =>
     {
-        // Open requests that are still moving are reloaded with the list.
+        // Open requests that are still moving are reloaded with the list, and once more after they stop: the list can
+        // show one finished before its open copy has caught up, and that copy would keep its last attempt running.
         foreach (var id in _open.Keys.ToList())
-            if (Tracker.Requests.FirstOrDefault(r => r.Id == id) is not { Active: false } || _open[id]?.Children?.Any(c => c.Active) == true)
+            if (Tracker.Requests.FirstOrDefault(r => r.Id == id) is not { Active: false } || _open[id] is { Active: true }
+                || _open[id]?.Children?.Any(c => c.Active) == true)
                 _open[id] = await Api.GetRequestAsync(id);
         StateHasChanged();
     });
