@@ -77,8 +77,7 @@ else
                             <div class="row-actions">
                                 <IconButton Icon="@(now && Player.Playing ? "pause" : "play")" Primary="now"
                                             Title="@(now ? (Player.Playing ? "Pause" : "Play") : "Play from here")"
-                                            OnClick="() => now ? Player.ToggleAsync() : Player.JumpAsync(index)" />
-                                <ItemMenu Name="@entry.Title" OnPlay="() => now ? Player.ToggleAsync() : Player.JumpAsync(index)" PlayLabel="@(now ? (Player.Playing ? "Pause" : "Play") : "Play from here")"
+                                            OnClick="() => now ? Player.ToggleAsync() : Player.JumpAsync(index)" />@* no space: buttons line up from row to row *@<ItemMenu Name="@entry.Title" OnPlay="() => now ? Player.ToggleAsync() : Player.JumpAsync(index)" PlayLabel="@(now ? (Player.Playing ? "Pause" : "Play") : "Play from here")"
                                           Keep="entry.Keep" UpgradeTrackId="@(entry.Keep is not null && entry.FileId is null ? entry.TrackId : null)"
                                           AlbumHref="@entry.AlbumHref" ArtistHref="@entry.ArtistHref"
                                           OnMove="by => Player.MoveBy(index, by)" MoveFirst="index == 0" MoveLast="index == Player.Queue.Count - 1"

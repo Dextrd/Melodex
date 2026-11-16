@@ -73,8 +73,7 @@ else
                         <td class="num muted hide-narrow">@Format.Duration(group.Items.Sum(i => i.DurationSeconds ?? 0))</td>
                         <td class="muted small hide-narrow">@Left(group.Items.Min(i => i.ExpiresAt))</td>
                         <td class="num actions">
-                            <IconButton Icon="listen" Requires="@UserPermissions.Listen" Title="Play its songs, in order" OnClick="() => PlayAsync(group.Items, 0)" />
-                            <ItemMenu What="album" Name="@(first.AlbumTitle ?? "")" Entries="group.Items.Select(PlayerEntry.Listening).ToList()"
+                            <IconButton Icon="listen" Requires="@UserPermissions.Listen" Title="Play its songs, in order" OnClick="() => PlayAsync(group.Items, 0)" />@* no space: buttons line up from row to row *@<ItemMenu What="album" Name="@(first.AlbumTitle ?? "")" Entries="group.Items.Select(PlayerEntry.Listening).ToList()"
                                       AlbumHref="@($"albums/{albumId}")" ArtistHref="@(first.ArtistId is { } a ? $"artists/{a}" : null)"
                                       OnAddToLibrary="@(Addable(group.Items).Count > 0 ? EventCallback.Factory.Create(this, () => EachAsync(Addable(group.Items), i => Api.AddListeningAsync(i.Id))) : default)"
                                       OnDelete="@EventCallback.Factory.Create(this, () => EachAsync(group.Items, i => Api.DiscardListeningAsync(i.Id)))" />
@@ -126,8 +125,7 @@ else
             <td class="muted small hide-narrow" title="@item.ExpiresAt?.ToLocalTime().ToString("f")">@Left(item.ExpiresAt)</td>
             <td class="num actions">
                 <IconButton Icon="listen" Requires="@UserPermissions.Listen" Title="@(Player.IsNow(item.TrackId) ? "Playing" : "Play from here")" Primary="@Player.IsNow(item.TrackId)"
-                            OnClick="() => PlayAsync(shown, shown.IndexOf(item))" />
-                <ItemMenu Entry="PlayerEntry.Listening(item)" Name="@item.Title"
+                            OnClick="() => PlayAsync(shown, shown.IndexOf(item))" />@* no space: buttons line up from row to row *@<ItemMenu Entry="PlayerEntry.Listening(item)" Name="@item.Title"
                           AlbumHref="@(number is null && item.AlbumId is { } a ? $"albums/{a}" : null)" ArtistHref="@(item.ArtistId is { } ar ? $"artists/{ar}" : null)"
                           OnAddToLibrary="@(item.State == ListenNowState.Playable ? EventCallback.Factory.Create(this, () => EachAsync([item], i => Api.AddListeningAsync(i.Id))) : default)"
                           OnDelete="@(item.State == ListenNowState.Playable ? EventCallback.Factory.Create(this, () => EachAsync([item], i => Api.DiscardListeningAsync(i.Id))) : default)" />
