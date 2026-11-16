@@ -192,6 +192,54 @@ public sealed class DuplicateCatalogueTests : IDisposable
         Assert.Equal(new[] { second.Id, third.Id }.Order(), results.Tracks.Select(t => t.Id).Order());
     }
 
+    // Radiohead's "The Bends" is an album (1995) and a single (1996) in MusicBrainz, each with that title (#125).
+    private static async Task<(Artist Radiohead, Album Album, Album Single)> TheBendsAsync(MelodexDbContext db)
+    {
+        var radiohead = MusicBrainzArtist(db, "Radiohead", "mb-radiohead", inLibrary: true);
+        var album = new Album { ArtistId = radiohead.Id, Title = "The Bends", ArtistCredit = "Radiohead", Type = AlbumType.Album, FirstReleaseDate = "1995-03-13" };
+        var single = new Album { ArtistId = radiohead.Id, Title = "The Bends", ArtistCredit = "Radiohead", Type = AlbumType.Single, FirstReleaseDate = "1996-07-22" };
+        db.AddRange(album, single,
+            new ProviderIdMapping { EntityKind = EntityKind.Album, EntityId = album.Id, Provider = Providers.MusicBrainz, Value = "rg-bends" },
+            new ProviderIdMapping { EntityKind = EntityKind.Album, EntityId = single.Id, Provider = Providers.MusicBrainz, Value = "rg-bends-single" });
+        await db.SaveChangesAsync();
+        return (radiohead, album, single);
+    }
+
+    [Fact]
+    public async Task An_album_from_Deezer_is_the_one_of_its_type_when_MusicBrainz_has_two_of_its_title()
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<MelodexDbContext>();
+        var catalogue = scope.ServiceProvider.GetRequiredService<CatalogueService>();
+        var (radiohead, album, _) = await TheBendsAsync(db);
+        db.Crosswalk.Add(new ProviderIdMapping { EntityKind = EntityKind.Artist, EntityId = radiohead.Id, Provider = Providers.Deezer, Value = "399" });
+        await db.SaveChangesAsync();
+
+        var imported = await catalogue.ImportAlbumAsync(DeezerAlbum("bends", "The Bends", "399", "Radiohead") with { FirstReleaseDate = "1995-03-13" }, radiohead, default);
+        await db.SaveChangesAsync();
+
+        Assert.Equal(album.Id, imported.Id);
+        Assert.Equal(2, await db.Albums.CountAsync(a => a.Title == "The Bends"));
+    }
+
+    [Fact]
+    public async Task An_album_Deezer_added_beside_two_of_its_title_is_merged_into_the_one_of_its_type()
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<MelodexDbContext>();
+        var catalogue = scope.ServiceProvider.GetRequiredService<CatalogueService>();
+        var (radiohead, album, single) = await TheBendsAsync(db);
+        var copy = new Album { ArtistId = radiohead.Id, Title = "The Bends", ArtistCredit = "Radiohead", Type = AlbumType.Album, FirstReleaseDate = "1995-03-13" };
+        db.AddRange(copy, new ProviderIdMapping { EntityKind = EntityKind.Album, EntityId = copy.Id, Provider = Providers.Deezer, Value = "bends" });
+        await db.SaveChangesAsync();
+
+        Assert.Equal(1, await catalogue.MergeDuplicateAlbumsAsync(default));
+
+        db.ChangeTracker.Clear();
+        Assert.Equal(new[] { album.Id, single.Id }.Order(), (await db.Albums.Where(a => a.Title == "The Bends").Select(a => a.Id).ToListAsync()).Order());
+        Assert.Equal(album.Id, await catalogue.FindAsync(EntityKind.Album, new ProviderId(Providers.Deezer, "bends"), default));
+    }
+
     [Fact]
     public async Task An_album_added_twice_before_is_merged_with_its_editions_and_files()
     {

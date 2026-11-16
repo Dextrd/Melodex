@@ -258,8 +258,9 @@ public sealed class CatalogueService(MelodexDbContext db, IndexPlugins indexPlug
     /// For an album a gap-filling catalogue has, unknown by its ID: the core catalogue's album by the same artist with the
     /// same title, so there aren't two. Only when there's one. Null for the core catalogue's own albums.
     /// </summary>
-    private async Task<Album?> SameAlbumAsync(Guid artistId, string title, string provider, CancellationToken ct)
+    private async Task<Album?> SameAlbumAsync(Guid artistId, IndexAlbum source, CancellationToken ct)
     {
+        var (title, provider) = (source.Title, source.Id.Provider);
         var indexes = await IndexesAsync(ct);
         if (indexes.Count == 0 || indexes[0].Provider == provider || TextMatch.NormaliseAlbum(title) is not { Length: > 0 } key)
             return null;
@@ -268,21 +269,46 @@ public sealed class CatalogueService(MelodexDbContext db, IndexPlugins indexPlug
         foreach (var album in await AlbumsTitledAsync(artistId, key, ct))
             if (await HasIdAsync(EntityKind.Album, album.Id, core, ct) && !await HasIdAsync(EntityKind.Album, album.Id, provider, ct))
                 candidates.Add(album);
+        candidates = Narrow(candidates, source.Type, source.FirstReleaseDate);
         return candidates.Count == 1 ? candidates[0] : null;
     }
+
+    /// <summary>
+    /// An artist can have two releases of one title, such as an album and a single from it (#125). When more than one
+    /// album matches by title, those of the same type are kept, then those first released within a year of it, as
+    /// reissues move the date. What's left may still be more than one, and isn't merged then.
+    /// </summary>
+    private static List<Album> Narrow(List<Album> albums, AlbumType type, string? firstReleased)
+    {
+        if (albums.Count > 1 && albums.Where(a => Compatible(a.Type, type)).ToList() is { Count: > 0 } sameType)
+            albums = sameType;
+        if (albums.Count > 1 && Year(firstReleased) is { } year
+            && albums.Where(a => Year(a.FirstReleaseDate) is { } y && Math.Abs(y - year) <= 1).ToList() is { Count: > 0 } sameTime)
+            albums = sameTime;
+        return albums;
+    }
+
+    // Catalogues tell an EP from a single differently, and some don't say.
+    private static bool Compatible(AlbumType a, AlbumType b) =>
+        a == b || (a is AlbumType.Ep or AlbumType.Single && b is AlbumType.Ep or AlbumType.Single) || a == AlbumType.Other || b == AlbumType.Other;
+
+    private static int? Year(string? date) => date is { Length: >= 4 } && int.TryParse(date[..4], out var year) ? year : null;
 
     /// <summary>
     /// For the core catalogue's album, unknown by its ID: the album by the same artist with the same title that only
     /// gap-filling catalogues know, so it can become the core's. Only when there's one, and no album of the core's has
     /// that title already. Null for gap-filling catalogues' albums.
     /// </summary>
-    private async Task<Album?> CopyOfAlbumAsync(Guid artistId, string title, string provider, CancellationToken ct)
+    private async Task<Album?> CopyOfAlbumAsync(Guid artistId, IndexAlbum source, CancellationToken ct)
     {
+        var (title, provider) = (source.Title, source.Id.Provider);
         var indexes = await IndexesAsync(ct);
         if (indexes.Count < 2 || indexes[0].Provider != provider || TextMatch.NormaliseAlbum(title) is not { Length: > 0 } key)
             return null;
+        // Two of the title, such as an album and a single from it: the one of its type (#125).
+        var titled = Narrow(await AlbumsTitledAsync(artistId, key, ct), source.Type, source.FirstReleaseDate);
         var copies = new List<Album>();
-        foreach (var album in await AlbumsTitledAsync(artistId, key, ct))
+        foreach (var album in titled)
         {
             if (await HasIdAsync(EntityKind.Album, album.Id, provider, ct))
                 return null;
@@ -325,6 +351,7 @@ public sealed class CatalogueService(MelodexDbContext db, IndexPlugins indexPlug
                 if (album.Id != copy.Id && await HasIdAsync(EntityKind.Album, album.Id, core, ct)
                     && !await db.Crosswalk.AnyAsync(m => m.EntityKind == EntityKind.Album && m.EntityId == album.Id && providers.Contains(m.Provider), ct))
                     candidates.Add(album);
+            candidates = Narrow(candidates, copy.Type, copy.FirstReleaseDate);
             if (candidates.Count != 1)
                 continue;
             await MergeAlbumAsync(copy, candidates[0], ct);
@@ -449,13 +476,13 @@ public sealed class CatalogueService(MelodexDbContext db, IndexPlugins indexPlug
         if (album is null)
         {
             artist ??= await ArtistForRefAsync(source.Artist, source.Title, ct);
-            if (await SameAlbumAsync(artist.Id, source.Title, source.Id.Provider, ct) is { } same)
+            if (await SameAlbumAsync(artist.Id, source, ct) is { } same)
             {
                 await MapAsync(EntityKind.Album, same.Id, source.Id, ct);
                 return same;
             }
             // A copy a gap-filling catalogue added first becomes the core catalogue's album, rather than there being two.
-            album = await CopyOfAlbumAsync(artist.Id, source.Title, source.Id.Provider, ct);
+            album = await CopyOfAlbumAsync(artist.Id, source, ct);
             if (album is null)
             {
                 album = new Album { ArtistId = artist.Id, Title = source.Title, ArtistCredit = source.ArtistCredit };
