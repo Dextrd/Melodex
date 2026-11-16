@@ -4,6 +4,12 @@ What changed in each release of Melodex. Versions follow [semantic versioning](h
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-11-16
+
+A Tools page for bringing playlists in and out: import a list or your YouTube Music library, and export playlists or
+the library. A wishlist for songs and albums you'd like, lyrics for songs fetched to listen to, and a new Soulseek
+retriever through your own slskd. The core image changes; the database updates itself on start.
+
 ### Added
 
 - A **Tools** page, with **Import from a list**: an M3U or M3U8 playlist, a CSV from a spreadsheet or another service,
