@@ -4,6 +4,11 @@ What changed in each release of Melodex. Versions follow [semantic versioning](h
 
 ## [Unreleased]
 
+### Fixed
+
+- The Soulseek plugin couldn't be added: it said **Required.** before its settings could be filled in. It's added
+  now, and its health says what's still needed (#166).
+
 ## [1.5.0] - 2026-11-16
 
 A Tools page for bringing playlists in and out: import a list or your YouTube Music library, and export playlists or
