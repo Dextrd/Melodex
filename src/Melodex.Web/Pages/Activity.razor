@@ -7,6 +7,7 @@
 @inject Preferences Prefs
 @inject NavigationManager Nav
 @inject IJSRuntime Js
+@inject AuthState Auth
 @using Microsoft.JSInterop
 
 <PageTitle>Activity · Melodex</PageTitle>
@@ -44,7 +45,38 @@
            @bind="_filter" @bind:event="oninput" />
     <SortMenu Options="SortOptions" Value="@_sort" Descending="_descending" DirectionHint="@DirectionHint"
               OnChange="@(key => SortAsync(key, key == "newest"))" OnReverse="() => SortAsync(_sort, !_descending)" />
+    @if (_loaded && MayChange && Changeable.Count > 0)
+    {
+        var which = _filter.Length > 0 ? "these" : "all";
+        @if (Changeable.All(i => i.Paused))
+        {
+            <IconButton Icon="play" Label="@($"Resume {which}")" Title="@($"Let {Format.Count(Changeable.Count, Noun, Nouns)} go again")" Disabled="_busy"
+                        OnClick="() => ChangeAsync(BulkAction.Resume)" />
+        }
+        else
+        {
+            <IconButton Icon="pause" Label="@($"Pause {which}")" Title="@($"Hold back {Format.Count(Changeable.Count(i => !i.Paused), Noun, Nouns)} until resumed")"
+                        Disabled="_busy" OnClick="() => ChangeAsync(BulkAction.Pause)" />
+        }
+        <IconButton Icon="cancel" Label="@($"Cancel {which}")" Title="@($"Cancel {Format.Count(Changeable.Count, Noun, Nouns)}")" Disabled="_busy"
+                    OnClick="() => _confirmCancel = true" />
+    }
 </div>
+
+@if (_confirmCancel)
+{
+    <Dialog Title="@($"Cancel {Format.Count(Changeable.Count, Noun, Nouns)}?")" OnClose="() => _confirmCancel = false" Alert="true">
+        <p>
+            @(Shown == "tasks"
+                ? "Each stops for good. What a task has done already stays done."
+                : "Each stops for good, with its parts. Files already in the library stay; songs fetched to listen to go.")
+        </p>
+        <div class="toolbar dialog-buttons">
+            <button @onclick="() => _confirmCancel = false">Keep them</button>
+            <button class="danger" disabled="@_busy" @onclick="() => ChangeAsync(BulkAction.Cancel)">@if (_busy) { <span class="spinner"></span> }Cancel them</button>
+        </div>
+    </Dialog>
+}
 
 @if (!_loaded)
 {
@@ -271,9 +303,42 @@ else
     private Timer? _timer;
 
     /// <summary>A request or a background task, in one list.</summary>
+    private bool _busy, _confirmCancel;
+
+    // Pause all and Cancel all act on what's shown and still going, with the permission for the tab's kind.
+    private bool MayChange => Auth.May(Shown == "tasks" ? UserPermissions.Scan : UserPermissions.Request);
+    private List<Item> Changeable => Visible.Where(i => i.Active).ToList();
+    private string Noun => Shown == "tasks" ? "task" : "download";
+    private string Nouns => Shown == "tasks" ? "tasks" : "downloads";
+
+    private async Task ChangeAsync(BulkAction action)
+    {
+        _busy = true;
+        try
+        {
+            var change = new BulkChange(action, Changeable.Select(i => i.Request?.Id ?? i.Task!.Id).ToList());
+            if (Shown == "tasks")
+            {
+                await Api.ChangeTasksAsync(change);
+                await LoadTasksAsync();
+            }
+            else
+            {
+                await Api.ChangeRequestsAsync(change);
+                await Tracker.RefreshAsync();
+            }
+        }
+        finally
+        {
+            _busy = false;
+            _confirmCancel = false;
+        }
+    }
+
     private sealed record Item(DateTime UpdatedAt, RequestInfo? Request = null, TaskInfo? Task = null)
     {
         public bool Active => Request?.Active ?? Task!.Active;
+        public bool Paused => Request?.Paused ?? Task!.Paused;
         public string Title => Request?.Title ?? Task!.Title ?? Task.Kind;
 
         /// <summary>Working on it now, rather than waiting its turn or paused.</summary>

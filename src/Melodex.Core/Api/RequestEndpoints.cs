@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using Melodex.Client;
 using Melodex.Core.Access;
 using Melodex.Core.Data;
@@ -55,6 +56,22 @@ public static class RequestEndpoints
             .RequireScope(Scopes.Request).WithName("CancelRequest")
             .WithSummary("Cancel a request and its unfinished parts. Files already in the library stay. A request that needs review or failed "
                          + "is dismissed: cancelled with its parts that did, so it leaves Couldn't fetch.");
+
+        requests.MapPost("/bulk", async (BulkChange body, MelodexDbContext db, RequestService service, CancellationToken ct) =>
+            {
+                var changed = 0;
+                foreach (var request in await db.Requests.Where(r => body.Ids.Contains(r.Id)).ToListAsync(ct))
+                    if (!RequestService.Finished.Contains(request.Status) && await (body.Action switch
+                        {
+                            BulkAction.Pause => service.PauseAsync(request, ct),
+                            BulkAction.Resume => service.ResumeAsync(request, ct),
+                            _ => service.CancelAsync(request, ct),
+                        }))
+                        changed++;
+                return new BulkChanged(changed);
+            })
+            .RequireScope(Scopes.Request).WithName("ChangeRequests")
+            .WithSummary("Pause, resume or cancel many requests at once, as each one's own action does. Finished ones are left as they are.");
 
         requests.MapPost("/{id:guid}/pause", async (Guid id, MelodexDbContext db, RequestService service, CancellationToken ct) =>
             {

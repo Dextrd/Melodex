@@ -535,6 +535,19 @@ public sealed class MelodexClient(HttpClient http)
 
     public Task CancelTaskAsync(Guid id, CancellationToken ct = default) => PostAsync($"{Api}/tasks/{id}/cancel", null, ct);
 
+    /// <summary>Pauses, resumes or cancels many tasks at once.</summary>
+    public Task<BulkChanged> ChangeTasksAsync(BulkChange change, CancellationToken ct = default) => BulkAsync("tasks", change, ct);
+
+    /// <summary>Pauses, resumes or cancels many requests at once.</summary>
+    public Task<BulkChanged> ChangeRequestsAsync(BulkChange change, CancellationToken ct = default) => BulkAsync("requests", change, ct);
+
+    private async Task<BulkChanged> BulkAsync(string what, BulkChange change, CancellationToken ct)
+    {
+        using var response = await http.PostAsJsonAsync($"{Api}/{what}/bulk", change, MelodexJson.Options, ct);
+        await EnsureAsync(response, ct);
+        return (await response.Content.ReadFromJsonAsync<BulkChanged>(MelodexJson.Options, ct))!;
+    }
+
     public Task PauseTaskAsync(Guid id, CancellationToken ct = default) => PostAsync($"{Api}/tasks/{id}/pause", null, ct);
 
     public Task ResumeTaskAsync(Guid id, CancellationToken ct = default) => PostAsync($"{Api}/tasks/{id}/resume", null, ct);
