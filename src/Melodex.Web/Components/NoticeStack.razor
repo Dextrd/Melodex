@@ -5,9 +5,10 @@
 
 @*
     The notifications at the bottom right, above the player; full width on a phone. The newest is at the bottom, and past
-    a few the oldest are grouped into one line. Screen readers hear each as it comes.
+    a few the oldest are grouped into one line. Each shows the cover of what it's about, or an icon for it, and closes
+    itself after a few seconds unless the pointer is over them. Screen readers hear each as it comes.
 *@
-<div class="toasts" role="status" aria-live="polite" aria-label="Notifications">
+<div class="toasts" role="status" aria-live="polite" aria-label="Notifications" @onmouseenter="Notices.Hold" @onmouseleave="Notices.Release">
     @if (Hidden > 0)
     {
         <div class="toast toast-more">
@@ -15,7 +16,7 @@
                 <span class="toast-title">@Format.Count(Hidden, "more notification", "more notifications")</span>
                 <span class="toast-text muted small">See everything in Activity</span>
             </a>
-            <button type="button" class="toast-close" title="Close them all" aria-label="Close them all" @onclick="CloseGrouped">
+            <button type="button" class="toast-close" title="Dismiss them all" aria-label="Dismiss them all" @onclick="CloseGrouped">
                 <Icon Name="cancel" />
             </button>
         </div>
@@ -23,13 +24,13 @@
     @foreach (var notice in Notices.Shown.Skip(Hidden))
     {
         <div class="toast @(notice.Failed ? "failed" : null)" @key="notice.Key">
-            @if (notice.Working)
+            @if (notice.Art is { } art)
             {
-                <span class="spinner" aria-hidden="true"></span>
+                <img class="toast-art" src="@art" alt="" loading="lazy" />
             }
             else
             {
-                <span class="toast-glyph" aria-hidden="true"><Icon Name="@(notice.Failed ? "attention" : "done")" /></span>
+                <span class="toast-glyph" aria-hidden="true"><Icon Name="@notice.Icon" /></span>
             }
             @if (notice.Href is { } href)
             {
@@ -45,7 +46,7 @@
                     @if (notice.Text is { } text) { <span class="toast-text muted small">@text</span> }
                 </span>
             }
-            <button type="button" class="toast-close" title="Close" aria-label="Close" @onclick="() => Notices.Close(notice.Key, byYou: true)">
+            <button type="button" class="toast-close" title="Dismiss" aria-label="Dismiss" @onclick="() => Notices.Close(notice.Key)">
                 <Icon Name="cancel" />
             </button>
         </div>
@@ -66,18 +67,17 @@
 
     private void Redraw() => InvokeAsync(StateHasChanged);
 
-    // Going to it closes it, unless it's still going.
+    // Going to it closes it.
     private void Go(Notice notice)
     {
-        if (!notice.Working)
-            Notices.Close(notice.Key);
+        Notices.Close(notice.Key);
         Nav.NavigateTo(notice.Href!);
     }
 
     private void CloseGrouped()
     {
         foreach (var notice in Notices.Shown.Take(Hidden).ToList())
-            Notices.Close(notice.Key, byYou: true);
+            Notices.Close(notice.Key);
     }
 
     public void Dispose() => Notices.Changed -= Redraw;

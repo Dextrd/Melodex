@@ -5,38 +5,40 @@ namespace Melodex.Web;
 /// <summary>What a notification is about, each kind of which can be turned off under Appearance.</summary>
 public enum NoticeKind
 {
-    /// <summary>A long task: a scan, a catalogue update, an import, formatting.</summary>
+    /// <summary>A long task finishing: a scan, a catalogue update, an import, formatting.</summary>
     Task,
 
-    /// <summary>Something you asked for being fetched.</summary>
+    /// <summary>Something you asked for finishing: in the library, to review, or failed.</summary>
     Download,
 
-    /// <summary>Something you did that goes on elsewhere, such as looking for an upgrade.</summary>
+    /// <summary>Something you started that goes on elsewhere finishing, such as looking for a better copy.</summary>
     Action,
 }
 
 /// <param name="Key">Shown again with the same key, it replaces the one showing.</param>
-/// <param name="Working">Still going: it shows a spinner and stays until it's done.</param>
+/// <param name="Icon">The icon shown when there's no artwork.</param>
+/// <param name="Art">The cover of what it's about, shown in place of the icon.</param>
 /// <param name="Failed">It went wrong: it shows as an error.</param>
 public sealed record Notice(string Key, NoticeKind Kind, string Title, string? Text = null, string? Href = null,
-    bool Working = false, bool Failed = false)
+    string Icon = "done", string? Art = null, bool Failed = false)
 {
     /// <summary>When it was first shown, for the order they stack in.</summary>
     public DateTime Shown { get; init; } = DateTime.UtcNow;
 }
 
 /// <summary>
-/// The notifications that slide in from the bottom right, above the player: the newest at the bottom. One that isn't
-/// working closes itself after a few seconds; each can be closed sooner. Kinds the signed-in user turned off aren't shown.
+/// The notifications that slide in from the bottom right, above the player: the newest at the bottom. Each closes itself
+/// after a few seconds, unless the pointer is over them, and can be closed sooner. Kinds the signed-in user turned off
+/// aren't shown.
 /// </summary>
 public sealed class Notices(AuthState auth) : IDisposable
 {
-    /// <summary>How long one that's done stays.</summary>
-    public static readonly TimeSpan Linger = TimeSpan.FromSeconds(6);
+    /// <summary>How long each stays.</summary>
+    public static readonly TimeSpan Linger = TimeSpan.FromSeconds(8);
 
     private readonly List<Notice> _shown = [];
     private readonly Dictionary<string, Timer> _closing = [];
-    private readonly HashSet<string> _closedByYou = [];
+    private bool _held;
 
     /// <summary>Oldest first, so the newest is at the bottom.</summary>
     public IReadOnlyList<Notice> Shown => _shown;
@@ -61,37 +63,38 @@ public sealed class Notices(AuthState auth) : IDisposable
             _shown[at] = notice with { Shown = _shown[at].Shown };
         else
             _shown.Add(notice);
-        Forget(notice.Key);
-        if (!notice.Working)
-            _closing[notice.Key] = new Timer(_ => Close(notice.Key), null, Linger, Timeout.InfiniteTimeSpan);
+        if (!_held)
+            CloseLater(notice.Key);
         Changed?.Invoke();
     }
 
-    /// <summary>The one showing with this key, if it is.</summary>
-    public Notice? Find(string key) => _shown.FirstOrDefault(n => n.Key == key);
-
-    /// <summary>Whether it was closed with its close button, so it isn't shown again.</summary>
-    public bool WasClosed(string key) => _closedByYou.Contains(key);
-
-    /// <param name="byYou">With its close button, rather than as it times out.</param>
-    public void Close(string key, bool byYou = false)
+    public void Close(string key)
     {
-        if (byYou)
-            _closedByYou.Add(key);
         Forget(key);
         if (_shown.RemoveAll(n => n.Key == key) > 0)
             Changed?.Invoke();
     }
 
-    public void CloseAll()
+    /// <summary>The pointer is over them: none closes until it leaves.</summary>
+    public void Hold()
     {
-        foreach (var notice in _shown.ToList())
-        {
-            _closedByYou.Add(notice.Key);
-            Forget(notice.Key);
-        }
-        _shown.Clear();
-        Changed?.Invoke();
+        _held = true;
+        foreach (var key in _closing.Keys.ToList())
+            Forget(key);
+    }
+
+    /// <summary>The pointer has left: each closes after a while again.</summary>
+    public void Release()
+    {
+        _held = false;
+        foreach (var notice in _shown)
+            CloseLater(notice.Key);
+    }
+
+    private void CloseLater(string key)
+    {
+        Forget(key);
+        _closing[key] = new Timer(_ => Close(key), null, Linger, Timeout.InfiniteTimeSpan);
     }
 
     private void Forget(string key)

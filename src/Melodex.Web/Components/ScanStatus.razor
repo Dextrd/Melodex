@@ -1,7 +1,6 @@
 @implements IDisposable
 @inject MelodexClient Api
 @inject AuthState Auth
-@inject Notices Notices
 @inject TaskNotices Tasks
 
 @*
@@ -9,14 +8,7 @@
     matching files again and formatting. Polls while a task runs.
 *@
 <div class="row small scan-status">
-    @if (_status?.CurrentTask is { } task && Notices.Wants(NoticeKind.Task))
-    {
-        @* What it's doing shows in its notification; here only that something is going. *@
-        <a class="muted scan-progress working" href="activity?open=@task.Id" title="@(task.Title): @(task.Progress ?? "Starting…")" aria-label="@task.Title is going: see what it's doing">
-            <span class="spinner" aria-hidden="true"></span>
-        </a>
-    }
-    else if (_status?.CurrentTask is { } running)
+    @if (_status?.CurrentTask is { } running)
     {
         <a class="muted scan-progress" href="activity?open=@running.Id" title="See what it's doing">@(running.Progress ?? "Starting…")</a>
     }

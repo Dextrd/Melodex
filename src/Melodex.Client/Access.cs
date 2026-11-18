@@ -35,9 +35,9 @@ public enum ThemeMode { Auto, Light, Dark, Black }
 /// <summary>How the web app looks and behaves for someone, kept with their account: <c>PUT /auth/appearance</c>.</summary>
 /// <param name="HighContrast">Stronger text and borders, and status colours that colour-blind people can tell apart.</param>
 /// <param name="ListPage">No longer used: the Library draws only the tiles near the screen, however many there are. Kept so older settings still read.</param>
-/// <param name="TaskNotices">Notifications for long tasks, such as scans, as they run and when they finish.</param>
-/// <param name="DownloadNotices">Notifications when something you asked for starts being fetched, and when it finishes.</param>
-/// <param name="ActionNotices">Notifications for things you did that go on elsewhere, such as looking for an upgrade.</param>
+/// <param name="TaskNotices">Notifications when long tasks, such as scans, finish or fail.</param>
+/// <param name="DownloadNotices">Notifications when something you asked for is in the library, waiting for review, or failed.</param>
+/// <param name="ActionNotices">Notifications when things you started that go on elsewhere finish, such as looking for an upgrade.</param>
 public sealed record Appearance(ThemeColor Color = ThemeColor.Pink, ThemeMode Mode = ThemeMode.Auto, bool HighContrast = false,
     int ListPage = Appearance.DefaultListPage, bool TaskNotices = true, bool DownloadNotices = true, bool ActionNotices = true)
 {

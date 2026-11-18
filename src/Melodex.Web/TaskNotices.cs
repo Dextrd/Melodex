@@ -1,13 +1,14 @@
+using System.Text.RegularExpressions;
 using Melodex.Client;
 
 namespace Melodex.Web;
 
 /// <summary>
-/// Shows a notification for each long task while it runs, updating as it goes, and says how it ended: scans, catalogue
-/// updates, imports and formatting. What's queued after them on its own, such as finding lyrics, doesn't pop up.
-/// Reads the running tasks when the server says tasks changed, and every few seconds while one runs.
+/// Shows a notification when a long task ends, saying how: scans, catalogue updates, imports and formatting. A scan that
+/// leaves files to review says so, and goes to Review. What's queued after them on its own, such as finding lyrics,
+/// doesn't pop up. Reads the running tasks when the server says tasks changed, and every few seconds while one runs.
 /// </summary>
-public sealed class TaskNotices : IDisposable
+public sealed partial class TaskNotices : IDisposable
 {
     private static readonly TimeSpan Busy = TimeSpan.FromSeconds(3);
     private static readonly TimeSpan Idle = TimeSpan.FromSeconds(30);
@@ -41,11 +42,10 @@ public sealed class TaskNotices : IDisposable
         _ = RefreshAsync();
     }
 
-    /// <summary>A task just started here, shown at once rather than at the next look.</summary>
+    /// <summary>A task just started here, watched at once so even a quick one gets its say.</summary>
     public void Started(TaskInfo task)
     {
         EnsureStarted();
-        Show(task);
         _running[task.Id] = task;
         Schedule(Busy);
     }
@@ -64,11 +64,8 @@ public sealed class TaskNotices : IDisposable
         try
         {
             var active = (await _api.ListTasksAsync(active: true)).Where(t => Shown.Contains(t.Kind)).ToList();
-            foreach (var task in active.Where(t => t.State == TaskState.Running || _running.ContainsKey(t.Id)))
-            {
-                Show(task);
+            foreach (var task in active.Where(t => t.State == TaskState.Running))
                 _running[task.Id] = task;
-            }
             foreach (var id in _running.Keys.Except(active.Select(t => t.Id)).ToList())
             {
                 _running.Remove(id);
@@ -87,31 +84,40 @@ public sealed class TaskNotices : IDisposable
         }
     }
 
-    private void Show(TaskInfo task)
-    {
-        var key = KeyOf(task.Id);
-        // Closed while it ran: left closed, and not shown again when it's done.
-        if (_notices.WasClosed(key))
-            return;
-        _notices.Show(new Notice(key, NoticeKind.Task, task.Title ?? task.Kind,
-            task.Paused ? "Paused" : task.State == TaskState.Queued ? "Waiting its turn" : task.Progress ?? "Starting…",
-            $"activity?open={task.Id}", Working: true));
-    }
-
     private void Finished(TaskInfo task)
     {
-        var key = KeyOf(task.Id);
-        if (_notices.WasClosed(key))
-            return;
         if (task.State == TaskState.Cancelled)
+            return;
+        var key = KeyOf(task.Id);
+        var title = task.Title ?? task.Kind;
+        var href = $"activity?open={task.Id}";
+        if (task.State == TaskState.Failed)
         {
-            _notices.Close(key);
+            _notices.Show(new Notice(key, NoticeKind.Task, title + " failed", task.Error, href, "attention", Failed: true));
             return;
         }
-        var failed = task.State == TaskState.Failed;
-        _notices.Show(new Notice(key, NoticeKind.Task, (task.Title ?? task.Kind) + (failed ? " failed" : " done"),
-            failed ? task.Error : task.Progress, $"activity?open={task.Id}", Failed: failed));
+        // A scan that left files to review goes there.
+        if (task.Kind == "library-scan" && ToReview().Match(task.Progress ?? "") is { Success: true } m && int.Parse(m.Groups[1].Value) > 0)
+        {
+            title += $": {Format.Count(int.Parse(m.Groups[1].Value), "file", "files")} to review";
+            href = "review";
+        }
+        else
+            title += " done";
+        _notices.Show(new Notice(key, NoticeKind.Task, title, task.Progress, href, IconOf(task.Kind)));
     }
+
+    private static string IconOf(string kind) => kind switch
+    {
+        "library-scan" => "search",
+        "catalogue-update" => "album",
+        "library-format" => "format",
+        "tools-import" => "import",
+        _ => "done",
+    };
+
+    [GeneratedRegex(@"(\d+) to review")]
+    private static partial Regex ToReview();
 
     private void Schedule(TimeSpan after)
     {
