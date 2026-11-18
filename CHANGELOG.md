@@ -4,6 +4,14 @@ What changed in each release of Melodex. Versions follow [semantic versioning](h
 
 ## [Unreleased]
 
+### Added
+
+- **Import from Deezer** on the Tools page, from the spreadsheet of your personal data Deezer gives you (no Deezer
+  account linked): your playlists and favourite tracks become playlists, and favourite albums can be asked for. Only
+  those sheets are read; your account's details and listening are left unopened. Songs match by their ISRCs, on the
+  album Deezer names, and importing a later copy brings only what's new (#25).
+- A list's song matched by its ISRC is shown on the album the list names, not the first it came out on (#25).
+
 ## [1.5.2] - 2026-11-18
 
 Fixes and small additions from using 1.5: **Pause all** and **Cancel all** in Activity, Listen now fetching only the

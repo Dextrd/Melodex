@@ -411,7 +411,7 @@ public sealed class ImportService(MelodexDbContext db, TaskQueue queue, Playlist
             .GroupBy(f => f.TrackId).ToDictionary(g => g.Key, g => g.First());
         var listed = trackIds.Count == 0 ? [] : (await db.EditionTracks.AsNoTracking().Where(et => trackIds.Contains(et.TrackId))
                 .Select(et => new { et.TrackId, et.EditionId, et.Edition.AlbumId, et.Edition.Album.Title, et.Edition.Album.FirstReleaseDate }).ToListAsync(ct))
-            .GroupBy(x => x.TrackId).ToDictionary(g => g.Key, g => g.OrderBy(x => x.FirstReleaseDate ?? "9999").First());
+            .GroupBy(x => x.TrackId).ToDictionary(g => g.Key, g => g.OrderBy(x => x.FirstReleaseDate ?? "9999").ToList());
         var albumIds = lines.Select(l => l.AlbumId).OfType<Guid>().Distinct().ToList();
         var albums = albumIds.Count == 0 ? [] : await db.Albums.AsNoTracking().Where(a => albumIds.Contains(a.Id))
             .Select(a => new { a.Id, a.Title, a.ArtistCredit, a.ArtistId }).ToDictionaryAsync(a => a.Id, ct);
@@ -427,7 +427,10 @@ public sealed class ImportService(MelodexDbContext db, TaskQueue queue, Playlist
             else if (line.TrackId is { } trackId && tracks.TryGetValue(trackId, out var track))
             {
                 var (albumId, editionId, album) = owned.TryGetValue(trackId, out var mine) ? (mine.AlbumId, mine.EditionId, mine.Title)
-                    : listed.TryGetValue(trackId, out var on) ? (on.AlbumId, (Guid?)on.EditionId, on.Title)
+                    // The album the list names, if the song's on it, or the first it came out on.
+                    : listed.TryGetValue(trackId, out var albumsOn) && (albumsOn.FirstOrDefault(a => line.Album is not null
+                        && SongNames.TitleKey(a.Title) == SongNames.TitleKey(line.Album)) ?? albumsOn[0]) is { } on
+                        ? (on.AlbumId, (Guid?)on.EditionId, on.Title)
                     : (Guid.Empty, null, null);
                 matches[line.Id] = new ImportMatch(trackId, null, track.Title, track.ArtistCredit, track.ArtistId,
                     albumId == Guid.Empty ? null : albumId, album, albumId == Guid.Empty ? null : LibraryView.CoverUrl(albumId, editionId), track.Duration?.TotalSeconds);

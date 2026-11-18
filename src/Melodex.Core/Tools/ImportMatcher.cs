@@ -59,6 +59,13 @@ public sealed class ImportMatcher(MelodexDbContext db, CatalogueService catalogu
         var plugin = await catalogue.PluginAsync(ct);
         if (line.Isrc is { } isrc && plugin is IIsrcLookup lookup && (await lookup.LookupIsrcAsync(isrc, ct)).FirstOrDefault() is { } byIsrc)
         {
+            // A recording is on several albums, and the lookup names none: the one the list names, if it's among them.
+            if (byIsrc.Album is null && line.Album is { } named && plugin is IRecordingAlbums albums)
+            {
+                var key = SongNames.TitleKey(named);
+                if ((await albums.GetRecordingAlbumsAsync(byIsrc.Id.Value, ct)).FirstOrDefault(a => SongNames.TitleKey(a.Title) == key) is { } on)
+                    byIsrc = byIsrc with { Album = on };
+            }
             await SetAsync(line, (await ImportAsync(byIsrc, ct)).Track.Id, 1, ct);
             return;
         }

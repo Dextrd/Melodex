@@ -33,6 +33,17 @@ else
             ask for it. An email brings a zip within a few days.
         </p>
     }
+    else if (Service == ImportFormat.Deezer)
+    {
+        <p class="muted">
+            Deezer gives you a copy of your personal data, as a spreadsheet. Choose it, and then which of your playlists, favourite
+            tracks and favourite albums to import. Only those are read from it.
+        </p>
+        <p class="muted small service-steps">
+            To ask for it: on Deezer's website, open <strong>Account settings → Privacy settings</strong> and, under <strong>My personal
+            data</strong>, ask for it. An email brings a link to download it, usually within a day.
+        </p>
+    }
     else
     {
         <p class="muted">
@@ -47,8 +58,9 @@ else
     }
     <p class="muted small"><a href="settings/help/tools#@Anchor">More in the guide</a>.</p>
     <div class="field">
-        <label class="field-label" for="service-files">The export's zip, or its files</label>
-        <InputFile id="service-files" OnChange="ReadAsync" multiple accept=".zip,.json,.csv,application/zip,application/json,text/csv" />
+        <label class="field-label" for="service-files">@(Service == ImportFormat.Deezer ? "The export's spreadsheet" : "The export's zip, or its files")</label>
+        <InputFile id="service-files" OnChange="ReadAsync" multiple
+                   accept=".zip,.json,.csv,.xlsx,application/zip,application/json,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" />
     </div>
     @if (_busy && _peek is null) { <Loading /> }
     @if (_error is not null)
@@ -111,13 +123,19 @@ else
     {
         // Spotify's reader is held back until it's been checked against a real export (#22).
         ["youtube-music"] = ImportFormat.YouTubeMusic,
+        ["deezer"] = ImportFormat.Deezer,
     };
 
     [Parameter] public string Slug { get; set; } = "";
 
     private ImportFormat? Service => Services.TryGetValue(Slug, out var service) ? service : null;
     private string Name => Service is { } service ? ServiceNames.Of(service) : "a music service";
-    private string Anchor => Service == ImportFormat.Spotify ? "importing-from-spotify" : "importing-from-youtube-music";
+    private string Anchor => Service switch
+    {
+        ImportFormat.Spotify => "importing-from-spotify",
+        ImportFormat.Deezer => "importing-from-deezer",
+        _ => "importing-from-youtube-music",
+    };
 
     /// <summary>The page for importing a service's export.</summary>
     public static string? Link(ImportFormat service) => Services.FirstOrDefault(s => s.Value == service).Key is { } slug ? $"tools/import/{slug}" : null;
@@ -174,9 +192,12 @@ else
         var chosen = e.GetMultipleFiles(500);
         if (chosen.Sum(f => f.Size) > MaxExport)
         {
-            _error = Service == ImportFormat.Spotify
-                ? "That's more than 30 MB. Choose only the files with your library and playlists in: YourLibrary.json and the Playlist files."
-                : "That's more than 30 MB. Choose only the files with your library and playlists in: music library songs.csv and the playlists folder.";
+            _error = Service switch
+            {
+                ImportFormat.Spotify => "That's more than 30 MB. Choose only the files with your library and playlists in: YourLibrary.json and the Playlist files.",
+                ImportFormat.Deezer => "That's more than 30 MB, which Deezer's spreadsheet shouldn't be. Choose the one Deezer sent.",
+                _ => "That's more than 30 MB. Choose only the files with your library and playlists in: music library songs.csv and the playlists folder.",
+            };
             return;
         }
         _busy = true;

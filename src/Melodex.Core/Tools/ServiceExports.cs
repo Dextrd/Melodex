@@ -1,5 +1,6 @@
 using System.IO.Compression;
 using System.Text.Json;
+using System.Xml.Linq;
 using Melodex.Client;
 
 namespace Melodex.Core.Tools;
@@ -28,12 +29,26 @@ public static class ServiceExports
         var unpacked = new List<(string Name, byte[] Bytes)>();
         foreach (var (name, bytes) in files)
         {
-            if (bytes.Length > 4 && bytes[0] == 'P' && bytes[1] == 'K')
+            // A spreadsheet is a zip too, but it's read whole.
+            if (bytes.Length > 4 && bytes[0] == 'P' && bytes[1] == 'K' && !IsSpreadsheet(bytes))
                 unpacked.AddRange(Unzip(bytes));
             else
                 unpacked.Add((name, bytes));
         }
-        return Spotify(unpacked) ?? YouTubeMusic(unpacked);
+        return Spotify(unpacked) ?? YouTubeMusic(unpacked) ?? Deezer(unpacked);
+    }
+
+    private static bool IsSpreadsheet(byte[] bytes)
+    {
+        try
+        {
+            using var zip = new ZipArchive(new MemoryStream(bytes), ZipArchiveMode.Read);
+            return zip.GetEntry("xl/workbook.xml") is not null;
+        }
+        catch (InvalidDataException)
+        {
+            return false;
+        }
     }
 
     private static IEnumerable<(string Name, byte[] Bytes)> Unzip(byte[] bytes)
@@ -41,7 +56,7 @@ public static class ServiceExports
         using var zip = new ZipArchive(new MemoryStream(bytes), ZipArchiveMode.Read);
         foreach (var entry in zip.Entries)
         {
-            if (entry.Length is 0 or > MaxEntry || !(entry.Name.EndsWith(".json", StringComparison.OrdinalIgnoreCase) || entry.Name.EndsWith(".csv", StringComparison.OrdinalIgnoreCase)))
+            if (entry.Length is 0 or > MaxEntry || !new[] { ".json", ".csv", ".xlsx" }.Any(e => entry.Name.EndsWith(e, StringComparison.OrdinalIgnoreCase)))
                 continue;
             using var stream = entry.Open();
             using var copy = new MemoryStream();
@@ -164,6 +179,81 @@ public static class ServiceExports
         static string? Cell(IReadOnlyList<string> row, int index) => index >= 0 && index < row.Count && row[index].Trim() is { Length: > 0 } cell ? cell : null;
     }
 
+    // ---- Deezer ----
+
+    /// <summary>The prefix of a line's ID for a Deezer track or album: "deezer:track:138547415".</summary>
+    public const string DeezerPrefix = "deezer:";
+
+    /// <summary>
+    /// Deezer's copy of your personal data (Account settings → Privacy → My personal data): a spreadsheet with a sheet for
+    /// each kind of data. Only these are read, the rest (your account, devices and listening) left unopened:
+    /// "favoriteSong" (Song Title, Artists, Album Title, ISRC, Link), "favoriteAlbum" (Album Title, Artists, Link), and
+    /// "playlistCreated", a row for each song of each playlist you made (Playlist Title, Playlist Link, then the song's
+    /// columns, its link as Track Link). Favourite artists are follows, not music to import.
+    /// </summary>
+    private static ServiceExport? Deezer(IReadOnlyList<(string Name, byte[] Bytes)> files)
+    {
+        var lists = new List<ServiceListData>();
+        var known = false;
+        foreach (var (_, bytes) in files)
+        {
+            Dictionary<string, List<Dictionary<string, string>>> sheets;
+            try
+            {
+                sheets = Spreadsheet.Read(bytes, name => name.EndsWith("favoriteSong", StringComparison.OrdinalIgnoreCase)
+                    || name.EndsWith("favoriteAlbum", StringComparison.OrdinalIgnoreCase) || name.EndsWith("playlistCreated", StringComparison.OrdinalIgnoreCase));
+            }
+            catch (Exception e) when (e is InvalidDataException or System.Xml.XmlException)
+            {
+                continue;
+            }
+            if (sheets.Count == 0)
+                continue;
+            known = true;
+            foreach (var (name, rows) in sheets.OrderBy(s => s.Key, StringComparer.Ordinal))
+            {
+                if (name.EndsWith("favoriteSong", StringComparison.OrdinalIgnoreCase))
+                {
+                    var songs = rows.Select(r => Song(r, "Link")).OfType<ServiceItem>().ToList();
+                    if (songs.Count > 0)
+                        lists.Add(new ServiceListData("liked", "Favourite tracks", ServiceListKind.Liked, songs));
+                }
+                else if (name.EndsWith("favoriteAlbum", StringComparison.OrdinalIgnoreCase))
+                {
+                    var albums = rows.Select(r => Item(Get(r, "Album Title"), Get(r, "Artists") ?? Get(r, "Artist"), null, DeezerId(Get(r, "Link"))))
+                        .OfType<ServiceItem>().ToList();
+                    if (albums.Count > 0)
+                        lists.Add(new ServiceListData("albums", "Favourite albums", ServiceListKind.Albums, albums));
+                }
+                else
+                {
+                    // Known by its link, as two can share a name; in the order they first come.
+                    var keys = new HashSet<string>(StringComparer.Ordinal);
+                    foreach (var playlist in rows.GroupBy(r => Get(r, "Playlist Link") ?? Get(r, "Playlist Title") ?? ""))
+                    {
+                        var title = Get(playlist.First(), "Playlist Title") ?? "Playlist";
+                        var key = $"playlist:{title}";
+                        for (var n = 2; !keys.Add(key); n++)
+                            key = $"playlist:{title} ({n})";
+                        lists.Add(new ServiceListData(key, key["playlist:".Length..], ServiceListKind.Playlist,
+                            playlist.Select(r => Song(r, "Track Link")).OfType<ServiceItem>().ToList()));
+                    }
+                }
+            }
+        }
+        return known ? new ServiceExport(ImportFormat.Deezer, lists.OrderBy(l => l.Kind switch { ServiceListKind.Liked => 0, ServiceListKind.Albums => 1, _ => 2 }).ToList()) : null;
+
+        static ServiceItem? Song(Dictionary<string, string> row, string link) => Get(row, "Song Title") is { } title
+            ? new ServiceItem(new ImportSong(title, Get(row, "Artists") ?? Get(row, "Artist"), Get(row, "Album Title"), null, Get(row, "ISRC")), DeezerId(Get(row, link)))
+            : null;
+        static string? Get(Dictionary<string, string> row, string column) => row.TryGetValue(column, out var value) && value.Trim() is { Length: > 0 } text ? text : null;
+        // "www.deezer.com/track/138547415" → "deezer:track:138547415".
+        static string? DeezerId(string? link) =>
+            link is not null && System.Text.RegularExpressions.Regex.Match(link, @"deezer\.com/(?:[a-z]{2}/)?(track|album|playlist)/(\d+)") is { Success: true } m
+                ? $"{DeezerPrefix}{m.Groups[1].Value}:{m.Groups[2].Value}"
+                : null;
+    }
+
     // A playlist's item: a track, or a file of the listener's own ("spotify:local:Artist:Album:Title:Seconds"). Episodes
     // and audiobooks are left out.
     private static ServiceItem? PlaylistItem(JsonElement item)
@@ -191,4 +281,69 @@ public static class ServiceExports
 
     private static string? Text(JsonElement element, string property) =>
         element.TryGetProperty(property, out var value) && value.ValueKind == JsonValueKind.String && value.GetString()?.Trim() is { Length: > 0 } text ? text : null;
+}
+
+/// <summary>
+/// Reads sheets of an .xlsx spreadsheet as rows of named cells, the first row being the names. Only the sheets asked
+/// for are opened.
+/// </summary>
+internal static class Spreadsheet
+{
+    private static readonly XNamespace Main = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+    private static readonly XNamespace Relationships = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+    private static readonly XNamespace PackageRelationships = "http://schemas.openxmlformats.org/package/2006/relationships";
+
+    /// <summary>The sheets whose names <paramref name="wanted"/> accepts, by name; none if it isn't a spreadsheet.</summary>
+    public static Dictionary<string, List<Dictionary<string, string>>> Read(byte[] bytes, Func<string, bool> wanted)
+    {
+        var sheets = new Dictionary<string, List<Dictionary<string, string>>>(StringComparer.Ordinal);
+        if (bytes.Length < 4 || bytes[0] != 'P' || bytes[1] != 'K')
+            return sheets;
+        using var zip = new ZipArchive(new MemoryStream(bytes), ZipArchiveMode.Read);
+        if (Load(zip, "xl/workbook.xml") is not { } workbook || Load(zip, "xl/_rels/workbook.xml.rels") is not { } rels)
+            return sheets;
+        var targets = rels.Root!.Elements(PackageRelationships + "Relationship")
+            .ToDictionary(r => (string)r.Attribute("Id")!, r => (string)r.Attribute("Target")!);
+        List<string>? shared = null;
+        foreach (var sheet in workbook.Root!.Element(Main + "sheets")?.Elements(Main + "sheet") ?? [])
+        {
+            var name = (string?)sheet.Attribute("name") ?? "";
+            if (!wanted(name) || (string?)sheet.Attribute(Relationships + "id") is not { } id || !targets.TryGetValue(id, out var target))
+                continue;
+            var path = target.StartsWith('/') ? target.TrimStart('/') : "xl/" + target;
+            if (Load(zip, path) is not { } xml)
+                continue;
+            shared ??= Load(zip, "xl/sharedStrings.xml")?.Root!.Elements(Main + "si").Select(si => string.Concat(si.Descendants(Main + "t").Select(t => t.Value))).ToList() ?? [];
+            var rows = xml.Descendants(Main + "row")
+                .Select(row => row.Elements(Main + "c").GroupBy(c => Column((string?)c.Attribute("r"))).ToDictionary(g => g.Key, g => Value(g.First(), shared)))
+                .ToList();
+            if (rows.Count == 0)
+                continue;
+            var header = rows[0];
+            // A name used twice is the first column of it.
+            var columns = header.Where(h => h.Value.Trim().Length > 0).GroupBy(h => h.Value.Trim(), StringComparer.OrdinalIgnoreCase)
+                .Select(g => (Name: g.Key, Column: g.First().Key)).ToList();
+            sheets[name] = rows.Skip(1).Select(row => columns.ToDictionary(c => c.Name, c => row.GetValueOrDefault(c.Column, ""), StringComparer.OrdinalIgnoreCase))
+                .ToList();
+        }
+        return sheets;
+    }
+
+    private static XDocument? Load(ZipArchive zip, string path)
+    {
+        if (zip.GetEntry(path) is not { } entry)
+            return null;
+        using var stream = entry.Open();
+        return XDocument.Load(stream);
+    }
+
+    // "C12" → "C".
+    private static string Column(string? reference) => new((reference ?? "").TakeWhile(char.IsLetter).ToArray());
+
+    private static string Value(XElement cell, List<string> shared) => (string?)cell.Attribute("t") switch
+    {
+        "s" => int.TryParse(cell.Element(Main + "v")?.Value, out var index) && index >= 0 && index < shared.Count ? shared[index] : "",
+        "inlineStr" => string.Concat(cell.Descendants(Main + "t").Select(t => t.Value)),
+        _ => cell.Element(Main + "v")?.Value ?? "",
+    };
 }

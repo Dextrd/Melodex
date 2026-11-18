@@ -17,6 +17,9 @@ public enum ImportFormat
 
     /// <summary>Google Takeout's YouTube and YouTube Music export: a playlist, or the songs in your library.</summary>
     YouTubeMusic,
+
+    /// <summary>Deezer's copy of your personal data: a playlist, favourite tracks or favourite albums.</summary>
+    Deezer,
 }
 
 /// <summary>What a CSV column holds.</summary>
