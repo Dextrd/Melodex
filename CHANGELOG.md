@@ -4,6 +4,12 @@ What changed in each release of Melodex. Versions follow [semantic versioning](h
 
 ## [Unreleased]
 
+## [1.5.2] - 2026-11-18
+
+Fixes and small additions from using 1.5: **Pause all** and **Cancel all** in Activity, Listen now fetching only the
+songs near the one playing, upgrades that keep to the cutoff and the same recording, and a clearer plugin address.
+The core and Soulseek plugin images change; the database is unchanged.
+
 ### Added
 
 - **Pause all** and **Cancel all** on Activity's Downloads and Tasks, for everything still going; with a filter on,
