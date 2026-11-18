@@ -97,11 +97,16 @@ public sealed class RequestWorker(IServiceScopeFactory scopes, RequestSignal sig
             }
             if (!plan.Fetch)
             {
+                // Only if it's still queued: a cancel made while it was planned would otherwise be saved over, its parts fetched.
+                await using var transaction = await db.Database.BeginTransactionAsync(cts.Token);
                 db.Requests.AddRange(plan.Children);
-                request.Status = RequestStatus.InProgress;
-                request.Detail = $"0 of {plan.Children.Count} in the library";
-                request.UpdatedAt = DateTime.UtcNow;
                 await db.SaveChangesAsync(cts.Token);
+                var detail = $"0 of {plan.Children.Count} in the library";
+                if (await db.Requests.Where(r => r.Id == request.Id && r.Status == RequestStatus.Queued)
+                        .ExecuteUpdateAsync(s => s.SetProperty(r => r.Status, RequestStatus.InProgress).SetProperty(r => r.Detail, detail)
+                            .SetProperty(r => r.UpdatedAt, DateTime.UtcNow), cts.Token) == 0)
+                    return;
+                await transaction.CommitAsync(cts.Token);
                 logger.LogInformation("[{Request}] Split into {Count} parts", request.Title, plan.Children.Count);
                 signal.Wake();
                 return;

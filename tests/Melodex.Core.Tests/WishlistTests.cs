@@ -8,9 +8,6 @@ namespace Melodex.Core.Tests;
 [Collection(RequestCollection.Name)]
 public sealed class WishlistTests(RequestFixture fixture) : IAsyncLifetime
 {
-    // Albums other tests fetch or listen to, so these stay out of their way: these come from the other end of the list.
-    private static readonly string[] Taken = ["Human After All", "Third", "Homework", "Dummy", "Portishead", "Roseland NYC Live", "Magic Doors", "Random Access Memories"];
-
     private MelodexClient Api => fixture.Api;
 
     public async Task InitializeAsync()
@@ -26,7 +23,7 @@ public sealed class WishlistTests(RequestFixture fixture) : IAsyncLifetime
     [TestLibraryFact]
     public async Task Songs_and_albums_go_on_it_once_come_off_it_and_leave_once_the_library_has_them()
     {
-        var albums = fixture.MissingAlbums.Where(a => !Taken.Contains(a.Title) && a.TotalTracks >= 3).Reverse().Take(2).ToList();
+        List<AlbumSummary> albums = [await fixture.TakeMissingAlbumAsync(), await fixture.TakeMissingAlbumAsync()];
         var song = (await Api.GetAlbumAsync(albums[0].Id))!.Tracks.First(t => t.Status == TrackStatus.Missing);
         var album = albums[1];
         try
@@ -40,7 +37,13 @@ public sealed class WishlistTests(RequestFixture fixture) : IAsyncLifetime
             var wished = (await Api.GetWishlistAsync()).Items;
             Assert.Equal([album.Id, song.TrackId], wished.Select(i => i.TargetId));
             Assert.Equal((album.Title, RequestKind.Album), (wished[0].Title, wished[0].Kind));
-            Assert.Equal((albums[0].Id, albums[0].Title), (wished[1].AlbumId!.Value, wished[1].AlbumTitle));
+            // An album it's on, which may be another than the one it was found on: a single can have an album's song.
+            var on = (await Api.GetAlbumAsync(wished[1].AlbumId!.Value))!;
+            var songs = new List<Guid>();
+            foreach (var edition in on.Editions)
+                songs.AddRange((await Api.GetAlbumAsync(on.Album.Id, edition.Id))!.Tracks.Select(t => t.TrackId));
+            Assert.Contains(song.TrackId, songs);
+            Assert.Equal(on.Album.Title, wished[1].AlbumTitle);
             Assert.NotNull(wished[1].CoverUrl);
 
             // Only what the catalogue knows, and only songs and albums.

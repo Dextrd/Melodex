@@ -61,12 +61,18 @@ public sealed class RequestService(MelodexDbContext db, RequestSignal signal, Re
             return await DismissAsync(request, ct);
         if (Finished.Contains(request.Status))
             return false;
-        var ids = await SubtreeAsync(request.Id, ct);
-        await db.Requests.Where(r => ids.Contains(r.Id) && !Finished.Contains(r.Status))
-            .ExecuteUpdateAsync(s => s.SetProperty(r => r.Status, RequestStatus.Cancelled).SetProperty(r => r.Detail, "Cancelled")
-                .SetProperty(r => r.UpdatedAt, DateTime.UtcNow), ct);
-        foreach (var id in ids)
-            cancellations.Cancel(id);
+        // Parts split off while this runs aren't read the first time, so again until there are none: once a part is
+        // cancelled, it can't split any more (RequestWorker splits only what's still queued).
+        var done = new HashSet<Guid>();
+        while ((await SubtreeAsync(request.Id, ct)).Where(id => !done.Contains(id)).ToList() is { Count: > 0 } ids)
+        {
+            await db.Requests.Where(r => ids.Contains(r.Id) && !Finished.Contains(r.Status))
+                .ExecuteUpdateAsync(s => s.SetProperty(r => r.Status, RequestStatus.Cancelled).SetProperty(r => r.Detail, "Cancelled")
+                    .SetProperty(r => r.UpdatedAt, DateTime.UtcNow), ct);
+            foreach (var id in ids)
+                cancellations.Cancel(id);
+            done.UnionWith(ids);
+        }
         await UpdateAncestorsAsync(request.ParentRequestId, ct);
         return true;
     }

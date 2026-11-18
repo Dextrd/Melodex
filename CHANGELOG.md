@@ -4,9 +4,43 @@ What changed in each release of Melodex. Versions follow [semantic versioning](h
 
 ## [Unreleased]
 
+### Added
+
+- **Pause all** and **Cancel all** on Activity's Downloads and Tasks, for everything still going; with a filter on,
+  **Pause these** and **Cancel these** act on what's shown. Cancelling asks first, saying how many (#176).
+
+### Changed
+
+- An upgrade that found nothing better is badged **Unchanged** in yellow, not green, which is kept for **Upgraded**
+  (#172).
+- A song's **Replaced by an upgrade** card has the same icon buttons as Review's, spaced apart and clear of the card's
+  edge (#170).
+- Adding a plugin asks for its **Plugin address**, and says it's the plugin's own container, not the service it uses. Given
+  a web page instead (such as slskd's), or a name nothing answers to, it says so in plain words. A plugin is added even
+  if its settings mark some as required, as they're filled in once it's added (#168).
+- An upgrade only fetches and keeps a copy that reaches the song's cutoff, not just one better than its file, so
+  sources that can only get lossy copies, such as yt-dlp, are passed over when the cutoff is lossless. Activity says
+  why (#146).
+
 ### Fixed
 
 - In Activity, a download that's open as it finishes no longer keeps its last attempt showing **Running** (#171).
+- An owned song's play button lines up with a missing song's listen button, in album pages, search, the library,
+  Listen now and the queue (#179).
+- Playing a song from an album you don't have all of no longer fetches every song of it to listen to at once: only the
+  songs near the one playing are fetched, three ahead and two behind by default (**Settings → Playback**), and the rest
+  as the queue comes to them (#174).
+- An upgrade could replace a live song with the studio take of its title when the catalogue didn't know the live one's
+  length. A copy is now checked against the length of the file it replaces, and the Soulseek plugin prefers files in the
+  album's own folder and passes over studio takes when a live recording is asked for (#177).
+- An album a gap-filling catalogue such as Deezer has showed twice when the artist had two of its title in MusicBrainz,
+  such as Radiohead's The Bends, an album and a single. It's matched to the one of its type, or released within a year of
+  it, and copies already made are merged when Melodex starts (#125).
+- Adding a listen-now song to the library just as it became playable could leave it at **Importing** for good (#169).
+- Cancelling an artist or album just as it was being split into albums or songs could miss some of them, which went on
+  fetching (#169).
+- A playlist import of a song the library has more than once, such as Glory Box on Dummy and on a live album, now
+  always matches the copy that came out first (#169).
 
 ## [1.5.1] - 2026-11-16
 
