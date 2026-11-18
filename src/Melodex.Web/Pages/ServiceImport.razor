@@ -109,7 +109,7 @@ else
 
     private static readonly Dictionary<string, ImportFormat> Services = new(StringComparer.OrdinalIgnoreCase)
     {
-        // Spotify's reader is held back until it's been checked against a real export (#22).
+        ["spotify"] = ImportFormat.Spotify,
         ["youtube-music"] = ImportFormat.YouTubeMusic,
     };
 
@@ -120,7 +120,7 @@ else
     private string Anchor => Service == ImportFormat.Spotify ? "importing-from-spotify" : "importing-from-youtube-music";
 
     /// <summary>The page for importing a service's export.</summary>
-    public static string? Link(ImportFormat service) => Services.FirstOrDefault(s => s.Value == service).Key is { } slug ? $"tools/import/{slug}" : null;
+    public static string Link(ImportFormat service) => $"tools/import/{Services.First(s => s.Value == service).Key}";
 
     private bool _busy, _folderEdited;
     private string? _error;
@@ -192,10 +192,8 @@ else
             var peek = await Api.PeekServiceImportAsync(Streams());
             if (peek.Service != Service)
             {
-                _error = Link(peek.Service) is null
-                    ? $"That's {ServiceNames.Of(peek.Service)}'s, which Melodex doesn't import yet."
-                    : $"That's {ServiceNames.Of(peek.Service)}'s, not {Name}'s.";
-                _otherService = Link(peek.Service) is null ? null : peek.Service;
+                _error = $"That's {ServiceNames.Of(peek.Service)}'s, not {Name}'s.";
+                _otherService = peek.Service;
                 _busy = false;
                 return;
             }

@@ -32,12 +32,15 @@ retriever through your own slskd. The core image changes; the database updates i
   button asks for them later. Songs that couldn't be matched wait in Review, under **Matching** with the files that
   couldn't be, each with the import it came from and the closest song found, to approve or search for; matching one
   puts it in the playlist where it was in the list (#21).
-- **Import from YouTube Music** on the Tools page, from Google Takeout's copy of your YouTube data (no Google account
-  linked): choose your library's songs and your playlists, whose videos Melodex looks up on YouTube by their IDs, check
-  the matches, and apply them. Each becomes a playlist, in a folder of your choice. Each list can be opened to watch its
-  songs matched as it goes: the one being matched opens and comes into view by itself. Tick the songs to import;
-  **Apply Import** stays on the page and shows the missing ones being fetched. Songs to review or that couldn't be
-  matched go to Review. Importing a later Takeout adds only what's new to the playlists made the first time (#25).
+- **Import from Spotify** on the Tools page, from the copy of your data Spotify sends you (no Spotify account linked):
+  choose its playlists, liked songs and saved albums, check the matches, and apply them. Each playlist and your liked
+  songs become playlists, in a folder of your choice, and missing saved albums can be asked for. Each list can be opened
+  to watch its songs matched as it goes: the one being matched opens and comes into view by itself. Tick the songs to
+  import; **Apply Import** stays on the page and shows the missing ones being fetched. Songs to review or that couldn't be
+  matched go to Review. Importing a later export adds only what's new to the playlists made the first
+  time (#22).
+- **Import from YouTube Music** too, from Google Takeout's copy of your YouTube data: your library's songs and your
+  playlists, whose videos Melodex looks up on YouTube by their IDs (#25).
 - **Export** on the Tools page: your playlists as M3U8 playlists, with paths in the music folder or under the folder
   another machine sees it as, or as a CSV of each song's artist, title, album, length, ISRC and MusicBrainz ID, which
   the list import reads back. Several come as a zip. Songs you don't have are left out, or kept by name only. The

@@ -49,6 +49,19 @@ playlist where it was in the list, asked for too if the import asked for the res
 Each import shows in **Activity** as it's matched, and opens from there. The bottom of an import's page deletes it, or
 once it's applied forgets it, leaving its playlist and requests as they are.
 
+## Importing from Spotify
+
+**Import from Spotify** reads the copy of your data Spotify gives you, so your playlists, liked songs and saved albums
+come across. It needs no Spotify account linked to Melodex.
+
+To get the copy, sign in on Spotify's website, open **Account → Privacy settings**, tick **Account data** (the extended
+streaming history isn't needed) and ask for it. Spotify emails a link to a zip, usually within a few days. Choose the zip,
+or the JSON files from it (`YourLibrary.json` and the `Playlist` files).
+
+Melodex lists your **liked songs**, **saved albums** and each **playlist**, with how many songs each has. Followed artists
+aren't imported. Untick any you don't want, and choose the folder the playlists go in (Spotify to start with) and what
+liked songs' playlist is called. Then see [checking and applying](#checking-and-applying-the-lists).
+
 ## Importing from YouTube Music
 
 **Import from YouTube Music** reads your Google Takeout, so your library songs and playlists come across. It needs no
@@ -69,13 +82,14 @@ gone or private is shown as couldn't match.
 
 ## Checking and applying the lists
 
-Choose **Start Import**, and each list is matched as a list import is, by its songs' titles, artists and albums. YouTube
-Music's copy has no lengths or ISRCs, so it's worth checking the matches. The list being matched opens by itself and comes
+Choose **Start Import**, and each list is matched as a list import is, by its songs' titles, artists and albums. Neither
+service's copy has lengths or ISRCs, so it's worth checking the matches. The list being matched opens by itself and comes
 into view, closing the one before unless you opened it yourself or are using it. Untick any song you don't want, or open
 **Check its matches** to choose another song.
 
-Then **Apply Import**: each playlist, and YouTube Music's library songs, becomes a playlist. **Get the missing songs**
-asks for every song marked Missing; missing songs hold their places in the playlists either way. The page stays open, following each list's songs
+Then **Apply Import**: each playlist (and Spotify's liked songs, and YouTube Music's library songs) becomes a playlist,
+and Spotify's saved albums can be asked for. **Get the missing songs and albums** asks for every song marked Missing, and
+the albums; missing songs hold their places in the playlists either way. The page stays open, following each list's songs
 as they're fetched. Songs that couldn't be matched, or are to review, go to Review, as with a list import.
 
 **Importing again updates.** Melodex knows each playlist by its name on the service, and each song by the service's ID
