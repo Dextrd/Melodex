@@ -1344,6 +1344,8 @@ svg.flip { transform: scaleY(-1); }
 /* Settings → Appearance. Each swatch shows its colour's accent in light and dark, half each. */
 .appearance { display: grid; gap: .6rem; padding: 1rem 1.1rem 1.2rem; max-width: 40rem; }
 .appearance .field-label:not(:first-child) { margin-top: .6rem; }
+/* A line saying what a section is sits just under its title, as a choice's hint does. */
+.appearance .field-label + p { margin: -.45rem 0 0; }
 .swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(7.5rem, 1fr)); gap: .5rem; }
 .swatch {
     display: flex; align-items: center; gap: .6rem; padding: .55rem .7rem; font: inherit; color: var(--text); cursor: pointer;
