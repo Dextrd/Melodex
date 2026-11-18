@@ -1044,6 +1044,9 @@ namespace Melodex.Core.Data.Migrations
                     b.Property<double>("QueueOrder")
                         .HasColumnType("REAL");
 
+                    b.Property<bool>("Replace")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("Requester")
                         .IsRequired()
                         .HasColumnType("TEXT");

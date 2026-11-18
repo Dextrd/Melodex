@@ -162,8 +162,17 @@ again after a month. Lyrics move with their song when formatting moves it, and g
 
 ## Removing music
 
-The Library page can remove an artist, album or track. Either the files are deleted (with any folder left holding
-only artwork) and Navidrome is told, or they stay and are hidden, so Melodex stops counting them until they're put
-back on Review.
+The Library page can remove an artist, album or track, and a song's page each of its files (**Remove**, beside the
+file). Either the files are deleted (with any folder left holding only artwork) and Navidrome is told, or they stay and
+are hidden, so Melodex stops counting them until they're put back on Review.
+
+## Replacing a song
+
+A song fetched as the wrong recording, but in a quality good enough that an upgrade won't touch it, can be replaced:
+**Replace**, beside its file on the song's page. Melodex fetches a new file, passing over the one you have (the copy it
+was fetched from, and any byte-for-byte the same), matches it by the catalogue's length rather than the file's, and
+keeps it whatever its quality, as long as the profile allows it. It goes in the old file's place, tagged as it was, so
+the song keeps its place in the library and in every playlist. The old file is held or deleted as upgrades' are, so it
+can be put back from **Review → Upgraded**. It shows on Activity marked **Replace**.
 
 Next: [Users and permissions](users-and-permissions.md).

@@ -438,6 +438,14 @@ public sealed class MelodexClient(HttpClient http)
     }
 
     /// <summary>Asks for upgrades of a song's, album's or artist's files below their cutoff, or the whole library's.</summary>
+    /// <summary>Fetches a new file for a song in place of this one, better or not, passing over the one you have.</summary>
+    public async Task<RequestInfo> ReplaceFileAsync(Guid fileId, CancellationToken ct = default)
+    {
+        using var response = await http.PostAsync($"{Api}/library/files/{fileId}/replace", null, ct);
+        await EnsureAsync(response, ct);
+        return (await response.Content.ReadFromJsonAsync<RequestInfo>(MelodexJson.Options, ct))!;
+    }
+
     public async Task<UpgradeSearch> SearchUpgradesAsync(FormatScope scope, CancellationToken ct = default)
     {
         using var response = await http.PostAsJsonAsync($"{Api}/upgrades/search", scope, MelodexJson.Options, ct);

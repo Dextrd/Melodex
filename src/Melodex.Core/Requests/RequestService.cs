@@ -358,7 +358,8 @@ public sealed class RequestService(MelodexDbContext db, RequestSignal signal, Re
         var parts = r.TargetKind == EntityKind.Track ? null : await PartsAsync(r.Id, ct);
         return new RequestInfo(r.Id, ToKind(r.TargetKind), r.TargetId, r.EditionId, r.Title, (RequestState)(int)r.Status, r.Detail,
             r.ParentRequestId, r.CreatedAt, r.UpdatedAt, parts is { Total: > 0 } ? parts : null, ListenNow: r.Mode == RequestMode.ListenNow,
-            Paused: r.Paused, QueueOrder: r.QueueOrder, Upgrade: r.UpgradesFileId != null, Target: target, Ended: ended);
+            Paused: r.Paused, QueueOrder: r.QueueOrder, Upgrade: r.UpgradesFileId != null && !r.Replace, Target: target, Ended: ended,
+            Replace: r.Replace);
     }
 
     // What each request is for, as the catalogue has it now, in a few queries for them all; missing once that's gone from it.

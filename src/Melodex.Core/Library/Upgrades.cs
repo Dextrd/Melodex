@@ -124,6 +124,37 @@ public sealed class Upgrades(
     }
 
     /// <summary>
+    /// Asks for a new file for a song you have in place of one of its files, better or not, passing over the one you have:
+    /// for a song fetched as the wrong recording. It keeps its place in the library and in playlists. The request going
+    /// for the song already, if there is one; null when the file isn't a matched one.
+    /// </summary>
+    public async Task<Request?> AskToReplaceAsync(Guid fileId, string requester, CancellationToken ct)
+    {
+        if (await db.LibraryFiles.FindAsync([fileId], ct) is not { TrackId: { } trackId } file)
+            return null;
+        if (await db.Requests.FirstOrDefaultAsync(r => r.Mode == RequestMode.Permanent && !RequestService.Finished.Contains(r.Status)
+                                                       && (r.UpgradesFileId == fileId || r.TargetKind == EntityKind.Track && r.TargetId == trackId), ct) is { } going)
+            return going;
+        var title = await db.Tracks.Where(t => t.Id == trackId).Select(t => t.Title + " · " + t.ArtistCredit).FirstOrDefaultAsync(ct);
+        var request = new Request
+        {
+            TargetKind = EntityKind.Track,
+            TargetId = trackId,
+            EditionId = file.EditionId,
+            UpgradesFileId = file.Id,
+            Replace = true,
+            Title = title ?? "A song",
+            Requester = requester,
+            Mode = RequestMode.Permanent,
+        };
+        db.Requests.Add(request);
+        await db.SaveChangesAsync(ct);
+        signal.Wake();
+        logger.LogInformation("Looking for a new file for {Title} in place of {Path}", request.Title, file.Path);
+        return request;
+    }
+
+    /// <summary>
     /// The scheduled look through the whole library, run every minute. While a window is open it keeps as many upgrades
     /// going as fetches run at once, asking for more as they finish, until it's asked for as many as a look may, there
     /// are none left, or the window closes; then those not started yet are cancelled. Returns how many it asked for.

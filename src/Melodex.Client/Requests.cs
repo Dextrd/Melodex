@@ -66,6 +66,7 @@ public sealed record KeepCopy(Guid JobId);
 /// <param name="ListenNow">A track fetched to listen to, not for the library; see <c>/listen</c>.</param>
 /// <param name="Paused">Held back: it won't start until resumed. One paused mid-fetch starts that fetch again.</param>
 /// <param name="QueueOrder">Its place in the queue: lower starts first.</param>
+/// <param name="Replace">A new file for a song you have, asked for from its page, in place of the one you have.</param>
 public sealed record RequestInfo(
     Guid Id,
     RequestKind Kind,
@@ -85,7 +86,8 @@ public sealed record RequestInfo(
     double QueueOrder = 0,
     bool Upgrade = false,
     RequestTarget? Target = null,
-    ListenNowEnd? Ended = null)
+    ListenNowEnd? Ended = null,
+    bool Replace = false)
 {
     /// <summary>Whether it can still change: not in the library, failed, needing review or cancelled.</summary>
     public bool Active => State is not (RequestState.InLibrary or RequestState.NeedsReview or RequestState.Failed or RequestState.Cancelled or RequestState.Playable);

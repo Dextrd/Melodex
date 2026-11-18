@@ -159,7 +159,25 @@ else
         @foreach (var file in track.Files)
         {
             <div class="card track-file">
-                <code>@file.Path</code>
+                <div class="row track-file-head">
+                    <code>@file.Path</code>
+                    <span class="spacer"></span>
+                    @if (Replacing(track) is { } replacing)
+                    {
+                        <a class="muted small" href="activity/downloads?open=@replacing.Id"><span class="spinner"></span> Looking for a new file</a>
+                    }
+                    else
+                    {
+                        <IconButton Icon="retry" Requires="@UserPermissions.Request" Label="Replace" Title="Fetch a new file for this song in its place, better or not, passing over this one: for the wrong recording. It keeps its place in playlists"
+                                    OnClick="() => _replacing = file" />
+                    }
+                    <IconButton Icon="remove" Requires="@UserPermissions.Remove" Label="Remove" Title="Take this file out of your library, deleting it or keeping it"
+                                OnClick="() => _removing = file" />
+                </div>
+                @if (_replaceError is { } error && _replacing is null)
+                {
+                    <p class="error small">@error</p>
+                }
                 @* What the file is, then what its tags say, all as one list. *@
                 <dl class="file-tags">
                     @if (file.Quality is { Codec: not null } quality)
@@ -214,6 +232,30 @@ else
     <AddToPlaylistDialog Name="@adding.Name" Songs="adding.Songs" OnClose="() => _adding = null" />
 }
 
+@if (_replacing is { } replace && _track is not null)
+{
+    <Dialog Title="@($"Replace {_track.Title}?")" OnClose="() => _replacing = null">
+        <p>
+            Melodex fetches a new file for the song, passing over the one you have, and puts it in that file's place, tagged as it
+            was. Use it for a song fetched as the wrong recording: the new one is found by the catalogue's length, and kept
+            whatever its quality, as long as the profile allows it.
+        </p>
+        <p class="muted small">
+            The song keeps its place in your library and in your playlists. The file you have now is held or deleted as upgrades'
+            are, under Settings → Quality, so it can be put back.
+        </p>
+        <div class="toolbar dialog-buttons">
+            <button @onclick="() => _replacing = null">Cancel</button>
+            <button class="primary" disabled="@_busy" @onclick="() => ReplaceAsync(replace)">@if (_busy) { <span class="spinner"></span> }Replace it</button>
+        </div>
+    </Dialog>
+}
+
+@if (_removing is { } remove && _track is not null)
+{
+    <RemoveDialog Kind="LibraryItemKind.File" Id="remove.Id" Name="@_track.Title" OnClose="RemovedAsync" />
+}
+
 @if (_formatting && _track is not null)
 {
     <FormatDialog Scope="new FormatScope(FormatScopeKind.Track, _track.Id)" Name="@_track.Title" OnClose="() => _formatting = false" />
@@ -227,6 +269,42 @@ else
     private bool _notFound;
     private IReadOnlyList<HeldFileInfo> _held = [];
     private bool _formatting;
+    private TrackFile? _replacing, _removing;
+    private bool _busy;
+    private string? _replaceError;
+
+    // A new file being looked for in place of the song's.
+    private RequestInfo? Replacing(TrackDetail track) => Tracker.Requests.FirstOrDefault(r => r.Replace && r.TargetId == track.Id && r.Active);
+
+    private async Task ReplaceAsync(TrackFile file)
+    {
+        _busy = true;
+        _replaceError = null;
+        try
+        {
+            await Api.ReplaceFileAsync(file.Id);
+            await Tracker.RefreshAsync();
+        }
+        catch (Exception e) when (e is HttpRequestException or MelodexApiException)
+        {
+            _replaceError = e.Message;
+        }
+        finally
+        {
+            _busy = false;
+            _replacing = null;
+        }
+    }
+
+    private async Task RemovedAsync(bool removed)
+    {
+        _removing = null;
+        if (removed)
+        {
+            ScanStatus.RaiseLibraryChanged();
+            await LoadAsync();
+        }
+    }
     private bool _choosingCover;
     private (string Name, IReadOnlyList<PlaylistItem> Songs)? _adding;
     // The best any of its files has.
@@ -256,6 +334,7 @@ else
         ScanStatus.LibraryChanged += Reload;
         Tracker.Changed -= Redraw;
         Tracker.Changed += Redraw;
+        _ = Tracker.EnsureLoadedAsync();
         await LoadAsync();
     }
 
