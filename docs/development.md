@@ -13,7 +13,9 @@
 | `src/Melodex.Plugins.FanartTv` | Built-in artwork plugin: artist pictures from fanart.tv, with your own API key |
 | `src/Melodex.Plugins.Lrclib` | Built-in lyrics plugin: synced and plain lyrics from LRCLIB |
 | `src/Melodex.Client` | Typed client and models for the public API |
-| `src/Melodex.Web` | The web app (Blazor WebAssembly), served by the core and talking only to the public API |
+| `src/Melodex.Web` | The web app: its pages, components and scripts, talking only to the public API, shared by the two below |
+| `src/Melodex.Web.Browser` | The web app in the browser (Blazor WebAssembly), served by the core |
+| `src/Melodex.App` | The Melodex app for Android and iOS (.NET MAUI Blazor Hybrid), not in `Melodex.sln`; see below |
 | `tests/Melodex.Core.Tests` | Tests, including the gate test against the test library |
 | `beets-worker` | The import engine: files staged downloads into the library with beets ([docs](import-worker.md)) |
 | `plugins/retriever-ytdlp` | Retrieval plugin: YouTube Music through yt-dlp |
@@ -51,6 +53,37 @@ Schema changes need a migration:
 dotnet tool restore
 dotnet ef migrations add <Name> -p src/Melodex.Core -o Data/Migrations
 ```
+
+## The app for phones
+
+`src/Melodex.App` is the web app (`src/Melodex.Web`) in a .NET MAUI BlazorWebView. It isn't in `Melodex.sln`, so the
+rest builds without the MAUI workloads; open the project on its own. Android builds on Linux, macOS or Windows:
+
+```bash
+dotnet workload install maui-android
+dotnet build src/Melodex.App -t:InstallAndroidDependencies -f net10.0-android -p:AcceptAndroidSDKLicenses=True   # once
+dotnet build src/Melodex.App -f net10.0-android -t:Run   # on a connected phone or a running emulator
+```
+
+iOS needs a Mac with Xcode and `dotnet workload install maui-ios`; the project only targets it there. CI builds both,
+iOS for the simulator only, as it needs no signing.
+
+How it fits together:
+
+- **Signing in** goes through `AppHost`. In a browser it's the session cookie; in the app, `DeviceHost` signs in with
+  `POST /api/v1/auth/devices` and keeps the device's key for that server in secure storage. The app's `HttpClient`
+  sends the key and keeps no cookies.
+- **What the page asks for itself**, covers, songs, bars, events and exports, is on the app's own origin
+  (`https://0.0.0.1/api/...`). `ServerProxy` answers those from the server in use, with the key, passing on `Range`
+  so songs can be played from anywhere. Links to the API's own pages, such as the reference, open in the browser.
+- **Choosing a server** is the app's own page (`Components/Connect.razor`). Changing server reloads the page, so every
+  scoped service starts afresh on the new one.
+- **Local storage** is the web view's, as a browser's would be: view preferences and the theme last used.
+- An app connects only to a server that has `POST /api/v1/auth/devices`, which it checks when connecting.
+
+Release APKs are signed with the key in the repository's `ANDROID_KEYSTORE` secret (base64), with
+`ANDROID_KEYSTORE_PASSWORD` and `ANDROID_KEY_ALIAS`. Without them, each release is signed with a throwaway key, and
+won't install over the last one.
 
 ## Releases
 

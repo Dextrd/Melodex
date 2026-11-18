@@ -1329,6 +1329,14 @@ svg.flip { transform: scaleY(-1); }
 .auth-card .field input { max-width: none; box-sizing: border-box; }
 .auth-card > button.primary { margin-top: .75rem; justify-content: center; }
 .auth-card code { overflow-wrap: anywhere; }
+/* The Melodex app's servers to choose from (Melodex.App's Connect). */
+.server-list { display: flex; flex-direction: column; gap: .4rem; margin: .5rem 0; }
+.server-row { display: flex; align-items: center; gap: .5rem; }
+.server-choice {
+    flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: .1rem; text-align: left;
+    padding: .6rem .75rem;
+}
+.server-choice > * { max-width: 100%; }
 .auth-check { display: flex; gap: .6rem; align-items: flex-start; margin: .6rem 0; cursor: pointer; }
 .auth-check input { margin-top: .25rem; }
 .auth-check > span { display: flex; flex-direction: column; gap: .2rem; }

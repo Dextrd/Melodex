@@ -27,6 +27,39 @@ jobs:
           dotnet tool restore
           dotnet ef migrations has-pending-model-changes -p src/Melodex.Core --no-build --configuration Release
 
+  # The Melodex app for phones (src/Melodex.App), which isn't in Melodex.sln: it needs the MAUI workloads.
+  app-android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - uses: actions/setup-java@v4
+        with:
+          distribution: microsoft
+          java-version: 21
+      - run: dotnet workload install maui-android
+      - run: dotnet publish src/Melodex.App -f net10.0-android -c Release -o app
+      - uses: actions/upload-artifact@v4
+        with:
+          name: melodex-android
+          path: app/*-Signed.apk
+
+  # Built for the simulator, which needs no signing: this checks the iOS app compiles, not that it runs.
+  app-ios:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+      - run: dotnet workload install maui-ios
+      - run: dotnet build src/Melodex.App -f net10.0-ios -c Release -p:RuntimeIdentifier=iossimulator-arm64
+
   docker:
     runs-on: ubuntu-latest
     # Every plugin, so each image is built and started.

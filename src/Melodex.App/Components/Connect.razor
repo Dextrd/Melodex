@@ -1,0 +1,172 @@
+@inject Servers Servers
+@inject Discovery Discovery
+@inject NavigationManager Nav
+@implements IDisposable
+
+<PageTitle>Connect · Melodex</PageTitle>
+
+@*
+    Choosing the Melodex server to use: one the app knows, one at an address typed in, such as one reached through
+    Tailscale, or one found on this network. Each keeps its own sign-in.
+*@
+<div class="auth-page">
+    <div class="auth-card">
+        <div class="brand"><Logo />Melodex</div>
+        <h1>Connect to Melodex</h1>
+
+        @if (Servers.All.Count > 0)
+        {
+            <div class="server-list">
+                @foreach (var server in Servers.All)
+                {
+                    <div class="server-row" @key="server.Id">
+                        <button type="button" class="server-choice" @onclick="() => Use(server)">
+                            <strong class="ellipsis">@server.Name</strong>
+                            <span class="muted small ellipsis">
+                                @(Servers.SignedIn(server) && server.Username is { } name ? $"Signed in as {name}" : "Not signed in")
+                            </span>
+                        </button>
+                        <button type="button" class="link small" title="@($"Forget {server.Name}")" @onclick="() => Servers.Remove(server)">Forget</button>
+                    </div>
+                }
+            </div>
+            <h2 class="section">Another server</h2>
+        }
+
+        <form @onsubmit="AddAsync" @onsubmit:preventDefault="true">
+            <label class="field">
+                <span class="field-label">Address</span>
+                <input type="url" inputmode="url" autocapitalize="off" autocorrect="off" placeholder="192.168.0.10:8787" @bind="_address" @bind:event="oninput" />
+                <span class="muted small">Where you open Melodex in a browser. Away from home, its address through something like Tailscale.</span>
+            </label>
+            @if (_error is not null) { <p class="error small">@_error</p> }
+            <div class="toolbar">
+                <button class="primary" type="submit" disabled="@(_busy || string.IsNullOrWhiteSpace(_address))">
+                    @if (_busy) { <span class="spinner"></span> }Connect
+                </button>
+                <button type="button" disabled="@_searching" @onclick="SearchAsync">
+                    @if (_searching) { <span class="spinner"></span> }Look on this network
+                </button>
+            </div>
+        </form>
+
+        @if (_found is not null)
+        {
+            @if (_found.Count == 0 && !_searching)
+            {
+                <p class="muted small">No Melodex answered on this network. Type its address instead.</p>
+            }
+            <div class="server-list">
+                @foreach (var found in _found)
+                {
+                    <div class="server-row" @key="found.Address">
+                        <button type="button" class="server-choice" @onclick="() => AddAsync(found.Address)">
+                            <strong class="ellipsis">@NameOf(found.Address)</strong>
+                            <span class="muted small">Melodex @found.Version</span>
+                        </button>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private const string NotThere = "No Melodex answers there. Check the address, and that this device can reach it.";
+
+    private readonly CancellationTokenSource _leaving = new();
+    private string _address = "";
+    private bool _busy;
+    private bool _searching;
+    private string? _error;
+    private List<FoundServer>? _found;
+
+    private void Use(SavedServer server)
+    {
+        Servers.Use(server);
+        // A new page, so everything starts afresh on this server.
+        Nav.NavigateTo("", forceLoad: true);
+    }
+
+    private async Task AddAsync()
+    {
+        if (Address(_address) is { } address)
+            await AddAsync(address);
+        else
+            _error = "That isn't an address.";
+    }
+
+    private async Task AddAsync(Uri address)
+    {
+        _busy = true;
+        _error = null;
+        try
+        {
+            if (Servers.All.FirstOrDefault(s => s.Address == address) is { } known)
+            {
+                Use(known);
+                return;
+            }
+            using var http = new HttpClient(new HttpClientHandler { UseCookies = false }) { Timeout = TimeSpan.FromSeconds(15) };
+            if (await Discovery.ProbeAsync(address, _leaving.Token) is null)
+            {
+                _error = NotThere;
+                return;
+            }
+            // Older servers can't sign in a device: asked with nothing, a new one says what's missing.
+            using var probe = await http.PostAsync(new Uri(address, "api/v1/auth/devices"), JsonContent.Create(new { }), _leaving.Token);
+            if (probe.StatusCode is System.Net.HttpStatusCode.NotFound or System.Net.HttpStatusCode.MethodNotAllowed)
+            {
+                _error = "That Melodex is older than the app. Update it, then connect again.";
+                return;
+            }
+            Use(new SavedServer(Guid.CreateVersion7(), NameOf(address), address));
+        }
+        catch (Exception e) when (e is HttpRequestException or TaskCanceledException)
+        {
+            _error = NotThere;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task SearchAsync()
+    {
+        _searching = true;
+        _found = [];
+        try
+        {
+            await foreach (var found in Discovery.SearchAsync(_leaving.Token))
+            {
+                if (_found.All(f => f.Address != found.Address))
+                    _found.Add(found);
+                StateHasChanged();
+            }
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        _searching = false;
+    }
+
+    /// <summary>What was typed, as the server's address: http unless it says otherwise, and always ending in a slash.</summary>
+    private static Uri? Address(string typed)
+    {
+        typed = typed.Trim();
+        if (!typed.Contains("://"))
+            typed = "http://" + typed;
+        if (!typed.EndsWith('/'))
+            typed += "/";
+        return Uri.TryCreate(typed, UriKind.Absolute, out var uri) && uri.Scheme is "http" or "https" && uri.Host.Length > 0 ? uri : null;
+    }
+
+    private static string NameOf(Uri address) => address.IsDefaultPort ? address.Host : $"{address.Host}:{address.Port}";
+
+    public void Dispose()
+    {
+        _leaving.Cancel();
+        _leaving.Dispose();
+    }
+}
