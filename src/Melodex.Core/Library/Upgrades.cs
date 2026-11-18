@@ -191,6 +191,9 @@ public sealed class Upgrades(
         }).ToList();
     }
 
+    // How long the media server has to say which version it is.
+    private static readonly TimeSpan ServerWait = TimeSpan.FromSeconds(5);
+
     /// <summary>
     /// Why an upgrade may lose a song's stars, ratings, play counts and playlists in the media server, or null when it
     /// keeps them: Navidrome 0.55 and later gives a song the same ID when its file is replaced by one tagged the same.
@@ -203,10 +206,13 @@ public sealed class Upgrades(
         ServerIdentity? server = null;
         try
         {
+            // Not long: the Quality page's upgrades wait for it.
+            using var quick = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            quick.CancelAfter(ServerWait);
             if (active.Connector is IServerIdentity identity)
-                server = await identity.GetServerAsync(ct);
+                server = await identity.GetServerAsync(quick.Token);
         }
-        catch (Exception e) when (e is not OperationCanceledException)
+        catch (Exception e) when (e is not OperationCanceledException || !ct.IsCancellationRequested)
         {
             logger.LogDebug("Couldn't ask {Server} what it is: {Reason}", active.Instance.Name, e.Message);
         }

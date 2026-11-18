@@ -1042,6 +1042,14 @@ td.actions > :is(.icon-button, .queue-menu, .song-menu) + .badge, td.actions > .
     background: linear-gradient(100deg, var(--bg) 30%, var(--border) 50%, var(--bg) 70%) 0 0 / 300% 100%;
     animation: shimmer 1.4s linear infinite;
 }
+/* Something still loading on a page that's otherwise there: lines shimmering where it will be. */
+.loading-card { display: flex; flex-direction: column; gap: .7rem; }
+.shimmer-line {
+    display: block; height: .9rem; border-radius: 4px;
+    background: linear-gradient(100deg, var(--bg) 30%, var(--border) 50%, var(--bg) 70%) 0 0 / 300% 100%;
+    animation: shimmer 1.4s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) { .shimmer-line { animation: none; } }
 @keyframes shimmer { from { background-position: 100% 0; } to { background-position: 0 0; } }
 @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
 /* Something on its way: a blank where it'll go, shimmering like a cover does. */
