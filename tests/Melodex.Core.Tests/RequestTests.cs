@@ -788,6 +788,56 @@ public sealed class RequestTests(RequestFixture fixture, ITestOutputHelper outpu
     }
 
     [TestLibraryFact]
+    public async Task A_look_through_the_library_keeps_a_few_upgrades_going_until_its_stopped()
+    {
+        var saved = (await Api.GetUpgradesAsync()).Settings;
+        var started = DateTime.UtcNow;
+        try
+        {
+            await Api.SaveUpgradeSettingsAsync(saved with { Scheduled = false, AtATime = 2 });
+            var found = await Api.SearchUpgradesAsync(new FormatScope(FormatScopeKind.Library));
+            Assert.Equal(2, found.Queued);
+            Assert.True(found.Upgradable > 3, $"{found.Upgradable} upgradable");
+            var run = await Api.GetUpgradeRunAsync();
+            Assert.NotNull(run);
+            Assert.True(run.ByHand);
+            Assert.Null(run.Until);
+
+            // With nothing to fetch from, each fails at once, and the next is asked for in its place: never more than two
+            // at a time, and no limit to how many.
+            var deadline = DateTime.UtcNow + TimeSpan.FromMinutes(1);
+            while (run is { Asked: <= 3 } && DateTime.UtcNow < deadline)
+            {
+                Assert.True(run.Going <= 2, $"{run.Going} going");
+                await Task.Delay(250);
+                run = await Api.GetUpgradeRunAsync();
+            }
+            Assert.True(run?.Asked > 3, $"Asked for {run?.Asked}");
+
+            // Stopped, it asks for no more, and those not started are cancelled.
+            Assert.True(await Api.StopUpgradesAsync());
+            Assert.Null(await Api.GetUpgradeRunAsync());
+            Assert.False(await Api.StopUpgradesAsync());
+            using var scope = fixture.Factory.Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<MelodexDbContext>();
+            Assert.False(await db.Requests.AnyAsync(r => r.UpgradesFileId != null && r.CreatedAt >= started && r.Status == Melodex.Core.Data.RequestStatus.Queued));
+            var asked = await db.Requests.CountAsync(r => r.UpgradesFileId != null && r.CreatedAt >= started);
+            await Task.Delay(TimeSpan.FromSeconds(6));
+            Assert.Equal(asked, await db.Requests.CountAsync(r => r.UpgradesFileId != null && r.CreatedAt >= started));
+        }
+        finally
+        {
+            await Api.StopUpgradesAsync();
+            await Api.SaveUpgradeSettingsAsync(saved);
+            using var scope = fixture.Factory.Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<MelodexDbContext>();
+            await fixture.SettleRequestsAsync();
+            db.Requests.RemoveRange(await db.Requests.Where(r => r.UpgradesFileId != null && r.CreatedAt >= started).ToListAsync());
+            await db.SaveChangesAsync();
+        }
+    }
+
+    [TestLibraryFact]
     public async Task An_owned_mp3_is_upgraded_in_its_place_its_old_file_held_and_put_back()
     {
         await fixture.AddSourceAsync(new FakeSource("better") { Candidates = 1, BitrateKbps = null, FileName = "better.wav" });

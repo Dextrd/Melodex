@@ -33,13 +33,18 @@ public sealed record UpgradeSettings
     /// <summary>The time zone the days and times are in, as the browser that saved them names it (IANA); UTC if it's unknown.</summary>
     public string TimeZone { get; init; } = "UTC";
 
+    /// <summary>The most <see cref="AtATime"/> may be.</summary>
+    public const int MostAtATime = 20;
+
     /// <summary>
-    /// The most upgrades one look asks for, from 1 to 500, longest unlooked-for first; null for as many as there are
-    /// time for in the window. A look through the whole library by hand asks for this many too, or 500 at most.
+    /// How many upgrades a look through the whole library keeps going, from 1 to 20: as each finishes, the next is asked
+    /// for in its place, until every song below its cutoff has been tried or the window closes.
     /// </summary>
-    // Written even when null, which would otherwise read back as the default.
-    [JsonIgnore(Condition = JsonIgnoreCondition.Never)]
-    public int? PerRun { get; init; } = 25;
+    public int AtATime { get; init; } = 5;
+
+    /// <summary>No longer used: a look carries on until everything's been tried. Kept so older settings still read.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? PerRun { get; init; }
 
     public OldFiles OldFiles { get; init; } = OldFiles.Hold;
 
@@ -50,11 +55,20 @@ public sealed record UpgradeSettings
 /// <summary>Upgrades' settings and where they stand.</summary>
 /// <param name="Warning">Why an upgrade may lose stars, plays and playlists in the connected media server; null when it keeps them.</param>
 /// <param name="NextRun">When the scheduled look through the library next starts, while it's on.</param>
-/// <param name="Running">Whether it's looking now, in its window.</param>
+/// <param name="Running">Whether a look through the library is going now.</param>
+/// <param name="Run">The look that's going, if one is.</param>
 /// <param name="Upgradable">Matched files below their cutoff.</param>
 /// <param name="Held">Files replaced by better copies that can still be put back, newest first.</param>
 public sealed record UpgradeStatus(UpgradeSettings Settings, string? Warning, DateTime? NextRun, int Upgradable, IReadOnlyList<HeldFileInfo> Held,
-    bool Running = false);
+    bool Running = false, UpgradeRunInfo? Run = null);
+
+/// <summary>A look through the whole library for upgrades that's going.</summary>
+/// <param name="ByHand">Started with Upgrade now, rather than by the schedule.</param>
+/// <param name="Requester">Who its upgrades are asked for by, as Activity shows them.</param>
+/// <param name="Asked">How many upgrades it's asked for so far.</param>
+/// <param name="Going">How many upgrades are going now, of any look.</param>
+/// <param name="Until">When the window it's in closes and it stops, if it's in one.</param>
+public sealed record UpgradeRunInfo(bool ByHand, string Requester, DateTime StartedAt, int Asked, int Going, DateTime? Until);
 
 /// <summary>A file an upgrade replaced, held outside the music folder until it's deleted.</summary>
 /// <param name="Path">Where it was, relative to the music folder.</param>

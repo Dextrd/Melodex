@@ -1815,3 +1815,5 @@ a.button.primary:hover { filter: brightness(1.1); }
 
 /* Use the default, under the qualities it puts back. */
 .toolbar.quality-reset { margin-top: .6rem; }
+.notice.upgrade-run { display: flex; align-items: center; gap: .6rem; margin: .5rem 0 1rem; }
+.notice.upgrade-run > span:nth-child(2) { flex: 1; }
