@@ -16,6 +16,7 @@ public static class MauiProgram
         builder.Services.AddSingleton<Servers>();
         builder.Services.AddSingleton<ServerProxy>();
         builder.Services.AddSingleton<Discovery>();
+        builder.Services.AddSingleton<MainPage>();
         builder.Services.AddMelodexWeb();
         builder.Services.AddScoped<AppHost, DeviceHost>();
         // The API, on the server chosen: a page load starts a new scope, so choosing another one reloads the page.

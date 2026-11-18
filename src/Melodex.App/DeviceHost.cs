@@ -8,7 +8,7 @@ namespace Melodex.App;
 /// How the web app works in the Melodex app: signing in makes a key for the device, kept for the server in use, and
 /// files are saved through the device's share sheet.
 /// </summary>
-public sealed class DeviceHost(MelodexClient api, Servers servers, NavigationManager nav, HttpClient http) : AppHost(api)
+public sealed class DeviceHost(MelodexClient api, Servers servers, NavigationManager nav, HttpClient http, MainPage page) : AppHost(api, nav)
 {
     private readonly MelodexClient _api = api;
 
@@ -41,10 +41,13 @@ public sealed class DeviceHost(MelodexClient api, Servers servers, NavigationMan
         await servers.SetKeyAsync(null);
     }
 
+    // A new web view rather than a new page, which the web view wouldn't start the app on again.
+    public override void Restart() => MainThread.BeginInvokeOnMainThread(page.Restart);
+
     public override void ChangeServer()
     {
         servers.Leave();
-        nav.NavigateTo("", forceLoad: true);
+        Restart();
     }
 
     public override async Task SaveAsync(string url)

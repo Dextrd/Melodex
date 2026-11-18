@@ -1,4 +1,5 @@
 using Melodex.Client;
+using Microsoft.AspNetCore.Components;
 
 namespace Melodex.Web;
 
@@ -6,7 +7,7 @@ namespace Melodex.Web;
 /// What the app does its own way, depending on where it runs. This is how it works in a browser, on the server's own
 /// page; the Melodex app for phones (Melodex.App) has its own, which signs in with a key for the device.
 /// </summary>
-public class AppHost(MelodexClient api)
+public class AppHost(MelodexClient api, NavigationManager nav)
 {
     /// <summary>The Melodex app on a device, rather than a browser.</summary>
     public virtual bool OnDevice => false;
@@ -19,6 +20,9 @@ public class AppHost(MelodexClient api)
     public virtual Task SignInAsync(SignIn signIn) => api.SignInAsync(signIn);
 
     public virtual Task SignOutAsync() => api.SignOutAsync();
+
+    /// <summary>Starts the app afresh, as on a new page: after a factory reset, or on another server.</summary>
+    public virtual void Restart() => nav.NavigateTo("", forceLoad: true);
 
     /// <summary>Back to the list of servers, to connect to another. Only on a device.</summary>
     public virtual void ChangeServer()

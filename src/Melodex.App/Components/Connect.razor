@@ -1,6 +1,6 @@
 @inject Servers Servers
 @inject Discovery Discovery
-@inject NavigationManager Nav
+@inject AppHost Host
 @implements IDisposable
 
 <PageTitle>Connect · Melodex</PageTitle>
@@ -36,7 +36,7 @@
         <form @onsubmit="AddAsync" @onsubmit:preventDefault="true">
             <label class="field">
                 <span class="field-label">Address</span>
-                <input type="url" inputmode="url" autocapitalize="off" autocorrect="off" placeholder="192.168.0.10:8787" @bind="_address" @bind:event="oninput" />
+                <input type="text" inputmode="url" autocapitalize="off" autocorrect="off" placeholder="192.168.0.10:8787" @bind="_address" @bind:event="oninput" />
                 <span class="muted small">Where you open Melodex in a browser. Away from home, its address through something like Tailscale.</span>
             </label>
             @if (_error is not null) { <p class="error small">@_error</p> }
@@ -84,8 +84,8 @@
     private void Use(SavedServer server)
     {
         Servers.Use(server);
-        // A new page, so everything starts afresh on this server.
-        Nav.NavigateTo("", forceLoad: true);
+        // Afresh, so everything is of this server.
+        Host.Restart();
     }
 
     private async Task AddAsync()
@@ -113,9 +113,10 @@
                 _error = NotThere;
                 return;
             }
-            // Older servers can't sign in a device: asked with nothing, a new one says what's missing.
+            // Older servers can't sign in a device: asked with nothing, a new one says what's missing, where an older one
+            // asks to be signed in first or doesn't know the address.
             using var probe = await http.PostAsync(new Uri(address, "api/v1/auth/devices"), JsonContent.Create(new { }), _leaving.Token);
-            if (probe.StatusCode is System.Net.HttpStatusCode.NotFound or System.Net.HttpStatusCode.MethodNotAllowed)
+            if (probe.StatusCode != System.Net.HttpStatusCode.BadRequest)
             {
                 _error = "That Melodex is older than the app. Update it, then connect again.";
                 return;

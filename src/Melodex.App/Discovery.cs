@@ -22,7 +22,9 @@ public sealed class Discovery
     private static readonly TimeSpan Patience = TimeSpan.FromSeconds(1);
     private const int AtOnce = 96;
 
-    private readonly HttpClient _http = new(new HttpClientHandler { UseCookies = false }) { Timeout = Patience };
+    // .NET's own sockets, which give up on an address that never answers when told to: Android's own connections don't,
+    // and hundreds of them waiting hold up everything else the app asks for.
+    private readonly HttpClient _http = new(new SocketsHttpHandler { UseCookies = false, ConnectTimeout = Patience }) { Timeout = Patience };
 
     public async IAsyncEnumerable<FoundServer> SearchAsync([EnumeratorCancellation] CancellationToken ct)
     {

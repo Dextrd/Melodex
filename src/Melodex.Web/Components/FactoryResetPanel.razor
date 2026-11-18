@@ -1,6 +1,6 @@
 @inject MelodexClient Api
 @inject AuthState Auth
-@inject NavigationManager Nav
+@inject AppHost Host
 
 @*
     The admin's way to start Melodex afresh: everything but the music folder goes, and setup begins again. Typing
@@ -104,7 +104,7 @@
             {
                 if (!(await Api.GetAuthStatusAsync()).SetUp)
                 {
-                    Nav.NavigateTo("", forceLoad: true);
+                    Host.Restart();
                     return;
                 }
             }

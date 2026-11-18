@@ -21,14 +21,14 @@
         <a href="." class="reload">Reload</a>
         <span class="dismiss">✕</span>
     </div>
-    <!-- As the browser's page (Melodex.Web.Browser), with the web view's Blazor. -->
+    <!-- As the browser's page (Melodex.Web.Browser), with the web view's Blazor, which the web view starts itself once it can talk to the app. -->
     <script src="js/cover.js"></script>
     <script src="js/scroll.js"></script>
     <script src="js/topbar.js"></script>
     <script src="js/ticker.js"></script>
     <script src="js/songmenu.js"></script>
     <script src="js/attempts.js"></script>
-    <script src="_framework/blazor.webview.js"></script>
+    <script src="_framework/blazor.webview.js" autostart="false"></script>
 </body>
 
 </html>
