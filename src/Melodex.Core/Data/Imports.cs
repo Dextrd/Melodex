@@ -17,6 +17,9 @@ public enum ImportSource
 
     /// <summary>A playlist or library songs from Google Takeout's YouTube Music export.</summary>
     YouTubeMusic,
+
+    /// <summary>A playlist, favourite tracks or favourite albums from Deezer's copy of your personal data.</summary>
+    Deezer,
 }
 
 /// <summary>How far an import has got.</summary>

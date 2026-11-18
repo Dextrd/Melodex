@@ -265,6 +265,21 @@ public sealed class ImportTests : IDisposable
         Assert.Equal([("Harder, Better, Faster, Stronger", "youtube:vid2"), ("", "youtube:vid9")], export.Lists[1].Items.Select(i => (i.Song.Title, i.Id)));
     }
 
+    [Fact]
+    public void A_deezer_export_gives_its_favourites_and_playlists_and_leaves_the_rest_unread()
+    {
+        var export = ServiceExports.Read([("deezer-data_1.xlsx", DeezerXlsx(more: false, isrcs: true))])!;
+        Assert.Equal(ImportFormat.Deezer, export.Service);
+        Assert.Equal([("liked", ServiceListKind.Liked, 2), ("albums", ServiceListKind.Albums, 1), ("playlist:Evening", ServiceListKind.Playlist, 2),
+            ("playlist:Evening (2)", ServiceListKind.Playlist, 1)], export.Lists.Select(l => (l.Key, l.Kind, l.Items.Count)));
+        Assert.Equal(new ImportSong("Glory Box", "Portishead", "Dummy", null, "GBUM70500141"), export.Lists[0].Items[0].Song);
+        Assert.Equal("deezer:track:3135556", export.Lists[0].Items[0].Id);
+        Assert.Equal((new ImportSong("Discovery", "Daft Punk", null, null), "deezer:album:302127"), (export.Lists[1].Items[0].Song, export.Lists[1].Items[0].Id));
+        Assert.Equal(["Roads", "Glory Box"], export.Lists[2].Items.Select(i => i.Song.Title));
+        // The account's sheet isn't read: nothing of it is in what's imported.
+        Assert.DoesNotContain(export.Lists.SelectMany(l => l.Items), i => i.Song.Title.Contains("someone@example.com") || i.Song.Artist == "Paris");
+    }
+
     [Theory]
     [InlineData("Glory Box", "Portishead - Topic", "Glory Box", "Portishead")]
     [InlineData("Daft Punk - One More Time (Official Video)", "Daft Punk", "One More Time", "Daft Punk")]
@@ -310,6 +325,86 @@ public sealed class ImportTests : IDisposable
         await _api.ApplyImportBatchAsync(second.Id, new ApplyImportBatch(RequestMissing: false));
         Assert.Equal("One More Time", (await _api.GetPlaylistAsync(trip.Id))!.Songs[^1].Title);
         Assert.Equal(playlists.Count, (await _api.ListPlaylistsAsync()).Count);
+    }
+
+    [TestLibraryFact]
+    public async Task A_deezer_export_makes_its_playlists_and_importing_it_again_adds_what_is_new()
+    {
+        await ScanAsync();
+        var file = () => ("deezer-data_1.xlsx", (Stream)new MemoryStream(DeezerXlsx(more: false, isrcs: false)));
+        var peek = await _api.PeekServiceImportAsync([file()]);
+        Assert.Equal(ImportFormat.Deezer, peek.Service);
+        Assert.Equal(["liked", "albums", "playlist:Evening", "playlist:Evening (2)"], peek.Lists.Select(l => l.Key));
+
+        var batch = await _api.CreateServiceImportAsync([file()], new CreateServiceImport(["liked", "playlist:Evening"], "Deezer/", "Favourites"));
+        foreach (var import in batch.Imports)
+            await MatchedAsync(import.Id);
+        await _api.ApplyImportBatchAsync(batch.Id, new ApplyImportBatch(RequestMissing: false));
+        var evening = (await _api.ListPlaylistsAsync()).Single(p => p.Name == "Deezer/Evening");
+        Assert.Equal(["Roads", "Glory Box"], (await _api.GetPlaylistAsync(evening.Id))!.Songs.Select(s => s.Title));
+        Assert.Contains(await _api.ListPlaylistsAsync(), p => p.Name == "Deezer/Favourites" && p.Count == 2);
+
+        // A later copy, with a song more on the playlist: only it's new, and it goes on the end.
+        var again = (await _api.PeekServiceImportAsync([("deezer-data_2.xlsx", new MemoryStream(DeezerXlsx(more: true, isrcs: false)))]))
+            .Lists.Single(l => l.Key == "playlist:Evening");
+        Assert.Equal((3, 1, evening.Id), (again.Count, again.New, again.UpdatesPlaylistId));
+    }
+
+    /// <summary>
+    /// A spreadsheet laid out as Deezer's copy of your data is: a sheet for each kind of data, its first row the columns'
+    /// names, its text mostly in shared strings. Two playlists share a name; the account's sheet has things that mustn't be read.
+    /// </summary>
+    private static byte[] DeezerXlsx(bool more, bool isrcs)
+    {
+        string? Isrc(string isrc) => isrcs ? isrc : null;
+        var sheets = new (string Name, string?[][] Rows)[]
+        {
+            ("1_creationData", [["Email", "City"], ["someone@example.com", "Paris"]]),
+            ("4_favoriteArtist", [["Artist Name", "Link"], ["Portishead", "www.deezer.com/artist/1"]]),
+            ("5_favoriteAlbum", [["Album Title", "Artists", "Link"], ["Discovery", "Daft Punk", "www.deezer.com/album/302127"]]),
+            ("8_favoriteSong", [["Song Title", "Artists", "Album Title", "ISRC", "Link"],
+                ["Glory Box", "Portishead", "Dummy", Isrc("GBUM70500141"), "www.deezer.com/track/3135556"],
+                ["Roads", "Portishead", "Dummy", Isrc("GBUM70500137"), "www.deezer.com/track/3135553"]]),
+            ("11_playlistCreated", [["Playlist Title", "Playlist Link", "Status", "Song Title", "Artists", "Album Title", "ISRC", "Track Link"],
+                ["Evening", "www.deezer.com/playlist/1", "Public", "Roads", "Portishead", "Dummy", Isrc("GBUM70500137"), "www.deezer.com/track/3135553"],
+                ["Evening", "www.deezer.com/playlist/2", "Private", "Glory Box", "Portishead", "Dummy", null, "www.deezer.com/track/3135556"],
+                ["Evening", "www.deezer.com/playlist/1", "Public", "Glory Box", "Portishead", "Dummy", Isrc("GBUM70500141"), "www.deezer.com/track/3135556"],
+                .. more ? [new[] { "Evening", "www.deezer.com/playlist/1", "Public", "Digital Love", "Daft Punk", "Discovery", null, "www.deezer.com/track/3135"}] : Array.Empty<string?[]>()]),
+        };
+        var shared = new List<string>();
+        string Cell(string column, string? text, int row)
+        {
+            if (text is null)
+                return "";
+            // Some as inline strings, as a spreadsheet may have.
+            if (row % 2 == 0)
+                return $"<c r=\"{column}{row}\" t=\"inlineStr\"><is><t>{System.Security.SecurityElement.Escape(text)}</t></is></c>";
+            shared.Add(text);
+            return $"<c r=\"{column}{row}\" t=\"s\"><v>{shared.Count - 1}</v></c>";
+        }
+        using var bytes = new MemoryStream();
+        using (var zip = new System.IO.Compression.ZipArchive(bytes, System.IO.Compression.ZipArchiveMode.Create, leaveOpen: true))
+        {
+            void Write(string name, string text)
+            {
+                using var writer = new StreamWriter(zip.CreateEntry(name).Open());
+                writer.Write(text);
+            }
+            const string main = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+            const string rel = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+            Write("xl/workbook.xml", $"<workbook xmlns=\"{main}\" xmlns:r=\"{rel}\"><sheets>"
+                + string.Concat(sheets.Select((sh, i) => $"<sheet name=\"{sh.Name}\" sheetId=\"{i + 1}\" r:id=\"rId{i + 1}\"/>")) + "</sheets></workbook>");
+            Write("xl/_rels/workbook.xml.rels", "<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">"
+                + string.Concat(sheets.Select((_, i) => $"<Relationship Id=\"rId{i + 1}\" Type=\"{rel}/worksheet\" Target=\"/xl/worksheets/sheet{i + 1}.xml\"/>"))
+                + "</Relationships>");
+            for (var i = 0; i < sheets.Length; i++)
+                Write($"xl/worksheets/sheet{i + 1}.xml", $"<worksheet xmlns=\"{main}\"><sheetData>"
+                    + string.Concat(sheets[i].Rows.Select((row, r) => $"<row r=\"{r + 1}\">"
+                        + string.Concat(row.Select((text, c) => Cell(((char)('A' + c)).ToString(), text, r + 1))) + "</row>"))
+                    + "</sheetData></worksheet>");
+            Write("xl/sharedStrings.xml", $"<sst xmlns=\"{main}\">" + string.Concat(shared.Select(t => $"<si><t>{System.Security.SecurityElement.Escape(t)}</t></si>")) + "</sst>");
+        }
+        return bytes.ToArray();
     }
 
     // ---- Exporting ----

@@ -67,10 +67,26 @@ YouTube's playlists hold only each video's ID: Melodex asks YouTube for each one
 (a song from YouTube Music's own catalogue has an "Artist - Topic" channel, which names its artist), and a video that's
 gone or private is shown as couldn't match.
 
+## Importing from Deezer
+
+**Import from Deezer** reads the copy of your personal data Deezer gives you, so your playlists, favourite tracks and
+favourite albums come across. It needs no Deezer account linked to Melodex.
+
+To get the copy, on Deezer's website open **Account settings → Privacy settings** and, under **My personal data**, ask
+for it. An email brings a link to a spreadsheet (`deezer-data_….xlsx`), usually within a day. Choose it as it is.
+
+The spreadsheet has a sheet for each kind of data Deezer keeps, your account's details and listening among them.
+Melodex opens only three: your **favourite tracks**, which become a playlist (call it what you like), your **favourite
+albums**, which can be asked for, and **each playlist you made**. The rest is left unread. Favourite artists are left
+out too: they're artists you follow, not music to fetch.
+
+Deezer's copy names each song's ISRC, so its songs match surely, by the recording itself.
+
 ## Checking and applying the lists
 
-Choose **Start Import**, and each list is matched as a list import is, by its songs' titles, artists and albums. YouTube
-Music's copy has no lengths or ISRCs, so it's worth checking the matches. The list being matched opens by itself and comes
+Choose **Start Import**, and each list is matched as a list import is, by its songs' ISRCs where the copy has them, and
+otherwise their titles, artists and albums. YouTube Music's copy has no lengths or ISRCs, so it's worth checking the
+matches. The list being matched opens by itself and comes
 into view, closing the one before unless you opened it yourself or are using it. Untick any song you don't want, or open
 **Check its matches** to choose another song.
 
