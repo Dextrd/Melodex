@@ -138,8 +138,7 @@
                                 </td>
                                 <td class="num hide-narrow muted">@Format.Duration(track.DurationSeconds)</td>
                                 <td class="num actions">
-                                    <IconButton Icon="play" Requires="@UserPermissions.Listen" Title="Play the tracks listed from here" OnClick="() => PlayFromAsync(track)" />
-                                    <ItemMenu Entry="PlayerEntry.Owned(track)" Keep="[new PlaylistItem(FileId: track.FileId)]" Name="@track.Title"
+                                    <IconButton Icon="play" Requires="@UserPermissions.Listen" Title="Play the tracks listed from here" OnClick="() => PlayFromAsync(track)" />@* no space: buttons line up from row to row *@<ItemMenu Entry="PlayerEntry.Owned(track)" Keep="[new PlaylistItem(FileId: track.FileId)]" Name="@track.Title"
                                               UpgradeTrackId="@(track.Local ? null : track.TrackId)" AlbumHref="@Format.AlbumHref(track)"
                                               ArtistHref="@(track.ArtistId is { } artist ? $"artists/{artist}" : null)"
                                               OnRemove="@EventCallback.Factory.Create(this, () => RemoveTrack(track))" />

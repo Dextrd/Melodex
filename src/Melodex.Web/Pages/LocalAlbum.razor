@@ -66,8 +66,7 @@ else
                         </td>
                         <td class="num hide-narrow muted">@Format.Duration(track.DurationSeconds)</td>
                         <td class="num actions">
-                            <IconButton Icon="play" Requires="@UserPermissions.Listen" Title="Play from here" OnClick="() => PlayFromAsync(index)" />
-                            <ItemMenu Entry="PlayerEntry.Owned(track, album)" Keep="[new PlaylistItem(FileId: track.FileId)]" Name="@track.Title" />
+                            <IconButton Icon="play" Requires="@UserPermissions.Listen" Title="Play from here" OnClick="() => PlayFromAsync(index)" />@* no space: buttons line up from row to row *@<ItemMenu Entry="PlayerEntry.Owned(track, album)" Keep="[new PlaylistItem(FileId: track.FileId)]" Name="@track.Title" />
                             <a class="small" href="@($"search?q={Uri.EscapeDataString($"{track.Artist} {track.Title}")}&file={track.FileId}")"
                                title="Look for it in the catalogue after all, and match it">Match</a>
                         </td>

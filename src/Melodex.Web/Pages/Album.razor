@@ -213,8 +213,7 @@ else
                                                 <IconButton Icon="listen" Requires="@UserPermissions.Listen" Title="Listen: fetch it to play now, without adding it to your library"
                                                             OnClick="() => Player.ListenAsync(track.TrackId, _album.ShownEditionId)" />
                                             }
-                                        </WishButton>
-                                        <ItemMenu ListenTrackId="track.TrackId" EditionId="_album.ShownEditionId" Name="@track.Title" Get="(RequestKind.Track, track.TrackId)"
+                                        </WishButton>@* no space: it lines up with an owned song's play button *@<ItemMenu ListenTrackId="track.TrackId" EditionId="_album.ShownEditionId" Name="@track.Title" Get="(RequestKind.Track, track.TrackId)"
                                                   Wish="(RequestKind.Track, track.TrackId)"
                                                   OnIgnore="@(track.Status == TrackStatus.Missing ? EventCallback.Factory.Create(this, () => ToggleTrackIgnoredAsync(track)) : default)" />
                                     </FetchButton>
