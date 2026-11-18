@@ -99,16 +99,37 @@ else if (!Visible.Any())
 }
 else
 {
-    var visible = Visible.ToList();
-    <div class="card">
-        @foreach (var item in visible.Take(_shown))
+    var drawn = 0;
+    <div class="activity-list" @ref="_list">
+    @foreach (var (section, items) in Grouped)
+    {
+        @if (section is { } part)
         {
+            var closed = _closed.Contains(SectionKey(part));
+            <h2 class="activity-section">
+                <button class="request-toggle" aria-expanded="@(closed ? "false" : "true")" @onclick="() => ToggleSectionAsync(part)">
+                    <span class="chevron @(closed ? "" : "open")" aria-hidden="true"></span>
+                    <span>@SectionLabel(part)</span><span class="tab-count">@items.Count</span>
+                </button>
+            </h2>
+            @if (closed)
+            {
+                continue;
+            }
+        }
+        <div class="card">
+        @foreach (var item in items)
+        {
+            @if (drawn++ >= _shown)
+            {
+                break;
+            }
             @if (item.Task is { } task)
             {
                 var isScan = task.Kind == "library-scan";
                 var canOpen = Opens.Contains(task.Kind);
                 var taskOpen = canOpen && (_openTasks.TryGetValue(task.Id, out var opened) ? opened : task.Active);
-                <div class="request" id="task-@task.Id">
+                <div class="request" id="task-@task.Id" data-flip="task-@task.Id" @key="task.Id">
                     <div class="request-head">
                         @if (canOpen)
                         {
@@ -143,7 +164,7 @@ else
             }
             var request = item.Request!;
             var open = _open.ContainsKey(request.Id);
-            <div class="request" id="request-@request.Id">
+            <div class="request" id="request-@request.Id" data-flip="request-@request.Id" @key="request.Id">
                 <div class="request-head">
                     <div class="request-toggle with-cover" @onclick="() => ToggleAsync(request.Id)">
                         <button class="chevron-button" aria-expanded="@(open ? "true" : "false")" aria-label="@(open ? "Hide its attempts" : "Show its attempts")"
@@ -170,9 +191,11 @@ else
                 }
             </div>
         }
+        </div>
+    }
     </div>
     @* The rest come as it's scrolled to: those already loaded, then, among earlier downloads, the ones before them. *@
-    _hasEnd = visible.Count > _shown || (Shown == "downloads" && !_recent && Tracker.HasEarlier);
+    _hasEnd = Drawable.Count() > _shown || (Shown == "downloads" && !_recent && Tracker.HasEarlier);
     @if (_hasEnd)
     {
         <div class="list-end muted small" @ref="_end"><span class="spinner"></span> Loading more…</div>
@@ -185,7 +208,8 @@ else
     /// <summary>tasks or downloads, from the address; the one last shown when it doesn't say.</summary>
     [Parameter] public string? Tab { get; set; }
 
-    private const string TabKey = "activity.tab", RecentKey = "activity.recent", SortKey = "activity.sort", DescendingKey = "activity.descending";
+    private const string TabKey = "activity.tab", RecentKey = "activity.recent", SortKey = "activity.sort", DescendingKey = "activity.descending",
+        ClosedKey = "activity.closed";
 
     // Newest: what's going first, then the rest as they last changed. The others go by name.
     private IReadOnlyList<(string Key, string Label)> SortOptions => Shown == "tasks"
@@ -243,6 +267,11 @@ else
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        if (_moving)
+        {
+            _moving = false;
+            await Js.InvokeVoidAsync("melodexFlip.play", _list);
+        }
         await LandAsync();
         if (!_hasEnd)
             return;
@@ -254,7 +283,7 @@ else
     [JSInvokable]
     public async Task MoreAsync()
     {
-        if (Visible.Count() > _shown)
+        if (Drawable.Count() > _shown)
             _shown += Step;
         else if (Shown == "downloads" && !_recent && Tracker.HasEarlier)
         {
@@ -375,28 +404,77 @@ else
                 .Where(i => IsRecent(i.Active, i.UpdatedAt) == _recent)
                 .Where(i => _filter.Length == 0 || i.Matches(_filter))
                 .ToList();
-            if (_sort != "newest")
-            {
-                Func<Item, string> key = _sort switch
-                {
-                    "artist" => i => i.Request?.Target?.ArtistName ?? "",
-                    "album" => i => i.Request?.Target?.AlbumTitle ?? "",
-                    _ => i => i.Request?.Target?.Name ?? i.Title,
-                };
-                var text = StringComparer.CurrentCultureIgnoreCase;
-                return _descending ? items.OrderByDescending(key, text) : items.OrderBy(key, text);
-            }
-            var active = items.Where(i => i.Active)
-                .OrderByDescending(i => i.Running).ThenBy(i => i.Request is not null).ThenBy(i => i.QueueOrder).ThenBy(i => i.UpdatedAt);
-            var newest = active.Concat(items.Where(i => !i.Active).OrderByDescending(i => i.UpdatedAt));
-            return _descending ? newest : newest.Reverse();
+            // Recent is in sections, each sorted on its own; Earlier is all finished.
+            return _recent ? Sections.SelectMany(part => Sorted(items.Where(i => SectionOf(i) == part))) : Sorted(items);
         }
     }
+
+    // Newest: what's going in the order it runs, the next first, then the rest as they last changed. The others by name.
+    private IEnumerable<Item> Sorted(IEnumerable<Item> items)
+    {
+        if (_sort != "newest")
+        {
+            Func<Item, string> key = _sort switch
+            {
+                "artist" => i => i.Request?.Target?.ArtistName ?? "",
+                "album" => i => i.Request?.Target?.AlbumTitle ?? "",
+                _ => i => i.Request?.Target?.Name ?? i.Title,
+            };
+            var text = StringComparer.CurrentCultureIgnoreCase;
+            return _descending ? items.OrderByDescending(key, text) : items.OrderBy(key, text);
+        }
+        var list = items.ToList();
+        var active = list.Where(i => i.Active)
+            .OrderByDescending(i => i.Running).ThenBy(i => i.Request is not null).ThenBy(i => i.QueueOrder).ThenBy(i => i.UpdatedAt);
+        var newest = active.Concat(list.Where(i => !i.Active).OrderByDescending(i => i.UpdatedAt));
+        return _descending ? newest : newest.Reverse();
+    }
+
+    /// <summary>Recent's three sections, each of which can be closed.</summary>
+    private enum Section { Running, Queued, Completed }
+
+    private static readonly Section[] Sections = [Section.Running, Section.Queued, Section.Completed];
+
+    private static Section SectionOf(Item item) => !item.Active ? Section.Completed : item.Running ? Section.Running : Section.Queued;
+
+    private static string SectionLabel(Section section) => section switch
+    {
+        Section.Running => "Running",
+        Section.Queued => "Queued",
+        _ => "Completed",
+    };
+
+    // Kept per tab, so Tasks and Downloads each remember theirs.
+    private string SectionKey(Section section) => $"{Shown}:{section}";
+
+    private HashSet<string> _closed = [];
+
+    private async Task ToggleSectionAsync(Section section)
+    {
+        if (!_closed.Remove(SectionKey(section)))
+            _closed.Add(SectionKey(section));
+        await Prefs.SetAsync(ClosedKey, _closed.ToList());
+    }
+
+    /// <summary>What's shown, in sections in Recent (those with anything in them), or all together in Earlier.</summary>
+    private List<(Section? Section, List<Item> Items)> Grouped
+    {
+        get
+        {
+            var visible = Visible.ToList();
+            return _recent
+                ? Sections.Select(part => ((Section?)part, visible.Where(i => SectionOf(i) == part).ToList())).Where(g => g.Item2.Count > 0).ToList()
+                : [(null, visible)];
+        }
+    }
+
+    /// <summary>What can be drawn, leaving out closed sections, in the order it's drawn.</summary>
+    private IEnumerable<Item> Drawable => _recent ? Visible.Where(i => !_closed.Contains(SectionKey(SectionOf(i)))) : Visible;
 
     private async Task TasksChangedAsync()
     {
         await LoadTasksAsync();
-        StateHasChanged();
+        await RedrawAsync();
     }
 
     protected override async Task OnInitializedAsync()
@@ -405,6 +483,7 @@ else
         _recent = await Prefs.GetAsync(RecentKey, true);
         _sort = await Prefs.GetAsync(SortKey, "newest");
         _descending = await Prefs.GetAsync(DescendingKey, true);
+        _closed = [.. await Prefs.GetAsync<List<string>>(ClosedKey, [])];
         Tracker.Changed += Refresh;
         Events.Received += OnEvent;
         await Task.WhenAll(Tracker.RefreshAsync(), LoadTasksAsync());
@@ -415,7 +494,7 @@ else
             if (_tasks.Any(t => t.Active) || ++_idlePolls % 5 == 0)
             {
                 await LoadTasksAsync();
-                StateHasChanged();
+                await RedrawAsync();
             }
         }), null, TimeSpan.FromSeconds(3), TimeSpan.FromSeconds(3));
     }
@@ -429,7 +508,7 @@ else
             InvokeAsync(async () =>
             {
                 await LoadTasksAsync();
-                StateHasChanged();
+                await RedrawAsync();
             });
     }
 
@@ -503,7 +582,10 @@ else
         var id = Guid.Parse(row[(row.IndexOf('-') + 1)..]);
         for (var tries = 0; tries < 50; tries++)
         {
-            var index = Visible.ToList().FindIndex(i => (i.Request?.Id ?? i.Task!.Id) == id);
+            // The section it's in opens.
+            if (_recent && Visible.FirstOrDefault(i => (i.Request?.Id ?? i.Task!.Id) == id) is { } landed)
+                _closed.Remove(SectionKey(SectionOf(landed)));
+            var index = Drawable.ToList().FindIndex(i => (i.Request?.Id ?? i.Task!.Id) == id);
             if (index >= 0)
             {
                 _shown = Math.Max(_shown, (index / Step + 1) * Step);
@@ -528,8 +610,25 @@ else
             if (Tracker.Requests.FirstOrDefault(r => r.Id == id) is not { Active: false } || _open[id] is { Active: true }
                 || _open[id]?.Children?.Any(c => c.Active) == true)
                 _open[id] = await Api.GetRequestAsync(id);
-        StateHasChanged();
+        await RedrawAsync();
     });
+
+    private ElementReference _list;
+    private bool _moving;
+
+    // Redraws after the list changed, rows sliding from where they were to where they are now (flip.js).
+    private async Task RedrawAsync()
+    {
+        try
+        {
+            await Js.InvokeVoidAsync("melodexFlip.measure", _list);
+            _moving = true;
+        }
+        catch (JSException)
+        {
+        }
+        StateHasChanged();
+    }
 
     private async Task ToggleAsync(Guid id)
     {
