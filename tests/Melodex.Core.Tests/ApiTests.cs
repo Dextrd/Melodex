@@ -46,6 +46,19 @@ public class ApiTests(MelodexFactory factory) : IClassFixture<MelodexFactory>
     }
 
     [Fact]
+    public async Task An_error_the_web_app_hit_goes_in_the_servers_log_for_those_signed_in()
+    {
+        await new Melodex.Client.MelodexClient(_client).ReportErrorAsync(
+            new Melodex.Client.ClientError("JSException: The play() request was interrupted", "at Player.StartAsync", "/album/1"));
+        var log = await _client.GetFromJsonAsync<JsonElement>("/api/v1/log");
+        Assert.Contains("The web app hit an error on /album/1: JSException: The play() request was interrupted", log.GetRawText());
+
+        using var anyone = factory.CreateClient();
+        var refused = await anyone.PostAsJsonAsync("/api/v1/client-errors", new { message = "x" });
+        Assert.Equal(HttpStatusCode.Unauthorized, refused.StatusCode);
+    }
+
+    [Fact]
     public async Task OpenApi_document_is_served_and_describes_the_v1_api()
     {
         var response = await _client.GetAsync("/openapi/v1.json");
