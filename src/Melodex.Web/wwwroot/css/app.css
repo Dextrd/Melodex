@@ -330,7 +330,8 @@ label { display: inline-flex; align-items: center; gap: .4rem; }
 .day-toggles { display: inline-flex; gap: .25rem; flex-wrap: wrap; }
 .day-toggle { padding: .15rem .55rem; border-radius: 999px; font-size: .85rem; }
 .day-toggle.on { background: var(--accent); border-color: var(--accent); color: var(--accent-text, #fff); }
-.held-files { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .5rem; }
+.held-files { list-style: none; margin: 0; padding: .75rem 1rem; display: flex; flex-direction: column; gap: .75rem; }
+.held-files .held-actions { display: flex; gap: .5rem; flex-wrap: wrap; }
 .held-files li { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
 .held-files .held-was { display: flex; align-items: baseline; gap: .4rem; flex-wrap: wrap; min-width: 0; overflow-wrap: anywhere; }
 

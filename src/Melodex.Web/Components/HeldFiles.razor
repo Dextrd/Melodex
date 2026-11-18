@@ -18,9 +18,14 @@
                 <span class="muted">@file.Was.Label, upgraded to @(file.Now?.Label ?? "a better copy") @Format.Ago(file.HeldAt); will be auto-approved on @file.DeleteAt.ToLocalTime().ToString("d MMMM")</span>
             </span>
             <span class="spacer"></span>
-            <button class="primary" @onclick="() => DeleteAsync(file)" disabled="@_busy" title="Keep the better copy, and delete the old file now">Approve</button>
-            <button @onclick="() => RestoreAsync(file, false)" disabled="@_busy" title="Delete the better copy and put the old file back. A later upgrade may replace it again.">Roll back</button>
-            <button @onclick="() => RestoreAsync(file, true)" disabled="@_busy" title="Delete the better copy, put the old file back, and never upgrade this song">Roll back, never upgrade</button>
+            <span class="held-actions">
+                <IconButton Icon="approve" Primary="true" Label="Approve" Title="Approve: keep the better copy, and delete the old file now" Disabled="_busy"
+                            OnClick="() => DeleteAsync(file)" />
+                <IconButton Icon="putback" Label="Roll back" Title="Roll back: delete the better copy and put the old file back. A later upgrade may replace it again."
+                            Disabled="_busy" OnClick="() => RestoreAsync(file, false)" />
+                <IconButton Icon="ignore" Label="Roll back, never upgrade" Title="Roll back, never upgrade: put the old file back, and never upgrade this song"
+                            Disabled="_busy" OnClick="() => RestoreAsync(file, true)" />
+            </span>
         </li>
     }
 </ul>
