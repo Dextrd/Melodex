@@ -37,6 +37,16 @@ public enum RequestState
 /// <param name="EditionId">For an album or track, the edition to fetch; otherwise the one you own, or the planner's pick.</param>
 public sealed record CreateRequest(RequestKind Kind, Guid Id, Guid? EditionId = null);
 
+/// <summary>What <c>POST /requests/bulk</c> and <c>POST /tasks/bulk</c> do to each one given.</summary>
+public enum BulkAction { Pause, Resume, Cancel }
+
+/// <summary>Body of <c>POST /requests/bulk</c> and <c>POST /tasks/bulk</c>: one action for many at once.</summary>
+/// <param name="Ids">Requests or tasks to act on. Any already past it (cancelling a finished one, say) are left as they are.</param>
+public sealed record BulkChange(BulkAction Action, IReadOnlyList<Guid> Ids);
+
+/// <summary>How many of those given were changed.</summary>
+public sealed record BulkChanged(int Changed);
+
 /// <summary>Body of <c>POST /requests/{id}/move</c> and <c>POST /tasks/{id}/move</c>.</summary>
 /// <param name="Before">Put it just before this one in the queue; null for the end.</param>
 public sealed record MoveInQueue(Guid? Before);
@@ -175,4 +185,13 @@ public sealed record FetchSettings
 
     /// <summary>How long a listen-now track that isn't added is kept after it was last played, from 5 minutes to a week.</summary>
     public int ListenNowExpiryMinutes { get; init; } = 60;
+
+    /// <summary>
+    /// How many songs after the one playing are fetched to listen to ahead of time, from 0 to 20. Songs further on in the
+    /// queue wait until it comes near them.
+    /// </summary>
+    public int ListenNowAhead { get; init; } = 3;
+
+    /// <summary>How many songs before the one playing are fetched to listen to, for going back, from 0 to 20.</summary>
+    public int ListenNowBehind { get; init; } = 2;
 }

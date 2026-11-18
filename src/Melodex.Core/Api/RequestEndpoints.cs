@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using Melodex.Client;
 using Melodex.Core.Access;
 using Melodex.Core.Data;
@@ -55,6 +56,22 @@ public static class RequestEndpoints
             .RequireScope(Scopes.Request).WithName("CancelRequest")
             .WithSummary("Cancel a request and its unfinished parts. Files already in the library stay. A request that needs review or failed "
                          + "is dismissed: cancelled with its parts that did, so it leaves Couldn't fetch.");
+
+        requests.MapPost("/bulk", async (BulkChange body, MelodexDbContext db, RequestService service, CancellationToken ct) =>
+            {
+                var changed = 0;
+                foreach (var request in await db.Requests.Where(r => body.Ids.Contains(r.Id)).ToListAsync(ct))
+                    if (!RequestService.Finished.Contains(request.Status) && await (body.Action switch
+                        {
+                            BulkAction.Pause => service.PauseAsync(request, ct),
+                            BulkAction.Resume => service.ResumeAsync(request, ct),
+                            _ => service.CancelAsync(request, ct),
+                        }))
+                        changed++;
+                return new BulkChanged(changed);
+            })
+            .RequireScope(Scopes.Request).WithName("ChangeRequests")
+            .WithSummary("Pause, resume or cancel many requests at once, as each one's own action does. Finished ones are left as they are.");
 
         requests.MapPost("/{id:guid}/pause", async (Guid id, MelodexDbContext db, RequestService service, CancellationToken ct) =>
             {
@@ -133,6 +150,10 @@ public static class RequestEndpoints
                     errors["candidatesPerPlugin"] = ["Must be between 1 and 5."];
                 if (value.ListenNowExpiryMinutes is < 5 or > 7 * 24 * 60)
                     errors["listenNowExpiryMinutes"] = ["Must be between 5 minutes and a week."];
+                if (value.ListenNowAhead is < 0 or > 20)
+                    errors["listenNowAhead"] = ["Must be between 0 and 20."];
+                if (value.ListenNowBehind is < 0 or > 20)
+                    errors["listenNowBehind"] = ["Must be between 0 and 20."];
                 if (errors.Count > 0)
                     return Results.ValidationProblem(errors);
                 await s.SaveFetchAsync(value, ct);

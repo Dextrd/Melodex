@@ -68,6 +68,7 @@
     private static string EntryState(PlayerEntry entry) => entry switch
     {
         { Unplayable: true } => entry.Detail is { Length: < 40 } d ? d : "Can't play",
+        { Unfetched: true } => "To fetch",
         { Waiting: true } => "Fetching…",
         { ListenState: ListenNowState.Playable } => "Listen now",
         { ListenState: ListenNowState.Importing } => "Adding…",

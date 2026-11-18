@@ -37,7 +37,8 @@ public sealed class Upgrades(
     private const double Later = 1e10;
 
     /// <summary>A matched file that's below its cutoff, and where its quality stands in the profile (higher is worse).</summary>
-    public sealed record Upgradable(Guid FileId, Guid TrackId, Guid? EditionId, FileQuality Quality, int Position);
+    /// <param name="Cutoff">The cutoff that applies to it: its song's, album's or artist's own, or null for the main profile's.</param>
+    public sealed record Upgradable(Guid FileId, Guid TrackId, Guid? EditionId, FileQuality Quality, int Position, string? Cutoff = null);
 
     /// <summary>
     /// The files in a set that can be upgraded: matched (not deferred, excluded or hidden), of a quality that's known,
@@ -69,7 +70,7 @@ public sealed class Upgrades(
             var fileQuality = LibraryFile.QualityOf(row.Codec, row.BitrateKbps, row.BitDepth, row.SampleRate, row.CutoffHz);
             if (profile.Position(fileQuality) is not { } position || profile.Meets(fileQuality, setting))
                 continue;
-            upgradable.Add(new Upgradable(row.Id, row.TrackId, row.EditionId, fileQuality, position));
+            upgradable.Add(new Upgradable(row.Id, row.TrackId, row.EditionId, fileQuality, position, setting));
         }
         return upgradable;
     }

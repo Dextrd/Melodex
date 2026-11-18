@@ -233,8 +233,7 @@ else
         @TrackList(track => @<text>
             @if (track.Owned)
             {
-                <IconButton Icon="play" Requires="@UserPermissions.Listen" Title="Play" OnClick="() => Player.PlayAsync([PlayerEntry.Owned(track)])" />
-                <ItemMenu Entry="PlayerEntry.Owned(track)" Keep="[new PlaylistItem(track.Id)]" Name="@track.Title" UpgradeTrackId="track.Id"
+                <IconButton Icon="play" Requires="@UserPermissions.Listen" Title="Play" OnClick="() => Player.PlayAsync([PlayerEntry.Owned(track)])" />@* no space: buttons line up from row to row *@<ItemMenu Entry="PlayerEntry.Owned(track)" Keep="[new PlaylistItem(track.Id)]" Name="@track.Title" UpgradeTrackId="track.Id"
                           AlbumHref="@(track.AlbumId is { } albumId ? $"albums/{albumId}" : null)" ArtistHref="@(track.ArtistId is { } artistId ? $"artists/{artistId}" : null)" />
             }
             else
@@ -242,8 +241,7 @@ else
                 <FetchButton Kind="RequestKind.Track" Id="track.Id" Button="false">
                     <WishButton Kind="RequestKind.Track" Id="track.Id">
                         <IconButton Icon="listen" Requires="@UserPermissions.Listen" Title="Listen: fetch it to play now, without adding it to your library" OnClick="() => Player.ListenAsync(track.Id)" />
-                    </WishButton>
-                    <ItemMenu ListenTrackId="track.Id" Name="@track.Title" Get="(RequestKind.Track, track.Id)" Wish="(RequestKind.Track, track.Id)"
+                    </WishButton>@* no space: it lines up with an owned song's play button *@<ItemMenu ListenTrackId="track.Id" Name="@track.Title" Get="(RequestKind.Track, track.Id)" Wish="(RequestKind.Track, track.Id)"
                               AlbumHref="@(track.AlbumId is { } albumId ? $"albums/{albumId}" : null)" ArtistHref="@(track.ArtistId is { } artistId ? $"artists/{artistId}" : null)" />
                 </FetchButton>
             }

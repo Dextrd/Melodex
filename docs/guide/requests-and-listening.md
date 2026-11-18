@@ -16,7 +16,8 @@ The **Activity** page shows every request and each attempt. A request that ended
 **Look again** later or after adding another plugin, open its **Details** to pick one of the candidates found, or, when
 a copy was turned away only for its quality, **Keep it anyway**, as it is.
 
-Requests run one at a time, in order. Move them up and down the queue, pause them or cancel them from Activity.
+Requests run one at a time, in order. Move them up and down the queue, pause them or cancel them from Activity, one by
+one or with **Pause all** and **Cancel all** (with a filter, **Pause these** and **Cancel these** act on what's shown).
 
 **Ignore** an album or song to stop counting it as missing.
 
@@ -81,9 +82,10 @@ cutoff is met.
   cancelled and wait for the next. Those looked for longest ago go first, and the worst of those. It's on from the
   start, and can be turned off. Upgrades go after anything you ask for, and **Look for upgrades now** ignores the
   window.
-- **Only a better copy is kept.** Sources are only asked for copies that may be better than what you have, and a
-  copy's quality is read and its spectrum checked once it's here: one no better is refused (Activity says **No
-  better**). A song nothing better is found for is left as it is (**Unchanged**), and looked for again in a later window.
+- **Only a copy that reaches the cutoff is kept.** Sources are only asked for copies that may be better than what you
+  have and reach the cutoff, so a source that can only get lossy copies, such as yt-dlp, is passed over when the cutoff
+  is lossless (Activity says it found nothing that reaches the cutoff). A copy's quality is read and its spectrum checked
+  once it's here: one no better, or short of the cutoff, is refused (Activity says **No better**). A song nothing better is found for is left as it is (**Unchanged**), and looked for again in a later window.
 - **It's the same recording.** A copy is checked against the length of the file it replaces, not only the
   catalogue's, so another take of the same title (a studio one for a live song, say) is refused.
 - **The better copy takes the old file's place**: the same path with its own extension (`10 Voyager.mp3` becomes
@@ -118,6 +120,10 @@ Press **Listen** to hear something before deciding. It's fetched to a separate s
 in the player at the bottom of the page beside the music you have, and is deleted a while after you last play it (an
 hour by default; change it under **Settings → Playback**). **Add to library** files the same file without fetching it
 again.
+
+Playing an album you don't have all of puts the whole album in the queue, but only the songs you don't have near the
+one playing are fetched: by default the one playing, the three after it and the two before it. The rest show **To
+fetch** in the queue, and are fetched as the queue comes near them. Change how many under **Settings → Playback**.
 
 **Library → Listen now** has the songs fetched to listen to that are still here, each once, grouped by album: play
 them, or add them to your library or delete them now from their ⋯ menus. Every fetch, and any that couldn't be found,

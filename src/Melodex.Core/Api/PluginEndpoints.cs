@@ -1,3 +1,4 @@
+using System.Net;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
@@ -43,7 +44,7 @@ public static class PluginEndpoints
                     }
                     catch (Exception e) when (e is HttpRequestException or RetrievalException or JsonException or TaskCanceledException && !ct.IsCancellationRequested)
                     {
-                        return Problem("endpoint", $"Couldn't read the plugin's manifest from {url}: {e.Message}");
+                        return Problem("endpoint", ManifestProblem(url, uri, e));
                     }
                     if (body.Type is { } type && manifest.Type != type)
                         return Problem("endpoint", $"{manifest.Name} is {KindOf(manifest.Type)}, not {KindOf(type)}.");
@@ -68,7 +69,9 @@ public static class PluginEndpoints
                 if (body.Settings is { ValueKind: JsonValueKind.Object } given)
                     foreach (var (name, value) in JsonNode.Parse(given.GetRawText())!.AsObject())
                         settings[name] = value?.DeepClone();
-                var errors = SettingsSchema.Validate(manifest.SettingsSchema, settings);
+                // A plugin's settings are filled in once it's added, so one it marks required needn't be given yet.
+                var errors = SettingsSchema.Validate(manifest.SettingsSchema, settings)
+                    .Where(e => !(e.Value is ["Required."] && settings[e.Key] is null)).ToDictionary();
                 if (errors.Count > 0)
                     return Results.ValidationProblem(errors.ToDictionary(e => $"settings.{e.Key}", e => e.Value));
 
@@ -284,6 +287,24 @@ public static class PluginEndpoints
         return new PluginInfo(p.Id, p.PluginId, p.Type, p.Name, p.Endpoint, p.Priority, p.Enabled, p.Health, p.HealthMessage, p.HealthCheckedAt,
             JsonDocument.Parse(settings.ToJsonString()).RootElement.Clone(), manifest);
     }
+
+    /// <summary>
+    /// Why a plugin couldn't be added from this address, in words that point at the usual mistake: the address of the
+    /// service a plugin uses (slskd, Prowlarr, qBittorrent), where the plugin's own is wanted.
+    /// </summary>
+    private static string ManifestProblem(string url, Uri uri, Exception e) => e switch
+    {
+        JsonException => $"{url} answered, but not as a Melodex plugin: it looks like a web page or another app. If it's the address of "
+                         + "the service a plugin uses, such as slskd or Prowlarr, give the plugin's own address here instead, and the "
+                         + "service's in the plugin's settings once it's added.",
+        RetrievalException { Status: HttpStatusCode.NotFound } => $"{url} answered, but has no Melodex plugin manifest: is it the address "
+                         + "of the service a plugin uses, rather than the plugin's own?",
+        HttpRequestException { HttpRequestError: HttpRequestError.NameResolutionError } => $"Couldn't find {uri.Host}. Is the plugin's "
+                         + "container running, in the same Compose project or network as Melodex? There, it's the plugin's service name.",
+        HttpRequestException { HttpRequestError: HttpRequestError.ConnectionError } => $"Nothing answered at {uri.Host}:{uri.Port}. Is "
+                         + "the plugin running, and is that its port?",
+        _ => $"Couldn't read the plugin's manifest from {url}: {e.Message}",
+    };
 
     private static IResult Problem(string field, string message) =>
         Results.ValidationProblem(new Dictionary<string, string[]> { [field] = [message] });

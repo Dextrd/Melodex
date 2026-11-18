@@ -66,6 +66,35 @@ public sealed class RemotePluginTests : IDisposable
     }
 
     [Fact]
+    public async Task An_address_that_isnt_a_plugins_says_what_it_seems_to_be()
+    {
+        // The service a plugin uses, such as slskd's web page, given where the plugin's own address is wanted.
+        _plugins.WebPages.Add("slskd");
+        var page = await Assert.ThrowsAsync<MelodexApiException>(() => _api.AddPluginAsync(new AddPlugin(Endpoint: "http://slskd:5030", Type: PluginType.Retrieval)));
+        Assert.Contains("not as a Melodex plugin", page.Message);
+        Assert.Contains("give the plugin's own address here", page.Message);
+
+        var missing = await Assert.ThrowsAsync<MelodexApiException>(() => _api.AddPluginAsync(new AddPlugin(Endpoint: "http://retriever-nowhere:8080", Type: PluginType.Retrieval)));
+        Assert.Contains("Couldn't find retriever-nowhere. Is the plugin's container running", missing.Message);
+    }
+
+    [Fact]
+    public async Task A_plugin_whose_settings_are_required_is_added_before_theyre_filled_in()
+    {
+        _plugins.Add("my-strict", Manifest("example.strict", PluginType.Lyrics) with
+        {
+            SettingsSchema = JsonDocument.Parse("""{"type":"object","required":["token"],"properties":{"token":{"type":"string"},"size":{"type":"integer","minimum":1}}}""").RootElement,
+        });
+        var added = await _api.AddPluginAsync(new AddPlugin(Endpoint: "http://my-strict:8080", Type: PluginType.Lyrics));
+        Assert.Equal("example.strict", added.PluginId);
+
+        // What's given is still checked.
+        var wrong = await Assert.ThrowsAsync<MelodexApiException>(() => _api.AddPluginAsync(new AddPlugin(Endpoint: "http://my-strict:8080", Type: PluginType.Lyrics,
+            Settings: JsonDocument.Parse("""{"size":0}""").RootElement)));
+        Assert.DoesNotContain("Required", wrong.Message);
+    }
+
+    [Fact]
     public async Task A_plugin_is_added_by_its_address_only_to_its_own_kind_and_a_contract_this_Melodex_has()
     {
         _plugins.Add("my-lyrics", Manifest("example.lyrics", PluginType.Lyrics));
@@ -186,6 +215,9 @@ public sealed class RemotePluginTests : IDisposable
         public ConcurrentDictionary<string, (byte[] Data, string ContentType)> Files { get; } = new();
         public ConcurrentBag<string> Unavailable { get; } = [];
 
+        /// <summary>Hosts that answer everything with a web page, as a service's own web interface does.</summary>
+        public ConcurrentBag<string> WebPages { get; } = [];
+
         public void Add(string host, PluginManifest manifest) => _manifests[host] = manifest;
 
         public void Answer(string host, string path, Func<JsonElement, object?> answer) => _answers[(host, path)] = answer;
@@ -194,8 +226,10 @@ public sealed class RemotePluginTests : IDisposable
         {
             var host = request.RequestUri!.Host;
             var path = request.RequestUri.AbsolutePath;
+            if (WebPages.Contains(host))
+                return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("<!DOCTYPE html><html></html>", Encoding.UTF8, "text/html") };
             if (!_manifests.TryGetValue(host, out var manifest))
-                throw new HttpRequestException($"Nothing answers at {host}.");
+                throw new HttpRequestException(HttpRequestError.NameResolutionError, $"Name or service not known ({host}:{request.RequestUri.Port})");
             if (path == "/v1/manifest")
                 return Json(manifest);
             var body = JsonDocument.Parse(await request.Content!.ReadAsStringAsync(cancellationToken)).RootElement.Clone();

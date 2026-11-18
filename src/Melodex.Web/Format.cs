@@ -57,7 +57,7 @@ public static class Format
         Client.RequestState.Importing or Client.RequestState.Notifying when r.Upgrade => "Upgrading",
         Client.RequestState.Importing or Client.RequestState.Notifying => "Filing",
         // An upgrade that found nothing better leaves the song as it was, in the library.
-        Client.RequestState.InLibrary when r.Upgrade => r.Detail?.StartsWith("Upgraded") == true ? "Upgraded" : "Unchanged",
+        Client.RequestState.InLibrary when r.Upgrade => Upgraded(r) ? "Upgraded" : "Unchanged",
         Client.RequestState.InLibrary => "In library",
         Client.RequestState.Playable when r.Ended == ListenNowEnd.Expired => "Expired",
         Client.RequestState.Playable when r.Ended == ListenNowEnd.Deleted => "Deleted",
@@ -68,7 +68,13 @@ public static class Format
     };
 
     /// <summary>The badge colour for a request, grey while paused.</summary>
-    public static string RequestBadge(RequestInfo r) => r.Paused && r.Active || r.Ended is not null ? "neutral" : RequestBadge(r.State);
+    public static string RequestBadge(RequestInfo r) =>
+        r.Paused && r.Active || r.Ended is not null ? "neutral"
+        // An upgrade that found nothing better didn't fail, but isn't a success either.
+        : r.State == Client.RequestState.InLibrary && r.Upgrade && !Upgraded(r) ? "partial"
+        : RequestBadge(r.State);
+
+    private static bool Upgraded(RequestInfo r) => r.Detail?.StartsWith("Upgraded") == true;
 
     /// <summary>The badge colour for a request state.</summary>
     public static string RequestBadge(Client.RequestState state) => state switch
