@@ -1840,10 +1840,8 @@ body:has(.player) .toasts { bottom: 6.5rem; }
 a.toast-body:hover .toast-title { text-decoration: underline; }
 .toast-title { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .toast-text { overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
-.toast-close { flex: none; display: inline-grid; place-items: center; width: 1.75rem; height: 1.75rem; padding: 0; border: 1px solid var(--border);
-    border-radius: 50%; background: var(--bg); color: var(--muted); cursor: pointer; }
-.toast-close:hover { color: var(--text); border-color: var(--text); }
-.toast-close svg { width: .9rem; height: .9rem; }
+/* Dismissed as a song is taken out of the queue. */
+.toast-close { flex: none; }
 .toast-more { background: var(--bg); }
 @keyframes toast-in { from { opacity: 0; transform: translateX(1.5rem); } }
 @media (prefers-reduced-motion: reduce) { .toast { animation: none; } }
