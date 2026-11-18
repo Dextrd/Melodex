@@ -28,6 +28,7 @@
             </p>
         </div>
         @if (_saving) { <span class="spinner"></span> }
+        @Switch
     </header>
     <div class="appearance">
         <div class="field-label">Colour</div>
@@ -67,6 +68,9 @@
 @code {
     /// <summary>Everyone's look, rather than your own.</summary>
     [Parameter] public bool ForEveryone { get; set; }
+
+    /// <summary>Shown at the top right, such as the switch between your own look and everyone's.</summary>
+    [Parameter] public RenderFragment? Switch { get; set; }
 
     private Appearance _appearance = new();
     private bool _saving;
