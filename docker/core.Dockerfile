@@ -5,6 +5,7 @@ COPY Directory.Build.props Melodex.sln ./
 COPY src/Melodex.Contracts/Melodex.Contracts.csproj src/Melodex.Contracts/
 COPY src/Melodex.Client/Melodex.Client.csproj src/Melodex.Client/
 COPY src/Melodex.Web/Melodex.Web.csproj src/Melodex.Web/
+COPY src/Melodex.Web.Browser/Melodex.Web.Browser.csproj src/Melodex.Web.Browser/
 COPY src/Melodex.Plugins.MusicBrainz/Melodex.Plugins.MusicBrainz.csproj src/Melodex.Plugins.MusicBrainz/
 COPY src/Melodex.Plugins.Navidrome/Melodex.Plugins.Navidrome.csproj src/Melodex.Plugins.Navidrome/
 COPY src/Melodex.Plugins.Plex/Melodex.Plugins.Plex.csproj src/Melodex.Plugins.Plex/

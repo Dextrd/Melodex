@@ -1,6 +1,7 @@
 @implements IDisposable
 @inject MelodexClient Api
 @inject AuthState Auth
+@inject AppHost Host
 
 @* The account button at the top right: who's signed in, their account, and signing out. *@
 @if (Auth.Status is { Username: { } name } status)
@@ -29,6 +30,12 @@
                     <a role="menuitem" href="settings/api" @onclick="() => _open = false">API keys</a>
                 }
                 <hr />
+                @if (Host.OnDevice)
+                {
+                    <button type="button" role="menuitem" @onclick="ChangeServer">
+                        Another server <span class="muted small ellipsis">On @Host.Server</span>
+                    </button>
+                }
                 <button type="button" role="menuitem" @onclick="SignOutAsync">Sign out</button>
             </div>
         }
@@ -47,8 +54,14 @@
     private async Task SignOutAsync()
     {
         _open = false;
-        await Api.SignOutAsync();
+        await Host.SignOutAsync();
         Auth.Set(await Api.GetAuthStatusAsync());
+    }
+
+    private void ChangeServer()
+    {
+        _open = false;
+        Host.ChangeServer();
     }
 
     public void Dispose() => Auth.Changed -= Redraw;

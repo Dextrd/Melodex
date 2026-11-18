@@ -4,6 +4,22 @@ What changed in each release of Melodex. Versions follow [semantic versioning](h
 
 ## [Unreleased]
 
+### Added
+
+- **The Melodex app** for Android, an APK with each release: the web app on your phone, connecting to your Melodex at
+  home or through something like Tailscale. It finds a Melodex on your Wi-Fi, remembers several servers with a
+  sign-in each, saves exports through the share sheet, and plays as the web app does. iOS follows through TestFlight
+  (#8).
+- **Your devices** on Your account: where you're signed in with the app, each of which you can sign out from there.
+  A new password signs out your other devices too (#8).
+- `POST /api/v1/auth/devices` signs in a device, with a key that acts as you signed in; `GET` lists your devices and
+  `DELETE /api/v1/auth/devices/{id}` signs one out. Signing out on a device ends its key (#8).
+
+### Changed
+
+- The web app's pages and components are a library, `Melodex.Web`, shared by the browser's host
+  (`Melodex.Web.Browser`) and the app's (#8).
+
 ## [1.5.2] - 2026-11-18
 
 Fixes and small additions from using 1.5: **Pause all** and **Cancel all** in Activity, Listen now fetching only the

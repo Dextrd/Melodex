@@ -1,0 +1,25 @@
+@inject Servers Servers
+
+@* The app: the web app on the server in use, or until there is one, choosing it. *@
+@if (!_loaded)
+{
+    <div class="boot loading"><span class="spinner"></span> Loading Melodex…</div>
+}
+else if (Servers.Current is null)
+{
+    <Connect />
+}
+else
+{
+    <Melodex.Web.App />
+}
+
+@code {
+    private bool _loaded;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Servers.LoadAsync();
+        _loaded = true;
+    }
+}

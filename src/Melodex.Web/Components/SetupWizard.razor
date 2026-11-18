@@ -1,5 +1,6 @@
 @using Melodex.Contracts.Plugins
 @using Melodex.Web.Pages
+@inject AppHost Host
 @inject MelodexClient Api
 @inject AuthState Auth
 @inject NavigationManager Nav
@@ -188,7 +189,7 @@
         _error = null;
         try
         {
-            await Api.SetUpLoginAsync(new SetUpLogin(_username, _password));
+            await Host.SetUpAsync(new SetUpLogin(_username, _password));
             _password = _confirm = "";
             Auth.Set(await Api.GetAuthStatusAsync());
         }

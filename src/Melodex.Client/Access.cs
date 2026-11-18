@@ -48,6 +48,15 @@ public sealed record SetUpLogin(string Username, string Password);
 /// <param name="RememberMe">Keep this browser signed in for 30 days from its last visit, rather than until it closes.</param>
 public sealed record SignIn(string Username, string Password, bool RememberMe = false);
 
+/// <summary>Body of <c>POST /auth/devices</c>: signing in from the Melodex app, on the device it names.</summary>
+public sealed record DeviceSignIn(string Username, string Password, string Device);
+
+/// <summary>A device's key: the app sends it as the API key, and it acts as you signed in. It's in this answer only.</summary>
+public sealed record DeviceKey(Guid Id, string Key);
+
+/// <summary>A device you're signed in on with the Melodex app. <c>Current</c> is the one asking.</summary>
+public sealed record DeviceInfo(Guid Id, string Name, DateTime CreatedAt, DateTime? LastUsedAt, bool Current);
+
 /// <summary>Body of <c>PUT /auth/account</c>: a new username or password for yourself, or both. The current password is always needed.</summary>
 public sealed record UpdateLogin(string CurrentPassword, string? Username = null, string? NewPassword = null);
 

@@ -81,6 +81,12 @@ public class ApiKey
 
     /// <summary>Roughly when it was last used; updated at most once a minute.</summary>
     public DateTime? LastUsedAt { get; set; }
+
+    /// <summary>
+    /// Set on a device's key, made when the Melodex app signs in: its owner's <see cref="User.Stamp"/> then. The key acts
+    /// as its owner signed in, and a new password ends it, as it ends a session. Null on a key made for an app.
+    /// </summary>
+    public string? SessionStamp { get; set; }
 }
 
 /// <summary>An address Melodex tells, with a signed POST, when something it cares about happens.</summary>

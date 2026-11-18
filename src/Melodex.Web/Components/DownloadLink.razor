@@ -1,0 +1,34 @@
+@inject AppHost Host
+
+@* A link that downloads a file the API makes, such as an export: in a browser a plain link, on a device saved by the app. *@
+@if (Host.OnDevice)
+{
+    <button type="button" class="@Class" disabled="@_saving" @onclick="SaveAsync">
+        @if (_saving) { <span class="spinner"></span> }@ChildContent
+    </button>
+}
+else
+{
+    <a class="@Class" href="@Href" download>@ChildContent</a>
+}
+
+@code {
+    [Parameter, EditorRequired] public string Href { get; set; } = "";
+    [Parameter] public string? Class { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    private bool _saving;
+
+    private async Task SaveAsync()
+    {
+        _saving = true;
+        try
+        {
+            await Host.SaveAsync(Href);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+}

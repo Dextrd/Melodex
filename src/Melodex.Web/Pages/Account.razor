@@ -1,9 +1,14 @@
 @page "/account"
 @inject AuthState Auth
+@inject MelodexClient Api
+@inject AppHost Host
 
 <PageTitle>Your account · Melodex</PageTitle>
 
-@* Your own login, what you may do, and your login on each media server: the page version of editing a user. *@
+@*
+    Your own login, what you may do, and your login on each media server: the page version of editing a user. Then the
+    devices you've signed in on with the Melodex app, each of which can be signed out from here.
+*@
 <h1>Your account</h1>
 @if (Auth.Status is { } status)
 {
@@ -15,4 +20,80 @@
             <UserEditor Self="true" />
         </div>
     </section>
+
+    @if (_devices is { Count: > 0 } devices)
+    {
+        <section class="panel" aria-label="Your devices">
+            <header class="panel-head">
+                <div class="panel-title">
+                    <h2>Your devices</h2>
+                    <p class="muted small">
+                        Where you're signed in with the Melodex app. Signing out one here asks it to sign in again; a new password signs out all of them@(Host.OnDevice ? " but this one" : "").
+                    </p>
+                </div>
+            </header>
+            <div class="plugin-grid">
+                @foreach (var device in devices)
+                {
+                    <div class="plugin-card" @key="device.Id">
+                        <div class="plugin-top">
+                            <strong class="ellipsis" title="@device.Name">@device.Name</strong>
+                            <span class="spacer"></span>
+                            @if (device.Current) { <span class="badge neutral">This device</span> }
+                        </div>
+                        <div class="muted small">
+                            Signed in @Format.Ago(device.CreatedAt) · @(device.LastUsedAt is { } used ? $"last used {Format.Ago(used)}" : "not used since")
+                        </div>
+                        <div class="toolbar">
+                            <button class="small" disabled="@(_busy == device.Id)" @onclick="() => SignOutAsync(device)">
+                                @if (_busy == device.Id) { <span class="spinner"></span> }Sign out
+                            </button>
+                        </div>
+                    </div>
+                }
+            </div>
+            @if (_error is not null) { <p class="error small">@_error</p> }
+        </section>
+    }
+}
+
+@code {
+    private IReadOnlyList<DeviceInfo>? _devices;
+    private Guid? _busy;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _devices = await Api.ListDevicesAsync();
+        }
+        catch (Exception e) when (e is HttpRequestException or MelodexApiException)
+        {
+            // An older core, without devices: nothing to show.
+        }
+    }
+
+    private async Task SignOutAsync(DeviceInfo device)
+    {
+        // Signing out this one is signing out, as from the account menu.
+        if (device.Current)
+        {
+            await Host.SignOutAsync();
+            Auth.Set(await Api.GetAuthStatusAsync());
+            return;
+        }
+        _busy = device.Id;
+        _error = null;
+        try
+        {
+            await Api.SignOutDeviceAsync(device.Id);
+            _devices = _devices!.Where(d => d.Id != device.Id).ToList();
+        }
+        catch (Exception e) when (e is HttpRequestException or MelodexApiException)
+        {
+            _error = e.Message;
+        }
+        _busy = null;
+    }
 }

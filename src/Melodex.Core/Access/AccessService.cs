@@ -190,6 +190,14 @@ public sealed class AccessService(IServiceScopeFactory scopes, ILogger<AccessSer
         });
     }
 
+    /// <summary>A new key for a device the user signed in on, which acts as them until they sign out there.</summary>
+    public static (string Key, ApiKey Record) NewDeviceKey(string device, User user)
+    {
+        var (key, record) = NewKey(device, [Scopes.Admin], user.Id);
+        record.SessionStamp = user.Stamp;
+        return (key, record);
+    }
+
     public static string HashKey(string key) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(key)));
 
     /// <summary>Keys changed: they're read again on the next call.</summary>
@@ -226,6 +234,11 @@ public sealed class AccessService(IServiceScopeFactory scopes, ILogger<AccessSer
             return null;
         NoteUsed(record.Id);
         var owner = record.UserId is { } id ? (await UsersAsync(ct)).GetValueOrDefault(id) : null;
+        // A device is its owner signed in on it, until they sign out there or their password changes.
+        if (record.SessionStamp is not null)
+            return owner is not null && owner.Stamp == record.SessionStamp
+                ? new Caller(CallerKind.User, owner.Username, PermissionsOf(owner), owner.Id, record.Id, owner.IsAdmin)
+                : null;
         return new Caller(CallerKind.Key, record.Name, ScopesOf(record, owner), owner?.Id, record.Id, owner?.IsAdmin == true);
     }
 
