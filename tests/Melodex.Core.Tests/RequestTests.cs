@@ -995,34 +995,38 @@ public sealed class RequestTests(RequestFixture fixture, ITestOutputHelper outpu
         Assert.StartsWith("No media server is connected", status.Warning);
         Assert.True(status.Settings.Scheduled);
         Assert.Equal([DayOfWeek.Monday], status.Settings.Days);
-        Assert.Equal((25, OldFiles.Hold, 14), (status.Settings.PerRun, status.Settings.OldFiles, status.Settings.HoldDays));
+        Assert.Equal((5, OldFiles.Hold, 14), (status.Settings.AtATime, status.Settings.OldFiles, status.Settings.HoldDays));
+        Assert.Null(status.Settings.PerRun);
         Assert.NotNull(status.NextRun);
     }
 
     [TestLibraryFact]
-    public async Task Scheduled_upgrades_ask_for_no_more_than_the_limit_and_stop_when_the_window_closes()
+    public async Task Scheduled_upgrades_keep_a_few_going_and_stop_when_the_window_closes()
     {
         var before = await Api.GetUpgradesAsync();
         var now = DateTime.UtcNow;
-        // All of today, in UTC.
+        // All of today, in UTC, one at a time.
         await Api.SaveUpgradeSettingsAsync(before.Settings with
         {
-            Days = [now.DayOfWeek], From = new(0, 0), Until = new(0, 0), TimeZone = "UTC", PerRun = 1
+            Days = [now.DayOfWeek], From = new(0, 0), Until = new(0, 0), TimeZone = "UTC", AtATime = 1,
         });
         using var scope = fixture.Factory.Services.CreateScope();
         var upgrades = scope.ServiceProvider.GetRequiredService<Upgrades>();
         var db = scope.ServiceProvider.GetRequiredService<Melodex.Core.Data.MelodexDbContext>();
         try
         {
-            Assert.True((await Api.GetUpgradesAsync()).Running);
-            Assert.Equal(1, await upgrades.RunScheduledAsync(now, default));
-            Assert.Equal(0, await upgrades.RunScheduledAsync(now.AddMinutes(1), default));
-            await Api.SaveUpgradeSettingsAsync((await Api.GetUpgradesAsync()).Settings with { PerRun = null });
-            Assert.Null((await Api.GetUpgradesAsync()).Settings.PerRun);
+            // The window's open, so a look starts (here, or by the scheduler first), and keeps one going at most.
+            await upgrades.RunScheduledAsync(now, default);
+            var status = await Api.GetUpgradesAsync();
+            Assert.True(status.Running);
+            Assert.Equal((false, Upgrades.ScheduledRequester), (status.Run!.ByHand, status.Run.Requester));
+            Assert.NotNull(status.Run.Until);
+            Assert.True(await db.Requests.CountAsync(r => r.Requester == Upgrades.ScheduledRequester && !RequestService.Finished.Contains(r.Status)) <= 1);
 
             // Two days on, the window has closed: nothing more is asked for, and any not started never will be.
             Assert.Equal(0, await upgrades.RunScheduledAsync(now.AddDays(2), default));
             Assert.False(await db.Requests.AnyAsync(r => r.Requester == Upgrades.ScheduledRequester && r.Status == Melodex.Core.Data.RequestStatus.Queued));
+            Assert.False((await Api.GetUpgradesAsync()).Running);
         }
         finally
         {
