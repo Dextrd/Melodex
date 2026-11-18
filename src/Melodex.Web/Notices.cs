@@ -54,9 +54,10 @@ public sealed class Notices(AuthState auth) : IDisposable
     };
 
     /// <summary>Shows it, or updates the one with its key, keeping its place.</summary>
-    public void Show(Notice notice)
+    /// <param name="always">Even if its kind is turned off: it answers something you just did, such as saying it went wrong.</param>
+    public void Show(Notice notice, bool always = false)
     {
-        if (!Wants(notice.Kind))
+        if (!always && !Wants(notice.Kind))
             return;
         var at = _shown.FindIndex(n => n.Key == notice.Key);
         if (at >= 0)

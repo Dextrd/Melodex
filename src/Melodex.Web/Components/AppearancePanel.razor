@@ -86,9 +86,9 @@
     [
         ("Long tasks", "When a scan, catalogue update, import or formatting finishes or fails, and when a scan leaves files to review",
             a => a.TaskNotices, (a, on) => a with { TaskNotices = on }),
-        ("Downloads", "When something you asked for is in your library, waiting for review, or failed",
+        ("Downloads", "When you ask for something, and when it's in your library, waiting for review, or failed",
             a => a.DownloadNotices, (a, on) => a with { DownloadNotices = on }),
-        ("Upgrades", "When the better copies you looked for are in, or none better was found",
+        ("Upgrades and menus", "When you look for a better copy or change your wishlist, and when the better copies are in",
             a => a.ActionNotices, (a, on) => a with { ActionNotices = on }),
     ];
 
