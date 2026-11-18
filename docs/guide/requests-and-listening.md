@@ -81,9 +81,10 @@ cutoff is met.
   cancelled and wait for the next. Those looked for longest ago go first, and the worst of those. It's on from the
   start, and can be turned off. Upgrades go after anything you ask for, and **Look for upgrades now** ignores the
   window.
-- **Only a better copy is kept.** Sources are only asked for copies that may be better than what you have, and a
-  copy's quality is read and its spectrum checked once it's here: one no better is refused (Activity says **No
-  better**). A song nothing better is found for is left as it is (**Unchanged**), and looked for again in a later window.
+- **Only a copy that reaches the cutoff is kept.** Sources are only asked for copies that may be better than what you
+  have and reach the cutoff, so a source that can only get lossy copies, such as yt-dlp, is passed over when the cutoff
+  is lossless (Activity says it found nothing that reaches the cutoff). A copy's quality is read and its spectrum checked
+  once it's here: one no better, or short of the cutoff, is refused (Activity says **No better**). A song nothing better is found for is left as it is (**Unchanged**), and looked for again in a later window.
 - **The better copy takes the old file's place**: the same path with its own extension (`10 Voyager.mp3` becomes
   `10 Voyager.flac`), and exactly the old file's tags, MusicBrainz IDs and embedded cover included. Its lyrics file
   stays with it. Only its loudness (ReplayGain) is its own.
