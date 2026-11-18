@@ -78,6 +78,14 @@ public sealed class MelodexClient(HttpClient http)
         return (await response.Content.ReadFromJsonAsync<TaskInfo>(MelodexJson.Options, ct))!;
     }
 
+    /// <summary>Queues filling in the catalogue for every library artist.</summary>
+    public async Task<TaskInfo> UpdateCatalogueAsync(CancellationToken ct = default)
+    {
+        using var response = await http.PostAsync($"{Api}/library/catalogue-update", null, ct);
+        response.EnsureSuccessStatusCode();
+        return (await response.Content.ReadFromJsonAsync<TaskInfo>(MelodexJson.Options, ct))!;
+    }
+
     /// <summary>A song's lyrics, as its files have them.</summary>
     public async Task<TrackLyrics> GetTrackLyricsAsync(Guid trackId, CancellationToken ct = default) =>
         (await http.GetFromJsonAsync<TrackLyrics>($"{Api}/library/tracks/{trackId}/lyrics", MelodexJson.Options, ct))!;

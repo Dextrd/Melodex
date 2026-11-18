@@ -4,8 +4,9 @@
 reads, and that the folder is readable by everyone or by `PUID`/`PGID`. On SELinux hosts, see
 [Installing](installing.md#selinux-and-podman).
 
-**Pages say "Updating catalogue" for a long time.** The first scan asks MusicBrainz about every album, at one request
-a second. It carries on in the background; pages fill in as it goes.
+**Pages say "Updating catalogue" for a long time.** The catalogue update after the first scan asks MusicBrainz about
+every album, at one request a second. It carries on in the background as its own task on Activity; pages fill in as
+it goes.
 
 **MusicBrainz is busy.** Melodex waits and tries again. To go faster, run your own MusicBrainz mirror and set its
 address under **Settings → Plugins → MusicBrainz**.
