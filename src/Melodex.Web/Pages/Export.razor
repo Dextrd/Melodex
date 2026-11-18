@@ -87,7 +87,7 @@
                 }
                 else
                 {
-                    <a class="button primary" href="@PlaylistLink" download>Download @(_chosen.Count == 1 ? "it" : $"{_chosen.Count} as a zip")</a>
+                    <DownloadLink Class="button primary" Href="@PlaylistLink">Download @(_chosen.Count == 1 ? "it" : $"{_chosen.Count} as a zip")</DownloadLink>
                 }
             </div>
         </div>
@@ -119,7 +119,7 @@ else
         }
         else
         {
-            <a class="button primary" href="@LibraryLink" download>Download the CSV</a>
+            <DownloadLink Class="button primary" Href="@LibraryLink">Download the CSV</DownloadLink>
         }
     </div>
 }

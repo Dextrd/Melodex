@@ -1,13 +1,22 @@
 @implements IDisposable
 @inject MelodexClient Api
 @inject AuthState Auth
+@inject AppHost Host
 
 @* The app, once this browser is signed in and Melodex is set up; until then, setting it up or signing in. *@
 @if (Auth.Status is not { } status)
 {
     @if (_error is not null)
     {
-        <div class="auth-page"><div class="auth-card"><p class="error">@_error</p><button @onclick="LoadAsync">Try again</button></div></div>
+        <div class="auth-page">
+            <div class="auth-card">
+                <p class="error">@_error</p>
+                <div class="toolbar">
+                    <button @onclick="LoadAsync">Try again</button>
+                    @if (Host.OnDevice) { <button class="link" @onclick="Host.ChangeServer">Another server</button> }
+                </div>
+            </div>
+        </div>
     }
     else
     {
@@ -53,13 +62,20 @@ else
                 <span class="field-label">Password</span>
                 <input type="password" autocomplete="current-password" @bind="_password" @bind:event="oninput" required />
             </label>
-            <label class="auth-check">
-                <input type="checkbox" @bind="_remember" />
-                <span>
-                    Remember me
-                    <span class="muted small">Stay signed in on this browser for 30 days from your last visit. Leave it off on a shared computer.</span>
-                </span>
-            </label>
+            @if (Host.OnDevice)
+            {
+                <p class="muted small">On <strong>@Host.Server</strong>. You stay signed in on this device until you sign out.</p>
+            }
+            else
+            {
+                <label class="auth-check">
+                    <input type="checkbox" @bind="_remember" />
+                    <span>
+                        Remember me
+                        <span class="muted small">Stay signed in on this browser for 30 days from your last visit. Leave it off on a shared computer.</span>
+                    </span>
+                </label>
+            }
 
             @if (_error is not null) { <p class="error small">@_error</p> }
 
@@ -67,6 +83,10 @@ else
                 @if (_busy) { <span class="spinner"></span> }
                 Sign in
             </button>
+            @if (Host.OnDevice)
+            {
+                <button type="button" class="link" @onclick="Host.ChangeServer">Another server</button>
+            }
 
             <p class="muted small">
                 Forgotten your password? The admin can set a new one under Settings → Users. If you're the admin, start Melodex once with
@@ -120,7 +140,7 @@ else
         _error = null;
         try
         {
-            await Api.SignInAsync(new SignIn(_username, _password, _remember));
+            await Host.SignInAsync(new SignIn(_username, _password, _remember));
             Auth.Set(await Api.GetAuthStatusAsync());
         }
         catch (MelodexApiException e)
@@ -135,7 +155,7 @@ else
 
     private async Task SignOutAsync()
     {
-        await Api.SignOutAsync();
+        await Host.SignOutAsync();
         await LoadAsync();
     }
 

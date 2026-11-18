@@ -7,11 +7,12 @@ public static class WebServices
 {
     /// <summary>
     /// The app's own services, the same in every host. The host adds the <see cref="HttpClient"/> that reaches the API,
-    /// with <see cref="SignInHandler"/> in its chain, and anything it does its own way.
+    /// with <see cref="SignInHandler"/> in its chain, and its own <see cref="AppHost"/> if it isn't a browser.
     /// </summary>
     public static IServiceCollection AddMelodexWeb(this IServiceCollection services)
     {
         services.AddScoped<AuthState>();
+        services.AddScoped<AppHost>();
         services.AddScoped<Theme>();
         services.AddScoped<MelodexClient>();
         services.AddScoped<Preferences>();

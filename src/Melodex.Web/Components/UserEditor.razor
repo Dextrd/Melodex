@@ -1,5 +1,6 @@
 @inject MelodexClient Api
 @inject AuthState Auth
+@inject AppHost Host
 
 @*
     Someone's account in three tabs: their login, what they may do, and their login on each media server that syncs
@@ -371,7 +372,7 @@ else
 
     private async Task SignOutAsync()
     {
-        await Api.SignOutAsync();
+        await Host.SignOutAsync();
         Auth.Set(await Api.GetAuthStatusAsync());
     }
 }
