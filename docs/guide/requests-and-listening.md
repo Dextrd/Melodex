@@ -86,6 +86,8 @@ cutoff is met.
   have and reach the cutoff, so a source that can only get lossy copies, such as yt-dlp, is passed over when the cutoff
   is lossless (Activity says it found nothing that reaches the cutoff). A copy's quality is read and its spectrum checked
   once it's here: one no better, or short of the cutoff, is refused (Activity says **No better**). A song nothing better is found for is left as it is (**Unchanged**), and looked for again in a later window.
+- **It's the same recording.** A copy is checked against the length of the file it replaces, not only the
+  catalogue's, so another take of the same title (a studio one for a live song, say) is refused.
 - **The better copy takes the old file's place**: the same path with its own extension (`10 Voyager.mp3` becomes
   `10 Voyager.flac`), and exactly the old file's tags, MusicBrainz IDs and embedded cover included. Its lyrics file
   stays with it. Only its loudness (ReplayGain) is its own.
