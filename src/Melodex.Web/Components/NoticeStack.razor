@@ -7,45 +7,45 @@
     The notifications at the bottom right, above the player; full width on a phone. The newest is at the bottom, and past
     a few the oldest are grouped into one line. Screen readers hear each as it comes.
 *@
-<div class="notices" role="status" aria-live="polite" aria-label="Notifications">
+<div class="toasts" role="status" aria-live="polite" aria-label="Notifications">
     @if (Hidden > 0)
     {
-        <div class="notice notice-more">
-            <a href="activity" class="notice-body">
-                <span class="notice-title">@Format.Count(Hidden, "more notification", "more notifications")</span>
-                <span class="notice-text muted small">See everything in Activity</span>
+        <div class="toast toast-more">
+            <a href="activity" class="toast-body">
+                <span class="toast-title">@Format.Count(Hidden, "more notification", "more notifications")</span>
+                <span class="toast-text muted small">See everything in Activity</span>
             </a>
-            <button type="button" class="notice-close" title="Close them all" aria-label="Close them all" @onclick="CloseGrouped">
+            <button type="button" class="toast-close" title="Close them all" aria-label="Close them all" @onclick="CloseGrouped">
                 <Icon Name="cancel" />
             </button>
         </div>
     }
     @foreach (var notice in Notices.Shown.Skip(Hidden))
     {
-        <div class="notice @(notice.Failed ? "failed" : null)" @key="notice.Key">
+        <div class="toast @(notice.Failed ? "failed" : null)" @key="notice.Key">
             @if (notice.Working)
             {
                 <span class="spinner" aria-hidden="true"></span>
             }
             else
             {
-                <span class="notice-glyph" aria-hidden="true"><Icon Name="@(notice.Failed ? "attention" : "done")" /></span>
+                <span class="toast-glyph" aria-hidden="true"><Icon Name="@(notice.Failed ? "attention" : "done")" /></span>
             }
             @if (notice.Href is { } href)
             {
-                <a href="@href" class="notice-body" @onclick="() => Go(notice)" @onclick:preventDefault="true">
-                    <span class="notice-title">@notice.Title</span>
-                    @if (notice.Text is { } text) { <span class="notice-text muted small">@text</span> }
+                <a href="@href" class="toast-body" @onclick="() => Go(notice)" @onclick:preventDefault="true">
+                    <span class="toast-title">@notice.Title</span>
+                    @if (notice.Text is { } text) { <span class="toast-text muted small">@text</span> }
                 </a>
             }
             else
             {
-                <span class="notice-body">
-                    <span class="notice-title">@notice.Title</span>
-                    @if (notice.Text is { } text) { <span class="notice-text muted small">@text</span> }
+                <span class="toast-body">
+                    <span class="toast-title">@notice.Title</span>
+                    @if (notice.Text is { } text) { <span class="toast-text muted small">@text</span> }
                 </span>
             }
-            <button type="button" class="notice-close" title="Close" aria-label="Close" @onclick="() => Notices.Close(notice.Key, byYou: true)">
+            <button type="button" class="toast-close" title="Close" aria-label="Close" @onclick="() => Notices.Close(notice.Key, byYou: true)">
                 <Icon Name="cancel" />
             </button>
         </div>
