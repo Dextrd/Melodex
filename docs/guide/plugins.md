@@ -21,7 +21,9 @@ through a catalogue that isn't MusicBrainz, such as Deezer, is filed as it's tag
 
 Each retrieval plugin runs as a container of its own, from the same compose file: yt-dlp and the inbox always, the
 others when named in `COMPOSE_PROFILES` (see [installing](installing.md#retrieval-plugins)). Add one under **Add**,
-where each is a template with its address filled in, and fill in its settings.
+where each is a template with its **plugin address** filled in, and fill in its settings. That's the address of the
+plugin's own container, such as `http://retriever-soulseek:8080`, not of the service it uses: slskd's, Prowlarr's or
+qBittorrent's address goes in the plugin's settings once it's added.
 
 ## One media server at a time
 

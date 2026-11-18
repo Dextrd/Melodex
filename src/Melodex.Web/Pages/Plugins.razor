@@ -61,9 +61,13 @@ else
                             Only add plugins you trust: they're sent their settings, and what they answer goes into your library.</p>
                     }
                     <label class="field">
-                        <span class="field-label">Address</span>
+                        <span class="field-label">Plugin address</span>
                         <input type="text" placeholder="http://my-plugin:8080" @bind="_endpoint" @bind:event="oninput" />
-                        <span class="muted small">Where Melodex reaches the plugin. In the same Compose project, that's its service name and port.</span>
+                        <span class="muted small">
+                            Where Melodex reaches the plugin's own container, not the service it uses (such as slskd, Prowlarr or
+                            qBittorrent). In the same Compose project, that's the plugin's service name and port, such as
+                            http://retriever-soulseek:8080. The service's address goes in the plugin's settings once it's added.
+                        </span>
                     </label>
                 }
                 <div class="toolbar dialog-buttons">
