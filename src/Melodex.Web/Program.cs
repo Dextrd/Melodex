@@ -15,6 +15,8 @@ builder.Services.AddScoped(services =>
 builder.Services.AddScoped<MelodexClient>();
 builder.Services.AddScoped<Preferences>();
 builder.Services.AddScoped<ServerEvents>();
+builder.Services.AddScoped<Notices>();
+builder.Services.AddScoped<TaskNotices>();
 builder.Services.AddScoped<RequestTracker>();
 builder.Services.AddScoped<WishlistStore>();
 builder.Services.AddScoped<Player>();

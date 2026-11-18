@@ -1,0 +1,84 @@
+@implements IDisposable
+@inject Notices Notices
+@inject TaskNotices Tasks
+@inject NavigationManager Nav
+
+@*
+    The notifications at the bottom right, above the player; full width on a phone. The newest is at the bottom, and past
+    a few the oldest are grouped into one line. Screen readers hear each as it comes.
+*@
+<div class="notices" role="status" aria-live="polite" aria-label="Notifications">
+    @if (Hidden > 0)
+    {
+        <div class="notice notice-more">
+            <a href="activity" class="notice-body">
+                <span class="notice-title">@Format.Count(Hidden, "more notification", "more notifications")</span>
+                <span class="notice-text muted small">See everything in Activity</span>
+            </a>
+            <button type="button" class="notice-close" title="Close them all" aria-label="Close them all" @onclick="CloseGrouped">
+                <Icon Name="cancel" />
+            </button>
+        </div>
+    }
+    @foreach (var notice in Notices.Shown.Skip(Hidden))
+    {
+        <div class="notice @(notice.Failed ? "failed" : null)" @key="notice.Key">
+            @if (notice.Working)
+            {
+                <span class="spinner" aria-hidden="true"></span>
+            }
+            else
+            {
+                <span class="notice-glyph" aria-hidden="true"><Icon Name="@(notice.Failed ? "attention" : "done")" /></span>
+            }
+            @if (notice.Href is { } href)
+            {
+                <a href="@href" class="notice-body" @onclick="() => Go(notice)" @onclick:preventDefault="true">
+                    <span class="notice-title">@notice.Title</span>
+                    @if (notice.Text is { } text) { <span class="notice-text muted small">@text</span> }
+                </a>
+            }
+            else
+            {
+                <span class="notice-body">
+                    <span class="notice-title">@notice.Title</span>
+                    @if (notice.Text is { } text) { <span class="notice-text muted small">@text</span> }
+                </span>
+            }
+            <button type="button" class="notice-close" title="Close" aria-label="Close" @onclick="() => Notices.Close(notice.Key, byYou: true)">
+                <Icon Name="cancel" />
+            </button>
+        </div>
+    }
+</div>
+
+@code {
+    // How many show before the oldest are grouped.
+    private const int Most = 4;
+
+    private int Hidden => Math.Max(0, Notices.Shown.Count - Most + (Notices.Shown.Count > Most ? 1 : 0));
+
+    protected override void OnInitialized()
+    {
+        Notices.Changed += Redraw;
+        Tasks.EnsureStarted();
+    }
+
+    private void Redraw() => InvokeAsync(StateHasChanged);
+
+    // Going to it closes it, unless it's still going.
+    private void Go(Notice notice)
+    {
+        if (!notice.Working)
+            Notices.Close(notice.Key);
+        Nav.NavigateTo(notice.Href!);
+    }
+
+    private void CloseGrouped()
+    {
+        foreach (var notice in Notices.Shown.Take(Hidden).ToList())
+            Notices.Close(notice.Key, byYou: true);
+    }
+
+    public void Dispose() => Notices.Changed -= Redraw;
+}

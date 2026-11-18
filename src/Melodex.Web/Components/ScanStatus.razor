@@ -1,15 +1,24 @@
 @implements IDisposable
 @inject MelodexClient Api
 @inject AuthState Auth
+@inject Notices Notices
+@inject TaskNotices Tasks
 
 @*
     Shows the scan button, or what the running task is doing, with a menu of the other things done to the whole library:
     matching files again and formatting. Polls while a task runs.
 *@
 <div class="row small scan-status">
-    @if (_status?.CurrentTask is { } task)
+    @if (_status?.CurrentTask is { } task && Notices.Wants(NoticeKind.Task))
     {
-        <a class="muted scan-progress" href="activity?open=@task.Id" title="See what it's doing">@(task.Progress ?? "Starting…")</a>
+        @* What it's doing shows in its notification; here only that something is going. *@
+        <a class="muted scan-progress working" href="activity?open=@task.Id" title="@(task.Title): @(task.Progress ?? "Starting…")" aria-label="@task.Title is going: see what it's doing">
+            <span class="spinner" aria-hidden="true"></span>
+        </a>
+    }
+    else if (_status?.CurrentTask is { } running)
+    {
+        <a class="muted scan-progress" href="activity?open=@running.Id" title="See what it's doing">@(running.Progress ?? "Starting…")</a>
     }
     else if (_status?.Preparing == true)
     {
@@ -167,7 +176,7 @@ else if (_confirm == Confirm.Format)
     private async Task ScanAsync(Rematch rematch)
     {
         _menu = false;
-        await Api.ScanLibraryAsync(rematch);
+        Tasks.Started(await Api.ScanLibraryAsync(rematch));
         Reading = true;
         ReadingChanged?.Invoke();
         await RefreshAsync();

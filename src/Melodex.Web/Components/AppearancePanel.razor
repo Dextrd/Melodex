@@ -60,6 +60,16 @@
                 <span class="muted small">Stronger text and borders, and owned, partial, covered and missing in colours that colour-blind people can tell apart</span>
             </span>
         </label>
+
+        <div class="field-label">Notifications</div>
+        <p class="muted small">They slide in at the bottom right while you use Melodex.</p>
+        @foreach (var (name, hint, on, set) in NoticeKinds)
+        {
+            <label class="dialog-choice">
+                <input type="checkbox" checked="@on(_appearance)" @onchange="e => SaveAsync(set(_appearance, (bool)e.Value!))" />
+                <span><strong>@name</strong><span class="muted small">@hint</span></span>
+            </label>
+        }
         @if (_error is not null) { <p class="error small">@_error</p> }
     </div>
 </section>
@@ -71,6 +81,16 @@
     private Appearance _appearance = new();
     private bool _saving;
     private string? _error;
+
+    private static readonly IReadOnlyList<(string Name, string Hint, Func<Appearance, bool> On, Func<Appearance, bool, Appearance> Set)> NoticeKinds =
+    [
+        ("Long tasks", "Scans, catalogue updates, imports and formatting, as they run and when they finish",
+            a => a.TaskNotices, (a, on) => a with { TaskNotices = on }),
+        ("Downloads", "When something you asked for starts being fetched, and when it's in your library or failed",
+            a => a.DownloadNotices, (a, on) => a with { DownloadNotices = on }),
+        ("Things that go on elsewhere", "Such as looking for an upgrade, with a link to where it's happening",
+            a => a.ActionNotices, (a, on) => a with { ActionNotices = on }),
+    ];
 
     private string Title => ForEveryone ? "Appearance for everyone" : "Appearance";
 

@@ -11,6 +11,20 @@ device you sign in on, and everyone chooses their own.
 
 The sign-in page uses the last theme chosen in that browser.
 
+## Notifications
+
+Notifications slide in at the bottom right, above the player (full width on a phone), the newest at the bottom:
+
+- **Long tasks**: a scan, a catalogue update, an import or formatting shows what it's doing while it runs, and says
+  how it went when it finishes. Beside **Scan** there's only a spinner while one runs.
+- **Downloads**: one when something you asked for starts being fetched, and one when it's in your library or failed.
+  Asking for many songs at once gives one notification for them all.
+- **Things that go on elsewhere**: such as looking for an upgrade from a song's menu.
+
+Each one opens what it's about, and its **×** closes it. Past a few, the oldest are grouped into one line. Work that
+runs on its own, such as finding lyrics after a scan, doesn't pop up. Turn each kind on or off under
+**Settings → Appearance → Notifications**; like the rest of your look, it's kept with your account.
+
 Next: [Plugins](plugins.md).
 
 Long lists open as quickly as short ones, however many artists, albums or songs they hold: only what's near the screen

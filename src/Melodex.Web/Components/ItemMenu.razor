@@ -2,6 +2,7 @@
 @inject AuthState Auth
 @inject MelodexClient Api
 @inject RequestTracker Tracker
+@inject Notices Notices
 @inject NavigationManager Nav
 @inject WishlistStore Wishlist
 
@@ -266,7 +267,11 @@
         try
         {
             await Tracker.CreateAsync(new CreateRequest(Get!.Value.Kind, Get.Value.Id, EditionId));
-            _note = "Asked for: it's in Activity.";
+            // Its notification says so, with a link to it.
+            if (Notices.Wants(NoticeKind.Download))
+                _open = false;
+            else
+                _note = "Asked for: it's in Activity.";
         }
         catch (MelodexApiException e)
         {
@@ -288,8 +293,20 @@
             {
                 { Upgradable: 0 } => scope.Kind == FormatScopeKind.Track ? "It's at its cutoff already, so there's nothing better to look for." : "Every song is at its cutoff already.",
                 { Queued: 0 } => "Better copies are being looked for already.",
-                _ => scope.Kind == FormatScopeKind.Track ? "Looking for a better copy: it's in Activity." : $"Looking for better copies of {found.Queued}: they're in Activity.",
+                _ => null,
             };
+            // Started: a notification says so, with a link to it in Activity.
+            if (_upgrade is null)
+            {
+                var title = scope.Kind == FormatScopeKind.Track ? "Looking for a better copy" : $"Looking for better copies of {Format.Count(found.Queued, "song", "songs")}";
+                if (Notices.Wants(NoticeKind.Action))
+                {
+                    Notices.Show(new Notice($"upgrade:{scope.Kind}:{scope.Id}", NoticeKind.Action, title, "Follow it in Activity", "activity/downloads"));
+                    _open = false;
+                }
+                else
+                    _upgrade = title + ": it's in Activity.";
+            }
         }
         catch (Exception e) when (e is HttpRequestException or MelodexApiException)
         {
