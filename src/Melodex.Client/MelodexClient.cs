@@ -578,6 +578,24 @@ public sealed class MelodexClient(HttpClient http)
         await EnsureAsync(response, ct);
     }
 
+    /// <summary>Sign in from the Melodex app: a key for this device, which acts as you until you sign out on it.</summary>
+    public async Task<DeviceKey> SignInDeviceAsync(DeviceSignIn signIn, CancellationToken ct = default)
+    {
+        using var response = await http.PostAsJsonAsync($"{Api}/auth/devices", signIn, MelodexJson.Options, ct);
+        await EnsureAsync(response, ct);
+        return (await response.Content.ReadFromJsonAsync<DeviceKey>(MelodexJson.Options, ct))!;
+    }
+
+    public async Task<IReadOnlyList<DeviceInfo>> ListDevicesAsync(CancellationToken ct = default) =>
+        await http.GetFromJsonAsync<List<DeviceInfo>>($"{Api}/auth/devices", MelodexJson.Options, ct) ?? [];
+
+    /// <summary>Sign out on one of your devices: its key stops working.</summary>
+    public async Task SignOutDeviceAsync(Guid id, CancellationToken ct = default)
+    {
+        using var response = await http.DeleteAsync($"{Api}/auth/devices/{id}", ct);
+        await EnsureAsync(response, ct);
+    }
+
     public async Task SignOutAsync(CancellationToken ct = default)
     {
         using var response = await http.PostAsync($"{Api}/auth/logout", null, ct);

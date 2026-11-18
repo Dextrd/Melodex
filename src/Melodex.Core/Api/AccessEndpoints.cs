@@ -70,21 +70,9 @@ public static class AccessEndpoints
 
         auth.MapPost("/login", async (SignIn body, HttpContext http, AccessService access, MelodexDbContext db, CancellationToken ct) =>
             {
-                var address = http.Connection.RemoteIpAddress?.ToString() ?? "unknown";
-                if (access.TooManyFailures(address))
-                    return Results.Problem("Too many wrong passwords. Wait a few minutes, then try again.", statusCode: StatusCodes.Status429TooManyRequests,
-                        title: "Too many tries");
-                var user = await access.FindAsync(body.Username, ct);
-                if (user is not { PasswordHash.Length: > 0 } || !AccessService.CheckPassword(body.Password, user.PasswordHash))
-                {
-                    access.Failed(address);
-                    // Slows guessing, and doesn't say which of the two was wrong.
-                    await Task.Delay(TimeSpan.FromMilliseconds(500), ct);
-                    return Results.Problem("That username and password don't match.", statusCode: StatusCodes.Status401Unauthorized, title: "Not signed in");
-                }
-                access.Succeeded(address);
-                await db.Users.Where(u => u.Id == user.Id).ExecuteUpdateAsync(u => u.SetProperty(x => x.LastSignInAt, DateTime.UtcNow), ct);
-                access.UsersChanged();
+                var (user, refused) = await CheckPasswordAsync(body.Username, body.Password, http, access, db, ct);
+                if (user is null)
+                    return refused!;
                 await http.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, AccessService.Principal(user),
                     new AuthenticationProperties { IsPersistent = body.RememberMe });
                 return Results.NoContent();
@@ -95,14 +83,63 @@ public static class AccessEndpoints
                          + "Apps use an API key instead.")
             .Produces(StatusCodes.Status204NoContent).ProducesProblem(StatusCodes.Status401Unauthorized).ProducesProblem(StatusCodes.Status429TooManyRequests);
 
-        auth.MapPost("/logout", async (HttpContext http) =>
+        auth.MapPost("/logout", async (HttpContext http, AccessService access, MelodexDbContext db, CancellationToken ct) =>
             {
+                // On a device, its key goes; in a browser, the session cookie.
+                var (caller, _) = await access.IdentifyAsync(http, ct);
+                if (caller is { Kind: CallerKind.User, KeyId: { } device })
+                {
+                    await db.ApiKeys.Where(k => k.Id == device && k.SessionStamp != null).ExecuteDeleteAsync(ct);
+                    access.KeysChanged();
+                }
                 await http.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
                 return Results.NoContent();
             })
             .AllowAnyone()
             .WithName("SignOut")
-            .WithSummary("End this browser's session.");
+            .WithSummary("End this browser's session, or sign out on this device in the Melodex app.");
+
+        auth.MapPost("/devices", async (DeviceSignIn body, HttpContext http, AccessService access, MelodexDbContext db, CancellationToken ct) =>
+            {
+                if (string.IsNullOrWhiteSpace(body.Device))
+                    return Results.ValidationProblem(new Dictionary<string, string[]> { ["device"] = ["Say which device this is."] });
+                var (user, refused) = await CheckPasswordAsync(body.Username, body.Password, http, access, db, ct);
+                if (user is null)
+                    return refused!;
+                var (key, record) = AccessService.NewDeviceKey(body.Device, user);
+                db.ApiKeys.Add(record);
+                await db.SaveChangesAsync(ct);
+                access.KeysChanged();
+                return Results.Ok(new DeviceKey(record.Id, key));
+            })
+            .AllowAnyone()
+            .WithName("SignInDevice")
+            .WithSummary("Sign in from the Melodex app. The answer holds a key for the device, which the app sends as its API key: it acts as you "
+                         + "signed in, until you sign out on the device or from your account, or your password changes.")
+            .Produces<DeviceKey>().ProducesValidationProblem().ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status429TooManyRequests);
+
+        auth.MapGet("/devices", async (HttpContext http, MelodexDbContext db, CancellationToken ct) =>
+            {
+                var caller = Caller.Of(http);
+                return (await db.ApiKeys.AsNoTracking().Where(k => k.UserId == caller.UserId && k.SessionStamp != null).OrderBy(k => k.CreatedAt).ToListAsync(ct))
+                    .Select(k => new DeviceInfo(k.Id, k.Name, k.CreatedAt, k.LastUsedAt, k.Id == caller.KeyId)).ToList();
+            })
+            .RequireScope(Scopes.SignedIn)
+            .WithName("ListDevices")
+            .WithSummary("The devices you're signed in on with the Melodex app.");
+
+        auth.MapDelete("/devices/{id:guid}", async (Guid id, HttpContext http, AccessService access, MelodexDbContext db, CancellationToken ct) =>
+            {
+                var caller = Caller.Of(http);
+                var removed = await db.ApiKeys.Where(k => k.Id == id && k.UserId == caller.UserId && k.SessionStamp != null).ExecuteDeleteAsync(ct);
+                access.KeysChanged();
+                return removed == 0 ? Results.NotFound() : Results.NoContent();
+            })
+            .RequireScope(Scopes.SignedIn)
+            .WithName("SignOutDevice")
+            .WithSummary("Sign out on one of your devices: the app there is asked to sign in again.")
+            .Produces(StatusCodes.Status204NoContent).Produces(StatusCodes.Status404NotFound);
 
         auth.MapPut("/account", async (UpdateLogin body, HttpContext http, AccessService access, MelodexDbContext db, CancellationToken ct) =>
             {
@@ -118,16 +155,17 @@ public static class AccessEndpoints
                     return Taken();
                 user.Username = username;
                 user.NormalizedUsername = AccessService.Normalize(username);
-                // A new password signs out every other session; this one carries on under the new stamp.
+                // A new password signs out every other session and device; this one carries on under the new stamp.
                 if (body.NewPassword is { Length: > 0 } password)
                 {
                     user.PasswordHash = AccessService.HashPassword(password);
                     user.Stamp = AccessService.NewStamp();
+                    await KeepOnlyThisDeviceAsync(db, user, caller, ct);
                 }
                 await db.SaveChangesAsync(ct);
                 access.UsersChanged();
-                await http.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, AccessService.Principal(user),
-                    new AuthenticationProperties { IsPersistent = await RememberedAsync(http) });
+                access.KeysChanged();
+                await StaySignedInAsync(http, caller, user);
                 return Results.NoContent();
             })
             .RequireScope(Scopes.SignedIn)
@@ -196,7 +234,7 @@ public static class AccessEndpoints
 
         users.MapGet("", async (MelodexDbContext db, CancellationToken ct) =>
             {
-                var keys = await db.ApiKeys.Where(k => k.UserId != null).GroupBy(k => k.UserId!.Value).Select(g => new { g.Key, Count = g.Count() })
+                var keys = await db.ApiKeys.Where(k => k.UserId != null && k.SessionStamp == null).GroupBy(k => k.UserId!.Value).Select(g => new { g.Key, Count = g.Count() })
                     .ToDictionaryAsync(x => x.Key, x => x.Count, ct);
                 var logins = await ServerUsernamesAsync(db, ct);
                 return (await db.Users.AsNoTracking().ToListAsync(ct))
@@ -245,14 +283,15 @@ public static class AccessEndpoints
                 {
                     user.PasswordHash = AccessService.HashPassword(password);
                     user.Stamp = AccessService.NewStamp();
+                    await KeepOnlyThisDeviceAsync(db, user, caller, ct);
                 }
                 await db.SaveChangesAsync(ct);
                 access.UsersChanged();
+                access.KeysChanged();
                 // Changing your own password here keeps you signed in, as changing it under your account does.
                 if (user.Id == caller.UserId && caller.Kind == CallerKind.User)
-                    await http.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, AccessService.Principal(user),
-                        new AuthenticationProperties { IsPersistent = await RememberedAsync(http) });
-                return Results.Ok(Info(user, await db.ApiKeys.CountAsync(k => k.UserId == user.Id, ct), (await ServerUsernamesAsync(db, ct)).TryGetValue(user.Id, out var linked) ? linked : null));
+                    await StaySignedInAsync(http, caller, user);
+                return Results.Ok(Info(user, await db.ApiKeys.CountAsync(k => k.UserId == user.Id && k.SessionStamp == null, ct), (await ServerUsernamesAsync(db, ct)).TryGetValue(user.Id, out var linked) ? linked : null));
             })
             .WithName("UpdateUser")
             .WithSummary("Rename someone, set a new password for them (which signs them out everywhere), or change what they may do. Only the admin "
@@ -283,7 +322,7 @@ public static class AccessEndpoints
         keys.MapGet("", async (HttpContext http, MelodexDbContext db, CancellationToken ct) =>
             {
                 var caller = Caller.Of(http);
-                var query = db.ApiKeys.AsNoTracking().Include(k => k.User).AsQueryable();
+                var query = db.ApiKeys.AsNoTracking().Include(k => k.User).Where(k => k.SessionStamp == null);
                 if (!caller.IsAdmin)
                     query = query.Where(k => k.UserId == caller.UserId);
                 return (await query.OrderBy(k => k.CreatedAt).ToListAsync(ct)).Select(Info).ToList();
@@ -320,7 +359,7 @@ public static class AccessEndpoints
         keys.MapDelete("/{id:guid}", async (Guid id, HttpContext http, MelodexDbContext db, AccessService access, CancellationToken ct) =>
             {
                 var caller = Caller.Of(http);
-                var removed = await db.ApiKeys.Where(k => k.Id == id && (caller.IsAdmin || k.UserId == caller.UserId)).ExecuteDeleteAsync(ct);
+                var removed = await db.ApiKeys.Where(k => k.Id == id && k.SessionStamp == null && (caller.IsAdmin || k.UserId == caller.UserId)).ExecuteDeleteAsync(ct);
                 access.KeysChanged();
                 return removed == 0 ? Results.NotFound() : Results.NoContent();
             })
@@ -394,6 +433,51 @@ public static class AccessEndpoints
         Results.ValidationProblem(new Dictionary<string, string[]> { ["username"] = ["Someone already has that username."] });
 
     // Whether this browser's session is remembered, so signing it in again under a new stamp keeps it so.
+    /// <summary>
+    /// Checks a username and password for signing in, turning away an address after too many wrong ones. The user, or
+    /// why not.
+    /// </summary>
+    private static async Task<(User? User, IResult? Refused)> CheckPasswordAsync(string username, string password, HttpContext http, AccessService access,
+        MelodexDbContext db, CancellationToken ct)
+    {
+        var address = http.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+        if (access.TooManyFailures(address))
+            return (null, Results.Problem("Too many wrong passwords. Wait a few minutes, then try again.", statusCode: StatusCodes.Status429TooManyRequests,
+                title: "Too many tries"));
+        var user = await access.FindAsync(username, ct);
+        if (user is not { PasswordHash.Length: > 0 } || !AccessService.CheckPassword(password, user.PasswordHash))
+        {
+            access.Failed(address);
+            // Slows guessing, and doesn't say which of the two was wrong.
+            await Task.Delay(TimeSpan.FromMilliseconds(500), ct);
+            return (null, Results.Problem("That username and password don't match.", statusCode: StatusCodes.Status401Unauthorized, title: "Not signed in"));
+        }
+        access.Succeeded(address);
+        await db.Users.Where(u => u.Id == user.Id).ExecuteUpdateAsync(u => u.SetProperty(x => x.LastSignInAt, DateTime.UtcNow), ct);
+        access.UsersChanged();
+        return (user, null);
+    }
+
+    /// <summary>
+    /// A new password signs the user out on their devices: all but the one asking, if it's theirs, which carries on under
+    /// the new stamp.
+    /// </summary>
+    private static async Task KeepOnlyThisDeviceAsync(MelodexDbContext db, User user, Caller caller, CancellationToken ct)
+    {
+        var current = caller.UserId == user.Id ? caller.KeyId : null;
+        await db.ApiKeys.Where(k => k.UserId == user.Id && k.SessionStamp != null && k.Id != current).ExecuteDeleteAsync(ct);
+        if (current is { } device)
+            await db.ApiKeys.Where(k => k.Id == device).ExecuteUpdateAsync(k => k.SetProperty(x => x.SessionStamp, user.Stamp), ct);
+    }
+
+    // A browser's session carries on under the new stamp; a device's key was moved to it already.
+    private static async Task StaySignedInAsync(HttpContext http, Caller caller, User user)
+    {
+        if (caller.KeyId is null)
+            await http.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, AccessService.Principal(user),
+                new AuthenticationProperties { IsPersistent = await RememberedAsync(http) });
+    }
+
     private static async Task<bool> RememberedAsync(HttpContext http) =>
         (await http.AuthenticateAsync(CookieAuthenticationDefaults.AuthenticationScheme)).Properties?.IsPersistent == true;
 

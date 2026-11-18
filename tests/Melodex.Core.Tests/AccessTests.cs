@@ -146,6 +146,70 @@ public sealed class AccessTests : IDisposable
     }
 
     [Fact]
+    public async Task A_device_signed_in_with_the_app_acts_as_its_user_until_it_signs_out()
+    {
+        var admin = new MelodexClient(_factory.CreateSignedInClient());
+        await admin.CreateUserAsync(new CreateUser("listener", "listening password", [Scopes.Read]));
+
+        var anonymous = new MelodexClient(_factory.CreateClient());
+        var wrong = await Assert.ThrowsAsync<MelodexApiException>(() => anonymous.SignInDeviceAsync(new DeviceSignIn("listener", "wrong password", "Pixel")));
+        Assert.Equal(HttpStatusCode.Unauthorized, wrong.Status);
+        var phoneKey = await anonymous.SignInDeviceAsync(new DeviceSignIn("listener", "listening password", "Pixel"));
+        var tabletKey = await anonymous.SignInDeviceAsync(new DeviceSignIn("listener", "listening password", "iPad"));
+
+        var phoneHttp = _factory.CreateClient();
+        phoneHttp.DefaultRequestHeaders.Add(AccessService.KeyHeader, phoneKey.Key);
+        var phone = new MelodexClient(phoneHttp);
+        var status = await phone.GetAuthStatusAsync();
+        Assert.True(status.SignedIn);
+        Assert.Equal("listener", status.Username);
+        Assert.Equal([Scopes.Read], status.Permissions);
+        // Signed in, as a key isn't, but able to do no more than its user may.
+        Assert.Equal(HttpStatusCode.OK, (await phoneHttp.GetAsync("api/v1/auth/appearance/default")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden,
+            (await phoneHttp.PostAsJsonAsync("api/v1/requests", new CreateRequest(RequestKind.Track, Guid.NewGuid()), MelodexJson.Options)).StatusCode);
+
+        // Devices are listed on the account, not with the keys.
+        Assert.Equal([("iPad", false), ("Pixel", true)], (await phone.ListDevicesAsync()).Select(d => (d.Name, d.Current)).OrderBy(d => d.Name));
+        Assert.Empty(await admin.ListApiKeysAsync());
+
+        // Signing out there ends its key.
+        await phone.SignOutAsync();
+        Assert.Equal(HttpStatusCode.Unauthorized, (await phoneHttp.GetAsync("api/v1/library")).StatusCode);
+        var tabletHttp = _factory.CreateClient();
+        tabletHttp.DefaultRequestHeaders.Add(AccessService.KeyHeader, tabletKey.Key);
+        Assert.Equal(HttpStatusCode.OK, (await tabletHttp.GetAsync("api/v1/library")).StatusCode);
+    }
+
+    [Fact]
+    public async Task A_new_password_signs_out_other_devices_but_not_this_one()
+    {
+        var admin = new MelodexClient(_factory.CreateSignedInClient());
+        await admin.CreateUserAsync(new CreateUser("listener", "listening password", [Scopes.Read]));
+        var anonymous = new MelodexClient(_factory.CreateClient());
+        var phoneKey = await anonymous.SignInDeviceAsync(new DeviceSignIn("listener", "listening password", "Pixel"));
+        var tabletKey = await anonymous.SignInDeviceAsync(new DeviceSignIn("listener", "listening password", "iPad"));
+        var phoneHttp = _factory.CreateClient();
+        phoneHttp.DefaultRequestHeaders.Add(AccessService.KeyHeader, phoneKey.Key);
+        var tabletHttp = _factory.CreateClient();
+        tabletHttp.DefaultRequestHeaders.Add(AccessService.KeyHeader, tabletKey.Key);
+
+        await new MelodexClient(phoneHttp).UpdateLoginAsync(new UpdateLogin("listening password", NewPassword: "a brand new password"));
+
+        Assert.Equal(HttpStatusCode.OK, (await phoneHttp.GetAsync("api/v1/library")).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await tabletHttp.GetAsync("api/v1/library")).StatusCode);
+
+        // Signed out from the account, or by the admin's new password, the phone goes too.
+        var phone = new MelodexClient(phoneHttp);
+        var laptop = await anonymous.SignInDeviceAsync(new DeviceSignIn("listener", "a brand new password", "Laptop"));
+        await phone.SignOutDeviceAsync(laptop.Id);
+        Assert.Equal(["Pixel"], (await phone.ListDevicesAsync()).Select(d => d.Name));
+        var listener = (await admin.ListUsersAsync()).Single(u => u.Username == "listener");
+        await admin.UpdateUserAsync(listener.Id, new UpdateUser(Password: "the admin's choice"));
+        Assert.Equal(HttpStatusCode.Unauthorized, (await phoneHttp.GetAsync("api/v1/library")).StatusCode);
+    }
+
+    [Fact]
     public async Task Bad_key_requests_are_refused()
     {
         var admin = new MelodexClient(_factory.CreateSignedInClient());
