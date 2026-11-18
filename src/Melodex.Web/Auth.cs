@@ -34,7 +34,7 @@ public sealed class AuthState
 }
 
 /// <summary>Notices the API refusing a call for want of signing in, so the app can ask.</summary>
-public sealed class SignInHandler(AuthState auth) : DelegatingHandler(new HttpClientHandler())
+public sealed class SignInHandler(AuthState auth, HttpMessageHandler? inner = null) : DelegatingHandler(inner ?? new HttpClientHandler())
 {
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
     {

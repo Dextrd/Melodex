@@ -30,6 +30,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Melodex.Plugins.Plex", "src
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Melodex.Plugins.Jellyfin", "src\Melodex.Plugins.Jellyfin\Melodex.Plugins.Jellyfin.csproj", "{9278A2E2-9578-45F3-88AA-05FD1EFDC5AD}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Melodex.Web.Browser", "src\Melodex.Web.Browser\Melodex.Web.Browser.csproj", "{B742DE0E-B540-431F-A152-C1B46A156C69}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -196,6 +198,18 @@ Global
 		{9278A2E2-9578-45F3-88AA-05FD1EFDC5AD}.Release|x64.Build.0 = Release|Any CPU
 		{9278A2E2-9578-45F3-88AA-05FD1EFDC5AD}.Release|x86.ActiveCfg = Release|Any CPU
 		{9278A2E2-9578-45F3-88AA-05FD1EFDC5AD}.Release|x86.Build.0 = Release|Any CPU
+		{B742DE0E-B540-431F-A152-C1B46A156C69}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B742DE0E-B540-431F-A152-C1B46A156C69}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B742DE0E-B540-431F-A152-C1B46A156C69}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{B742DE0E-B540-431F-A152-C1B46A156C69}.Debug|x64.Build.0 = Debug|Any CPU
+		{B742DE0E-B540-431F-A152-C1B46A156C69}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{B742DE0E-B540-431F-A152-C1B46A156C69}.Debug|x86.Build.0 = Debug|Any CPU
+		{B742DE0E-B540-431F-A152-C1B46A156C69}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B742DE0E-B540-431F-A152-C1B46A156C69}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B742DE0E-B540-431F-A152-C1B46A156C69}.Release|x64.ActiveCfg = Release|Any CPU
+		{B742DE0E-B540-431F-A152-C1B46A156C69}.Release|x64.Build.0 = Release|Any CPU
+		{B742DE0E-B540-431F-A152-C1B46A156C69}.Release|x86.ActiveCfg = Release|Any CPU
+		{B742DE0E-B540-431F-A152-C1B46A156C69}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -214,5 +228,6 @@ Global
 		{AD016187-AF74-4B84-9068-CC12442BED74} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{295ECCD4-028F-42A7-8042-72023C500691} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{9278A2E2-9578-45F3-88AA-05FD1EFDC5AD} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
+		{B742DE0E-B540-431F-A152-C1B46A156C69} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 	EndGlobalSection
 EndGlobal
