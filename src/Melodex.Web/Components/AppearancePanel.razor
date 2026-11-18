@@ -81,9 +81,17 @@
     // Everyone's look shows as you change it only while you follow it.
     private bool Shown => !ForEveryone || Auth.Status?.OwnAppearance != true;
 
-    protected override async Task OnInitializedAsync()
+    private bool? _loadedFor;
+
+    protected override void OnInitialized() => Auth.Changed += OnAuthChanged;
+
+    // Read again when switched between yours and everyone's, in place, so the switch slides rather than jumps.
+    protected override async Task OnParametersSetAsync()
     {
-        Auth.Changed += OnAuthChanged;
+        if (_loadedFor == ForEveryone)
+            return;
+        _loadedFor = ForEveryone;
+        _error = null;
         _appearance = Auth.Status?.Appearance ?? new Appearance();
         if (ForEveryone)
         {

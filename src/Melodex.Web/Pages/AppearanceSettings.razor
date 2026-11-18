@@ -10,7 +10,7 @@
 *@
 @if (Auth.May(UserPermissions.Settings))
 {
-    <AppearancePanel @key="_everyone" ForEveryone="_everyone">
+    <AppearancePanel ForEveryone="_everyone">
         <Switch>
             <Segmented T="bool" Value="_everyone" Options="Whose" OnChange="v => _everyone = v" Label="Whose look" Class="panel-switch" />
         </Switch>
