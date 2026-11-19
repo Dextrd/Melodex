@@ -1221,6 +1221,8 @@ svg.flip { transform: scaleY(-1); }
 .library-bar .toolbar { margin: 0; }
 .toolbar.one-line { flex-wrap: nowrap; }
 .toolbar.one-line > * { flex: none; }
+/* Except the space that pushes what's after it to the right. */
+.toolbar.one-line > .spacer { flex: 1; }
 .toolbar.one-line .filter { flex: 1 1 12rem; min-width: 8rem; max-width: 420px; }
 .toolbar.one-line .count { margin-left: auto; white-space: nowrap; }
 .filter-toggle, .filter-drop { display: none; }
