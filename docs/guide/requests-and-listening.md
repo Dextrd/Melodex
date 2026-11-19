@@ -19,6 +19,10 @@ a copy was turned away only for its quality, **Keep it anyway**, as it is.
 Requests run one at a time, in order. Move them up and down the queue, pause them or cancel them from Activity, one by
 one or with **Pause all** and **Cancel all** (with a filter, **Pause these** and **Cancel these** act on what's shown).
 
+Activity's **Recent** view, on both **Downloads** and **Tasks**, is in three sections: **Running**, **Queued** (the next
+to run at the top) and **Completed** (the most recently finished at the top). Click a section's heading to close or
+open it; each tab remembers. As something starts or finishes it slides from one section into the next.
+
 **Ignore** an album or song to stop counting it as missing.
 
 ## Quality
