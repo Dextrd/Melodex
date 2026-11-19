@@ -181,11 +181,11 @@ else
                             <td class="track-main">
                                 <div class="ellipsis"><a href="@Format.AlbumHref(album)">@album.Title</a></div>
                                 <div class="muted small ellipsis">
-                                    <span class="show-narrow"><StatusBadge Album="album.Status" /></span>
+                                    <span class="show-narrow"><StatusBadge Album="album.Status" PartlyCovered="album.PartlyCovered" /></span>
                                     @if (album.Local) { @album.ArtistCredit } else { <a href="artists/@album.ArtistId" @onclick="() => RememberArtistAsync(album.ArtistId, album.ArtistCredit)">@album.ArtistCredit</a> }@(Format.Year(album.FirstReleaseDate) is { Length: > 0 } year ? $" · {year}" : "") · @Format.TypeLabel(album.Type)
                                 </div>
                             </td>
-                            <td class="num hide-narrow"><StatusBadge Album="album.Status" /></td>
+                            <td class="num hide-narrow"><StatusBadge Album="album.Status" PartlyCovered="album.PartlyCovered" /></td>
                             <td class="num actions">
                                 @{
                                     var missing = album.Status == AlbumStatus.Missing;

@@ -37,6 +37,7 @@ Each artist's albums are one of:
 | **Owned** | You have every song |
 | **Partly owned** | You have some of the songs |
 | **Covered** | You have every song, but on other albums, such as a compilation |
+| **Partly covered** | You have some of the songs on other albums, and the rest are missing: it still counts as missing |
 | **Missing** | You have none of it |
 
 Live albums, compilations, remixes and the like are hidden by default; show them from the artist page. Files Melodex

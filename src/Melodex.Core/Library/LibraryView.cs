@@ -482,12 +482,12 @@ public sealed partial class LibraryView(MelodexDbContext db, SettingsService set
         var files = await db.LibraryFiles.Include(f => f.Edition).Where(f => f.TrackId == id).OrderBy(f => f.Path).ToListAsync(ct);
         var filed = files.Select(f => f.EditionId).OfType<Guid>().ToHashSet();
         var on = await db.EditionTracks.Include(et => et.Edition).ThenInclude(e => e.Album).Where(et => et.TrackId == id).ToListAsync(ct);
-        var statuses = (await GetAlbumSummariesAsync(on.Select(et => et.Edition.AlbumId).Distinct().ToList(), ct)).ToDictionary(a => a.Id, a => a.Status);
+        var albums = (await GetAlbumSummariesAsync(on.Select(et => et.Edition.AlbumId).Distinct().ToList(), ct)).ToDictionary(a => a.Id);
         var appearances = on
             .OrderBy(et => et.Edition.Album.FirstReleaseDate ?? "9999").ThenBy(et => et.Edition.Album.Title).ThenBy(et => et.Edition.ReleaseDate ?? "9999")
             .Select(et => new TrackAppearance(et.Edition.AlbumId, et.Edition.Album.Title, et.Edition.Album.Type, et.EditionId, et.Edition.Title,
                 et.Edition.ReleaseDate, et.Edition.Country, et.Disc, et.Number, et.Title, filed.Contains(et.EditionId),
-                statuses.GetValueOrDefault(et.Edition.AlbumId, AlbumStatus.Missing)))
+                albums.GetValueOrDefault(et.Edition.AlbumId)?.Status ?? AlbumStatus.Missing, albums.GetValueOrDefault(et.Edition.AlbumId)?.PartlyCovered == true))
             .ToList();
         // A cover chosen for the song itself, else its edition's.
         var cover = await db.Artwork.AnyAsync(a => a.EntityKind == EntityKind.Track && a.EntityId == id && a.Chosen, ct)
