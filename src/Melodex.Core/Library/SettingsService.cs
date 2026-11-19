@@ -74,17 +74,15 @@ public sealed class SettingsService(MelodexDbContext db)
 
     /// <summary>
     /// When scheduled tasks run. A new install starts with the defaults; one set up before there were scheduled tasks
-    /// starts with its upgrade schedule as it was, and nothing else, so nothing new runs until it's chosen.
+    /// starts with its upgrade schedule as it was, and nothing else, so nothing new runs until it's chosen. That's read
+    /// from the upgrade settings, which keep it as it was, until the schedules are first saved: reading saves nothing, so
+    /// the services reading it as Melodex starts don't race to.
     /// </summary>
     public async Task<ScheduleSettings> GetScheduleAsync(CancellationToken ct)
     {
         if (await db.Settings.FindAsync([ScheduleKey], ct) is { } row)
             return JsonSerializer.Deserialize<ScheduleSettings>(row.ValueJson, MelodexJson.Options) ?? new ScheduleSettings();
-        if (await db.Settings.FindAsync([ScheduleFromUpgradesKey], ct) is null)
-            return new ScheduleSettings();
-        var schedule = FromUpgrades(await GetUpgradesAsync(ct));
-        await SaveScheduleAsync(schedule, ct);
-        return schedule;
+        return await db.Settings.FindAsync([ScheduleFromUpgradesKey], ct) is null ? new ScheduleSettings() : FromUpgrades(await GetUpgradesAsync(ct));
     }
 
     public Task SaveScheduleAsync(ScheduleSettings value, CancellationToken ct) => SaveAsync(ScheduleKey, value, ct);

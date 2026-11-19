@@ -98,6 +98,28 @@ public sealed class ScheduleTests : IDisposable
         Assert.Equal((new TimeOnly(2, 0), new TimeOnly(5, 0)), (schedule.Daily.From, schedule.Daily.Until));
         Assert.Empty(schedule.Weekly.Tasks);
         Assert.Empty(schedule.Monthly.Tasks);
+
+        // Saving upgrades' other settings, which say when as the schedules do, leaves it as it was.
+        var upgrades = (await _api.GetUpgradesAsync()).Settings;
+        await _api.SaveUpgradeSettingsAsync(upgrades with { AtATime = 2, Scheduled = false, Days = [] });
+        Assert.Equal(schedule, (await _api.GetSchedulesAsync()).Settings, ScheduleComparer.Instance);
+    }
+
+    // Records compare their lists by reference, so the tasks are compared by what's in them.
+    private sealed class ScheduleComparer : IEqualityComparer<ScheduleSettings>
+    {
+        public static readonly ScheduleComparer Instance = new();
+
+        public bool Equals(ScheduleSettings? x, ScheduleSettings? y) =>
+            x is not null && y is not null && Plain(x) == Plain(y)
+            && Enum.GetValues<ScheduleRepeat>().All(r => x.Of(r).Tasks.SequenceEqual(y.Of(r).Tasks));
+
+        public int GetHashCode(ScheduleSettings obj) => 0;
+
+        private static ScheduleSettings Plain(ScheduleSettings s) => s with
+        {
+            Daily = s.Daily with { Tasks = [] }, Weekly = s.Weekly with { Tasks = [] }, Monthly = s.Monthly with { Tasks = [] },
+        };
     }
 
     [Fact]
