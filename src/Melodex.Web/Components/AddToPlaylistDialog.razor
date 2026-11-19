@@ -3,65 +3,135 @@
 @inject Notices Notices
 
 @*
-    Puts songs in your playlists, or takes them out: each playlist with its cover and a box, ticked when it has them all,
-    half-ticked when it has some. Ticking and unticking are saved together. A new playlist is made with them at once.
+    Puts songs in your playlists, or takes them out: a folder at a time, each playlist with its cover and a box, ticked
+    when it has them all, half-ticked when it has some. Ticking and unticking are saved together. A new playlist or
+    folder is named in a dialog of its own, then shown here: the playlist ticked, the folder opened.
 *@
-<Dialog Title="@($"Add {Name} to playlists")" OnClose="OnClose" Class="playlist-picker">
-    <div class="field">
-        <label class="field-label" for="playlist-new">New playlist</label>
-        <div class="row">
-            <input id="playlist-new" type="text" placeholder="@($"Name, or Folder{Delimiter}Name")" @bind="_newName" @bind:event="oninput"
-                   @onkeydown="EnterAsync" />
-            <button disabled="@(_busy || _newName.Trim().Length == 0)" @onclick="CreateAsync">Make it</button>
-        </div>
-    </div>
-    @if (_playlists is null)
-    {
-        <Loading Inline="true" />
-    }
-    else if (_playlists.Count > 0)
-    {
+@if (_naming is { } naming)
+{
+    var folder = naming == Naming.Folder;
+    <Dialog Title="@(folder ? "New folder" : "New playlist")" OnClose="() => _naming = null" Class="playlist-picker">
         <div class="field">
-            <label class="field-label" for="playlist-filter">Your playlists</label>
+            <label class="field-label" for="playlist-name">Name</label>
+            <input id="playlist-name" type="text" @bind="_name" @bind:event="oninput" @onkeydown="EnterAsync" />
+            <span class="muted small">
+                @if (folder)
+                {
+                    @(_path.Length > 0 ? $"In {string.Join(" › ", Parts(_path))}. " : "")@("It's kept once a playlist is made in it.")
+                }
+                else if (Delimiter.Length > 0)
+                {
+                    @($"Put it in folders with {Delimiter}, as in Moods{Delimiter}Calm.")
+                }
+            </span>
+        </div>
+        @if (_error is not null) { <p class="error small">@_error</p> }
+        <div class="toolbar dialog-buttons">
+            <span class="spacer"></span>
+            <button disabled="@_busy" @onclick="() => _naming = null">Cancel</button>
+            <button class="primary" disabled="@(_busy || _name.Trim().Length == 0)" @onclick="NameAsync">@if (_busy) { <span class="spinner"></span> }Make it</button>
+        </div>
+    </Dialog>
+}
+else
+{
+    <Dialog Title="@($"Add {Name} to playlists")" OnClose="OnClose" Class="playlist-picker">
+        @if (_playlists is null)
+        {
+            <Loading Inline="true" />
+        }
+        else
+        {
             @if (_playlists.Count > 8)
             {
-                <input id="playlist-filter" type="search" placeholder="Find a playlist" @bind="_filter" @bind:event="oninput" />
+                <div class="field">
+                    <input type="search" placeholder="Find a playlist" aria-label="Find a playlist" @bind="_filter" @bind:event="oninput" />
+                </div>
             }
-            <ul class="picker-list" role="group" aria-label="Your playlists">
+            @if (_filter.Length == 0 && Delimiter.Length > 0)
+            {
+                <nav class="folder-crumbs picker-crumbs" aria-label="Folders">
+                    @if (_path.Length == 0)
+                    {
+                        <strong>All playlists</strong>
+                    }
+                    else
+                    {
+                        <button class="link" @onclick="() => _path = string.Empty">All playlists</button>
+                        var parts = Parts(_path);
+                        @for (var i = 0; i < parts.Count; i++)
+                        {
+                            var to = string.Join(Delimiter, parts.Take(i + 1));
+                            <span class="muted" aria-hidden="true">›</span>
+                            @if (i == parts.Count - 1) { <strong>@parts[i]</strong> } else { <button class="link" @onclick="() => _path = to">@parts[i]</button> }
+                        }
+                    }
+                </nav>
+            }
+            <ul class="picker-list" aria-label="Your playlists">
+                @if (_filter.Length == 0)
+                {
+                    @foreach (var (path, name, count) in FoldersHere())
+                    {
+                        <li @key="path">
+                            <button class="plain picker-row" @onclick="() => _path = path">
+                                @if (_folderCovers.GetValueOrDefault(path) is { } url) { <Cover Url="@url" /> }
+                                else
+                                {
+                                    <span class="cover folder-cover" aria-hidden="true">
+                                        <svg viewBox="0 0 24 24"><path d="M3 6.5A1.5 1.5 0 0 1 4.5 5H9l2 2.5h8.5A1.5 1.5 0 0 1 21 9v9.5a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18.5z" /></svg>
+                                    </span>
+                                }
+                                <span class="picker-name">
+                                    <span class="ellipsis">@name</span>
+                                    <span class="muted small ellipsis">Folder · @(count == 0 ? "empty" : Format.Count(count, "playlist", "playlists"))</span>
+                                </span>
+                                <svg viewBox="0 0 24 24" class="chevron" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>
+                            </button>
+                        </li>
+                    }
+                }
                 @foreach (var playlist in Shown)
                 {
                     var folders = PlaylistNames.Folders(playlist.Name, Delimiter);
                     var state = State(playlist.Id);
-                    <li>
-                        <button class="plain picker-row @(Changed(playlist.Id) ? "changed" : "")" role="checkbox" disabled="@_busy"
-                                aria-checked="@(state switch { true => "true", false => "false", null => "mixed" })" @onclick="() => Toggle(playlist.Id)">
-                            <span class="picker-check" aria-hidden="true">
-                                @if (state == true) { <Icon Name="done" /> } else if (state is null) { <span class="picker-dash"></span> }
-                            </span>
-                            <PlaylistCover Covers="playlist.Covers" Class="small" />
+                    <li @key="playlist.Id">
+                        <label class="picker-row @(Changed(playlist.Id) ? "changed" : "")">
+                            <input type="checkbox" class="@(state is null ? "mixed" : "")" checked="@(state == true)" disabled="@_busy"
+                                   aria-checked="@(state switch { true => "true", false => "false", null => "mixed" })" @onchange="() => Toggle(playlist.Id)" />
+                            <PlaylistCover Covers="playlist.Covers" />
                             <span class="picker-name">
                                 <span class="ellipsis">@PlaylistNames.Leaf(playlist.Name, Delimiter)</span>
                                 <span class="muted small ellipsis">
-                                    @PlaylistNames.Length(playlist.Count, playlist.DurationSeconds)@(folders.Count > 0 ? $" · in {string.Join(" › ", folders)}" : "")
+                                    @PlaylistNames.Length(playlist.Count, playlist.DurationSeconds)@(_filter.Length > 0 && folders.Count > 0 ? $" · in {string.Join(" › ", folders)}" : "")
                                 </span>
                             </span>
                             @if (state is null)
                             {
                                 <span class="muted small nowrap">Has @Has(playlist.Id) of @_of</span>
                             }
-                        </button>
+                        </label>
                     </li>
                 }
+                @if (!Shown.Any() && (_filter.Length > 0 || !FoldersHere().Any()))
+                {
+                    <li class="picker-empty muted small">@(_filter.Length > 0 ? "No playlist is called that." : "No playlists here yet.")</li>
+                }
             </ul>
+        }
+        @if (_error is not null) { <p class="error small">@_error</p> }
+        <div class="toolbar dialog-buttons">
+            <IconButton Icon="plus" Label="New playlist" Disabled="_busy || _playlists is null" Title="Make a playlist, in this folder" OnClick="() => StartNaming(Naming.Playlist)" />
+            @if (Delimiter.Length > 0)
+            {
+                <IconButton Icon="add" Label="New folder" Disabled="_busy || _playlists is null" Title="Make a folder in this one, to make a playlist in" OnClick="() => StartNaming(Naming.Folder)" />
+            }
+            <span class="spacer"></span>
+            <button disabled="@_busy" @onclick="OnClose">Cancel</button>
+            <button class="primary" disabled="@(_busy || _wanted.Count == 0)" @onclick="SaveAsync">@if (_busy) { <span class="spinner"></span> }Save</button>
         </div>
-    }
-    @if (_error is not null) { <p class="error small">@_error</p> }
-    <div class="toolbar dialog-buttons">
-        <span class="spacer"></span>
-        <button disabled="@_busy" @onclick="OnClose">Cancel</button>
-        <button class="primary" disabled="@(_busy || _wanted.Count == 0)" @onclick="SaveAsync">@if (_busy) { <span class="spinner"></span> }Save</button>
-    </div>
-</Dialog>
+    </Dialog>
+}
 
 @code {
     /// <summary>What's being added, as the title says it: a song's or album's name.</summary>
@@ -69,34 +139,67 @@
     [Parameter, EditorRequired] public IReadOnlyList<PlaylistItem> Songs { get; set; } = [];
     [Parameter] public EventCallback OnClose { get; set; }
 
+    private enum Naming { Playlist, Folder }
+
     private List<PlaylistSummary>? _playlists;
     private Dictionary<Guid, int> _has = [];
+    private Dictionary<string, string> _folderCovers = [];
     private int _of;
 
     // What's been ticked (true) or unticked (false), by playlist; the rest stay as they are.
     private readonly Dictionary<Guid, bool> _wanted = [];
 
-    private string _newName = "";
+    // The folder open, "" for the top; and folders made here that have no playlist yet.
+    private string _path = "";
+    private readonly HashSet<string> _madeFolders = [];
+
+    private Naming? _naming;
+    private string _name = "";
     private string _filter = "";
     private bool _busy;
     private string? _error;
 
     private string Delimiter => PlaylistNames.Delimiter(Auth);
 
-    // Most recently changed first: the one you're building is usually it.
+    private IReadOnlyList<string> Parts(string path) => path.Length == 0 ? [] : path.Split(Delimiter);
+
+    private string FolderOf(PlaylistSummary playlist) => string.Join(Delimiter, PlaylistNames.Folders(playlist.Name, Delimiter));
+
+    private static bool IsWithin(string path, string folder, string delimiter) =>
+        folder.Length == 0 || path == folder || path.StartsWith(folder + delimiter, StringComparison.Ordinal);
+
+    // Found by name, from every folder; otherwise those in the folder open. Most recently changed first: the one you're
+    // building is usually it.
     private IEnumerable<PlaylistSummary> Shown => _playlists!
-        .Where(p => _filter.Length == 0 || p.Name.Contains(_filter, StringComparison.CurrentCultureIgnoreCase))
+        .Where(p => _filter.Length > 0 ? p.Name.Contains(_filter, StringComparison.CurrentCultureIgnoreCase) : Delimiter.Length == 0 || FolderOf(p) == _path)
         .OrderByDescending(p => p.UpdatedAt);
+
+    // The folders in the one open, by name, with how many playlists are in each, in its folders too.
+    private IEnumerable<(string Path, string Name, int Count)> FoldersHere()
+    {
+        if (Delimiter.Length == 0)
+            return [];
+        var depth = Parts(_path).Count;
+        var paths = _playlists!.Select(FolderOf).Where(f => f.Length > 0).Concat(_madeFolders)
+            .Where(f => IsWithin(f, _path, Delimiter) && Parts(f).Count > depth)
+            .Select(f => string.Join(Delimiter, Parts(f).Take(depth + 1)))
+            .Distinct();
+        return paths
+            .Select(path => (path, Parts(path)[^1], _playlists!.Count(p => IsWithin(FolderOf(p), path, Delimiter))))
+            .OrderBy(f => f.Item2, StringComparer.CurrentCultureIgnoreCase);
+    }
 
     protected override async Task OnInitializedAsync()
     {
         try
         {
             var holding = Api.GetPlaylistsHoldingAsync(new AddToPlaylist(Songs));
+            var folders = Api.GetPlaylistFoldersAsync();
             _playlists = (await Api.ListPlaylistsAsync()).ToList();
             var held = await holding;
             _has = held.ToDictionary(h => h.PlaylistId, h => h.Has);
             _of = held.FirstOrDefault()?.Of ?? Songs.Count;
+            _folderCovers = (await folders).Where(f => f.CoverUrl is not null).ToDictionary(f => f.Path, f => f.CoverUrl!);
         }
         catch (Exception e) when (e is HttpRequestException or MelodexApiException)
         {
@@ -123,6 +226,42 @@
             _wanted.Remove(id);
         else
             _wanted[id] = next;
+    }
+
+    // A new playlist is named in the folder open; a new folder goes in it.
+    private void StartNaming(Naming naming)
+    {
+        _naming = naming;
+        _error = null;
+        _name = naming == Naming.Playlist && _path.Length > 0 ? _path + Delimiter : "";
+    }
+
+    private Task EnterAsync(KeyboardEventArgs e) => e.Key == "Enter" ? NameAsync() : Task.CompletedTask;
+
+    private async Task NameAsync()
+    {
+        var name = _name.Trim();
+        if (name.Length == 0)
+            return;
+        if (_naming == Naming.Folder)
+        {
+            // Opened, to make a playlist in; it's only kept once one is.
+            var path = string.Join(Delimiter, Parts(_path).Concat(Parts(name).Select(p => p.Trim()).Where(p => p.Length > 0)));
+            _madeFolders.Add(path);
+            _path = path;
+            _naming = null;
+            return;
+        }
+        await RunAsync(async () =>
+        {
+            // Made empty and ticked, so it gets the songs with everything else on Save.
+            var made = await Api.CreatePlaylistAsync(new CreatePlaylist(name));
+            _playlists!.Add(made.Playlist);
+            _wanted[made.Playlist.Id] = true;
+            _path = FolderOf(made.Playlist);
+            _filter = "";
+            _naming = null;
+        });
     }
 
     private async Task SaveAsync()
@@ -156,24 +295,6 @@
     }
 
     private static string Names(List<string> names) => names.Count <= 2 ? string.Join(" and ", names) : $"{names[0]}, {names[1]} and {names.Count - 2} more";
-
-    private Task EnterAsync(KeyboardEventArgs e) => e.Key == "Enter" ? CreateAsync() : Task.CompletedTask;
-
-    // Made with the songs in it, and ticked in the list.
-    private async Task CreateAsync()
-    {
-        if (_newName.Trim().Length == 0)
-            return;
-        await RunAsync(async () =>
-        {
-            var made = await Api.CreatePlaylistAsync(new CreatePlaylist(_newName.Trim(), Songs: Songs));
-            _playlists!.Add(made.Playlist);
-            _has[made.Playlist.Id] = made.Playlist.Count;
-            _newName = "";
-            Notices.Show(new Notice($"playlist:{made.Playlist.Id}", NoticeKind.Action, $"Made {PlaylistNames.Leaf(made.Playlist.Name, Delimiter)}",
-                $"With {Format.Count(made.Playlist.Count, "song", "songs")}", $"playlists/{made.Playlist.Id}", "playlist", made.Playlist.Covers.FirstOrDefault()));
-        });
-    }
 
     private async Task RunAsync(Func<Task> action)
     {
