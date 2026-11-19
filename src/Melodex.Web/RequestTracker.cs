@@ -130,15 +130,17 @@ public sealed class RequestTracker : IDisposable
     /// Asks the server to start some requests itself, such as upgrades: those it starts that match get a notification
     /// when they finish, together. What was there before it's asked, however much, isn't counted.
     /// </summary>
-    public async Task<T> WatchNewAsync<T>(Func<Task<T>> start, Func<RequestInfo, bool> match)
+    /// <returns>What starting them said, and the requests it started, newest first.</returns>
+    public async Task<(T Started, IReadOnlyList<RequestInfo> Asked)> WatchNewAsync<T>(Func<Task<T>> start, Func<RequestInfo, bool> match)
     {
         await EnsureLoadedAsync();
         var known = _requests.Select(r => r.Id).ToHashSet();
         var started = await start();
         await RefreshAsync();
-        foreach (var asked in _requests.Where(r => r.ParentId is null && !known.Contains(r.Id) && match(r)))
-            Watch(asked);
-        return started;
+        var asked = _requests.Where(r => r.ParentId is null && !known.Contains(r.Id) && match(r)).ToList();
+        foreach (var one in asked)
+            Watch(one);
+        return (started, asked);
     }
 
     public async Task RefreshAsync()
@@ -224,7 +226,8 @@ public sealed class RequestTracker : IDisposable
             }
             : Format.Count(requests.Count, "thing", "things");
 
-    private static string Href(Lot lot) => lot.Asked.Count == 1 ? $"activity/downloads?open={lot.Asked[0].Id}" : "activity/downloads";
+    // To the first of them in Activity, flashed, so where they are is plain.
+    private static string Href(Lot lot) => $"activity/downloads?open={lot.Asked[0].Id}";
 
     private void Schedule(TimeSpan delay)
     {

@@ -286,19 +286,24 @@
         try
         {
             // Only the upgrades this starts get the notification when they're finished.
-            var found = await Tracker.WatchNewAsync(() => Api.SearchUpgradesAsync(scope), r => r.Upgrade);
+            var (found, asked) = await Tracker.WatchNewAsync(() => Api.SearchUpgradesAsync(scope), r => r.Upgrade);
             var one = scope.Kind == FormatScopeKind.Track;
             var key = $"upgrade:{scope.Kind}:{scope.Id}";
             if (found.Upgradable == 0)
                 Say(new Notice(key, NoticeKind.Action, one ? "Nothing better to look for" : "Every song is at its cutoff",
                     one ? "It's at its cutoff already" : "So there's nothing better to look for", Icon: "upgrade", Art: Cover), always: true);
             else if (found.Queued == 0)
-                Say(new Notice(key, NoticeKind.Action, "Better copies are being looked for already", "Follow them in Activity", "activity/downloads", "upgrade", Cover), always: true);
+            {
+                // To the one already going, for a song.
+                var going = one ? Tracker.Requests.FirstOrDefault(r => r.Upgrade && r.Active && r.TargetId == scope.Id) : null;
+                Say(new Notice(key, NoticeKind.Action, "Better copies are being looked for already", "Follow them in Activity",
+                    going is not null ? $"activity/downloads?open={going.Id}" : "activity/downloads", "upgrade", Cover), always: true);
+            }
             else
             {
                 // Another says when they're finished.
                 Say(new Notice(key, NoticeKind.Action, one ? "Looking for a better copy" : $"Looking for better copies of {Format.Count(found.Queued, "song", "songs")}",
-                    "Follow it in Activity", "activity/downloads", "upgrade", Cover));
+                    "Follow it in Activity", asked.Count > 0 ? $"activity/downloads?open={asked[0].Id}" : "activity/downloads", "upgrade", Cover));
             }
         }
         catch (Exception e) when (e is HttpRequestException or MelodexApiException)
