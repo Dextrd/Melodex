@@ -966,6 +966,49 @@ public sealed class RequestTests(RequestFixture fixture, ITestOutputHelper outpu
     }
 
     [TestLibraryFact]
+    public async Task A_song_can_be_replaced_keeping_its_place_and_passing_over_the_copy_it_has()
+    {
+        var (file, scope) = await OwnedAsync("Discovery (2001)/03 Digital Love.mp3");
+        using var owned = scope;
+        var (fileId, trackId, oldPath) = (file.Id, file.TrackId!.Value, file.Path);
+        var db = scope.ServiceProvider.GetRequiredService<Melodex.Core.Data.MelodexDbContext>();
+        var source = new FakeSource("another") { Candidates = 1, BitrateKbps = null };
+        await fixture.AddSourceAsync(source);
+        try
+        {
+            var asked = await Api.ReplaceFileAsync(fileId);
+            Assert.True(asked.Replace);
+            Assert.False(asked.Upgrade);
+            // Asking again while it's going gives the same request.
+            Assert.Equal(asked.Id, (await Api.ReplaceFileAsync(fileId)).Id);
+            var done = await fixture.WaitAsync(asked.Id);
+            Dump(done);
+            Assert.Equal(RequestState.InLibrary, done.State);
+            Assert.StartsWith("Replaced the MP3", done.Detail);
+            Assert.Equal(1, source.Fetches);
+            // The same library file and song, so its place in playlists stays; the old file is held, to put back.
+            var replaced = await db.LibraryFiles.AsNoTracking().SingleAsync(f => f.Id == fileId);
+            Assert.Equal(trackId, replaced.TrackId);
+            Assert.NotEqual(oldPath, replaced.Path);
+            var held = Assert.Single(await Api.GetHeldFilesAsync(trackId));
+            Assert.Equal(oldPath, held.Path);
+
+            // Asked again, the copy it fetched is passed over, and nothing else is found: the song stays as it is.
+            var again = await fixture.WaitAsync((await Api.ReplaceFileAsync(fileId)).Id);
+            Assert.Equal(RequestState.Failed, again.State);
+            Assert.Contains("found only the copy you have", again.Detail);
+            Assert.Equal(1, source.Fetches);
+
+            await Api.RestoreHeldFileAsync(held.Id, never: false);
+            Assert.Equal(oldPath, (await db.LibraryFiles.AsNoTracking().SingleAsync(f => f.Id == fileId)).Path);
+        }
+        finally
+        {
+            await fixture.RemoveSourcesAsync();
+        }
+    }
+
+    [TestLibraryFact]
     public async Task Songs_never_to_be_upgraded_and_songs_set_aside_are_not_upgradable()
     {
         var album = await fixture.AlbumAsync("Daft Punk", "Discovery");

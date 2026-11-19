@@ -121,6 +121,37 @@ public sealed class Upgrades(
     }
 
     /// <summary>
+    /// Asks for a new file for a song you have in place of one of its files, better or not, passing over the one you have:
+    /// for a song fetched as the wrong recording. It keeps its place in the library and in playlists. The request going
+    /// for the song already, if there is one; null when the file isn't a matched one.
+    /// </summary>
+    public async Task<Request?> AskToReplaceAsync(Guid fileId, string requester, CancellationToken ct)
+    {
+        if (await db.LibraryFiles.FindAsync([fileId], ct) is not { TrackId: { } trackId } file)
+            return null;
+        if (await db.Requests.FirstOrDefaultAsync(r => r.Mode == RequestMode.Permanent && !RequestService.Finished.Contains(r.Status)
+                                                       && (r.UpgradesFileId == fileId || r.TargetKind == EntityKind.Track && r.TargetId == trackId), ct) is { } going)
+            return going;
+        var title = await db.Tracks.Where(t => t.Id == trackId).Select(t => t.Title + " · " + t.ArtistCredit).FirstOrDefaultAsync(ct);
+        var request = new Request
+        {
+            TargetKind = EntityKind.Track,
+            TargetId = trackId,
+            EditionId = file.EditionId,
+            UpgradesFileId = file.Id,
+            Replace = true,
+            Title = title ?? "A song",
+            Requester = requester,
+            Mode = RequestMode.Permanent,
+        };
+        db.Requests.Add(request);
+        await db.SaveChangesAsync(ct);
+        signal.Wake();
+        logger.LogInformation("Looking for a new file for {Title} in place of {Path}", request.Title, file.Path);
+        return request;
+    }
+
+    /// <summary>
     /// Keeps a run through the whole library going, run every few seconds: a window that opens starts one, unless one's
     /// going already or this window's has been. While a run goes it keeps as many upgrades going as the settings say,
     /// asking for the next as each finishes, until every upgradable song has been tried. One that started in a window
@@ -183,7 +214,7 @@ public sealed class Upgrades(
 
     // Upgrades not finished, whoever asked: each takes a place.
     private Task<int> GoingAsync(CancellationToken ct) =>
-        db.Requests.CountAsync(r => r.UpgradesFileId != null && r.Mode == RequestMode.Permanent && !RequestService.Finished.Contains(r.Status), ct);
+        db.Requests.CountAsync(r => r.UpgradesFileId != null && !r.Replace && r.Mode == RequestMode.Permanent && !RequestService.Finished.Contains(r.Status), ct);
 
     // Asks for upgrades into the places free, and saves the run; it's done once there's nothing left to try or going.
     private async Task<(int Queued, int Upgradable)> TopUpAsync(UpgradeRun run, UpgradeSettings upgrades, CancellationToken ct)
@@ -208,7 +239,7 @@ public sealed class Upgrades(
         var why = stopped ? "Not started before the look for upgrades was stopped" : "Not started before the upgrade window closed";
         var began = run.Began;
         var cancelled = await db.Requests
-            .Where(r => r.Requester == run.Requester && r.UpgradesFileId != null && r.Status == RequestStatus.Queued && r.CreatedAt >= began)
+            .Where(r => r.Requester == run.Requester && r.UpgradesFileId != null && !r.Replace && r.Status == RequestStatus.Queued && r.CreatedAt >= began)
             .ExecuteUpdateAsync(u => u.SetProperty(r => r.Status, RequestStatus.Cancelled)
                 .SetProperty(r => r.Detail, why).SetProperty(r => r.UpdatedAt, utcNow), ct);
         await settings.SaveUpgradeRunAsync(run with { Closed = true, Stopped = stopped }, ct);

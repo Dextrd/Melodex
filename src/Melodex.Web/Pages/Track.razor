@@ -28,10 +28,8 @@ else if (_track is null && _glimpse is { } glimpse)
                 @if (glimpse.Owned)
                 {
                     <IconButton Icon="play" Requires="@UserPermissions.Listen" Primary="true" Large="true" Label="Play" Title="Play it" />
-                    <IconButton Icon="queue" Requires="@UserPermissions.Listen" Large="true" Title="Add to the queue" />
-                    <IconButton Icon="playlist" Requires="@UserPermissions.Listen" Large="true" Title="Add to a playlist" />
-                    <IconButton Icon="format" Requires="@UserPermissions.Format" Large="true" Label="Format" Title="Rewrite this song's files: their tags, cover and where they live" />
-                    <IconButton Icon="image" Requires="@UserPermissions.Format" Large="true" Label="Cover" Title="Choose this song's cover, from any release it's on or a picture of your own" />
+                    <IconButton Icon="queue" Requires="@UserPermissions.Listen" Large="true" Label="Add to queue" Title="Add to the queue" />
+                    <IconButton Icon="playlist" Requires="@UserPermissions.Listen" Large="true" Label="Add to playlist" Title="Add to a playlist" />
                 }
                 else
                 {
@@ -79,8 +77,6 @@ else
                 @if (owned)
                 {
                     <span class="badge @(Lyrics(track) is LyricsKind.Synced or LyricsKind.Plain ? "owned" : "neutral")" title="@LyricsHint(Lyrics(track))">@LyricsLabel(Lyrics(track))</span>
-                    var qualities = track.Files.Select(f => f.Quality).OfType<FileQuality>().ToList();
-                    <QualityBadge Quality="FileQuality.Lowest(qualities)" Mixed="FileQuality.Mixed(qualities)" />
                 }
                 <ProviderIds Ids="track.Ids" Entity="recording" />
             </div>
@@ -88,11 +84,8 @@ else
                 @if (owned)
                 {
                     <IconButton Icon="play" Requires="@UserPermissions.Listen" Primary="true" Large="true" Label="Play" Title="Play it" OnClick="() => Player.PlayAsync([Entry(track)])" />
-                    <QueueButton Large="true" Left="true" Title="Add to the queue: play next, or play last" OnQueue="next => Player.AddAsync([Entry(track)], next)" />
-                    <IconButton Icon="playlist" Requires="@UserPermissions.Listen" Large="true" Title="Add to a playlist" OnClick="() => _adding = (track.Title, [new PlaylistItem(track.Id)])" />
-                    <IconButton Icon="format" Requires="@UserPermissions.Format" Large="true" Label="Format" Title="Rewrite this song's files: their tags, cover and where they live" OnClick="() => _formatting = true" />
-                    <IconButton Icon="image" Requires="@UserPermissions.Format" Large="true" Label="Cover" Title="Choose this song's cover, from any release it's on or a picture of your own" OnClick="() => _choosingCover = true" />
-                    <QualityButton Kind="tracks" Id="track.Id" Name="@track.Title" Large="true" />
+                    <QueueButton Large="true" Left="true" Label="Add to queue" Title="Add to the queue: play next, or play last" OnQueue="next => Player.AddAsync([Entry(track)], next)" />
+                    <IconButton Icon="playlist" Requires="@UserPermissions.Listen" Large="true" Label="Add to playlist" Title="Add to a playlist" OnClick="() => _adding = (track.Title, [new PlaylistItem(track.Id)])" />
                 }
                 else if (!track.Ignored)
                 {
@@ -155,11 +148,43 @@ else
     {
         <TrackLyricsPanel TrackId="track.Id" Title="@track.Title" OnChanged="LoadAsync" />
 
-        <h2 class="section">@(track.Files.Count == 1 ? "File" : $"{track.Files.Count} files")</h2>
+        @*
+            The files' quality and what's done to all of them are on the section's title row, as the lyrics' are, and so
+            are one file's own buttons; with several, each file has its own.
+        *@
+        var single = track.Files.Count == 1;
+        var qualities = track.Files.Select(f => f.Quality).OfType<FileQuality>().ToList();
+        <div class="section-head">
+            <h2>@(single ? "File" : $"{track.Files.Count} files")</h2>
+            <QualityBadge Quality="FileQuality.Lowest(qualities)" Mixed="FileQuality.Mixed(qualities)" />
+            <div class="row lyrics-actions">
+                <IconButton Icon="format" Requires="@UserPermissions.Format" Label="Format" Title="Rewrite this song's files: their tags, cover and where they live" OnClick="() => _formatting = true" />
+                <IconButton Icon="image" Requires="@UserPermissions.Format" Label="Cover" Title="Choose this song's cover, from any release it's on or a picture of your own" OnClick="() => _choosingCover = true" />
+                <QualityButton Kind="tracks" Id="track.Id" Name="@track.Title" />
+                @if (single)
+                {
+                    @FileButtons((track, track.Files[0]))
+                }
+            </div>
+        </div>
         @foreach (var file in track.Files)
         {
             <div class="card track-file">
-                <code>@file.Path</code>
+                @if (single)
+                {
+                    <code>@file.Path</code>
+                }
+                else
+                {
+                    <div class="row track-file-head">
+                        <code>@file.Path</code>
+                        @FileButtons((track, file))
+                    </div>
+                }
+                @if (_replaceError is { } error && _replacing is null)
+                {
+                    <p class="error small">@error</p>
+                }
                 @* What the file is, then what its tags say, all as one list. *@
                 <dl class="file-tags">
                     @if (file.Quality is { Codec: not null } quality)
@@ -214,6 +239,30 @@ else
     <AddToPlaylistDialog Name="@adding.Name" Songs="adding.Songs" OnClose="() => _adding = null" />
 }
 
+@if (_replacing is { } replace && _track is not null)
+{
+    <Dialog Title="@($"Replace {_track.Title}?")" OnClose="() => _replacing = null">
+        <p>
+            Melodex fetches a new file for the song, passing over the one you have, and puts it in that file's place, tagged as it
+            was. Use it for a song fetched as the wrong recording: the new one is found by the catalogue's length, and kept
+            whatever its quality, as long as the profile allows it.
+        </p>
+        <p class="muted small">
+            The song keeps its place in your library and in your playlists. The file you have now is held or deleted as upgrades'
+            are, under Settings → Quality, so it can be put back.
+        </p>
+        <div class="toolbar dialog-buttons">
+            <button @onclick="() => _replacing = null">Cancel</button>
+            <button class="primary" disabled="@_busy" @onclick="() => ReplaceAsync(replace)">@if (_busy) { <span class="spinner"></span> }Replace it</button>
+        </div>
+    </Dialog>
+}
+
+@if (_removing is { } remove && _track is not null)
+{
+    <RemoveDialog Kind="LibraryItemKind.File" Id="remove.Id" Name="@_track.Title" OnClose="RemovedAsync" />
+}
+
 @if (_formatting && _track is not null)
 {
     <FormatDialog Scope="new FormatScope(FormatScopeKind.Track, _track.Id)" Name="@_track.Title" OnClose="() => _formatting = false" />
@@ -227,6 +276,59 @@ else
     private bool _notFound;
     private IReadOnlyList<HeldFileInfo> _held = [];
     private bool _formatting;
+    private TrackFile? _replacing, _removing;
+    private bool _busy;
+    private string? _replaceError;
+
+    // A new file being looked for in place of the song's.
+    // Replacing a file and removing it.
+    private RenderFragment FileButtons((TrackDetail Track, TrackFile File) at) => __builder =>
+    {
+        if (Replacing(at.Track) is { } replacing)
+        {
+            <a class="muted small" href="activity/downloads?open=@replacing.Id"><span class="spinner"></span> Looking for a new file</a>
+        }
+        else
+        {
+            <IconButton Icon="retry" Requires="@UserPermissions.Request" Label="Replace" Title="Fetch a new file for this song in its place, better or not, passing over this one: for the wrong recording. It keeps its place in playlists"
+                        OnClick="() => _replacing = at.File" />
+        }
+        <IconButton Icon="remove" Requires="@UserPermissions.Remove" Label="Remove" Title="Take this file out of your library, deleting it or keeping it"
+                    OnClick="() => _removing = at.File" />
+    };
+
+    private RequestInfo? Replacing(TrackDetail track) => Tracker.Requests.FirstOrDefault(r => r.Replace && r.TargetId == track.Id && r.Active);
+
+    private async Task ReplaceAsync(TrackFile file)
+    {
+        _busy = true;
+        _replaceError = null;
+        try
+        {
+            // A notification says when it's replaced.
+            Tracker.Watch(await Api.ReplaceFileAsync(file.Id));
+            await Tracker.RefreshAsync();
+        }
+        catch (Exception e) when (e is HttpRequestException or MelodexApiException)
+        {
+            _replaceError = e.Message;
+        }
+        finally
+        {
+            _busy = false;
+            _replacing = null;
+        }
+    }
+
+    private async Task RemovedAsync(bool removed)
+    {
+        _removing = null;
+        if (removed)
+        {
+            ScanStatus.RaiseLibraryChanged();
+            await LoadAsync();
+        }
+    }
     private bool _choosingCover;
     private (string Name, IReadOnlyList<PlaylistItem> Songs)? _adding;
     // The best any of its files has.
@@ -256,6 +358,7 @@ else
         ScanStatus.LibraryChanged += Reload;
         Tracker.Changed -= Redraw;
         Tracker.Changed += Redraw;
+        _ = Tracker.EnsureLoadedAsync();
         await LoadAsync();
     }
 

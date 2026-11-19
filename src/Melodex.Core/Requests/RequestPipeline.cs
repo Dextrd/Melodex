@@ -58,7 +58,18 @@ public sealed class RequestPipeline(
         // An upgrade whose file has gone, or become good enough meanwhile, has nothing to do.
         FileQuality? upgrading = null;
         string? cutoff = null;
-        if (request.UpgradesFileId is { } fileId)
+        // A replacement passes over the copy you have: the candidate it was fetched from, when Melodex fetched it.
+        HashSet<(Guid?, string)> passOver = [];
+        if (request is { Replace: true, UpgradesFileId: { } replacing })
+        {
+            if (await db.LibraryFiles.FindAsync([replacing], ct) is null)
+            {
+                await SetAsync(request, RequestStatus.Failed, "The file it would replace isn't in the library any more", ct);
+                return;
+            }
+            passOver = await FetchedFromAsync(request.TargetId, ct);
+        }
+        else if (request.UpgradesFileId is { } fileId)
         {
             if (await db.LibraryFiles.FindAsync([fileId], ct) is not { } old)
             {
@@ -158,7 +169,8 @@ public sealed class RequestPipeline(
                 tried.Add($"{plugin.Instance.Name} couldn't search ({error})");
                 continue;
             }
-            var fitting = Rank(candidates, target, fetch).Select(c => (plugin, c)).ToList();
+            var ranked = Rank(candidates, target, fetch).Select(c => (plugin, c)).ToList();
+            var fitting = ranked.Where(f => !passOver.Contains((plugin.Instance.Id, f.c.CandidateId))).ToList();
             // An upgrade only fetches what may be better, and reach the cutoff: said to, or not saying. A plugin that can
             // only get lossy copies, such as yt-dlp, is passed over this way when the cutoff is lossless.
             var better = upgrading is null ? fitting : fitting.Where(f => Better(profile, CandidateRanking.QualityOf(f.c), upgrading) != false).ToList();
@@ -168,7 +180,8 @@ public sealed class RequestPipeline(
             {
                 var why = reaching.Count < better.Count ? $"found nothing that reaches the {CutoffName(profile, cutoff)} cutoff"
                     : better.Count < fitting.Count ? $"found nothing better than the {upgrading!.Label} you have"
-                    : fitting.Count > 0 ? "found nothing in a quality the profile allows" : "found nothing that fits";
+                    : fitting.Count > 0 ? "found nothing in a quality the profile allows"
+                    : ranked.Count > 0 ? "found only the copy you have" : "found nothing that fits";
                 logger.LogInformation("[{Request}] {Plugin} {Why}", request.Title, plugin.Instance.Name, why);
                 tried.Add($"{plugin.Instance.Name} {why}");
                 continue;
@@ -188,6 +201,12 @@ public sealed class RequestPipeline(
         if (whole)
         {
             await SplitIntoTracksAsync(request, target, "No plugin could fetch the whole album, so it's fetched track by track", ct);
+            return;
+        }
+        if (request.Replace)
+        {
+            await SetAsync(request, RequestStatus.Failed, $"Nothing found to replace it with, so it stays as it is: {Summary(tried)}", ct);
+            logger.LogInformation("[{Request}] Nothing found to replace it with: {Reason}", request.Title, Summary(tried));
             return;
         }
         // The song is still in the library, as it was: it's looked for again another time.
@@ -378,6 +397,28 @@ public sealed class RequestPipeline(
             }
         }
 
+        // A replacement keeps any copy the profile allows, but not the very file you have.
+        if (request is { Replace: true, UpgradesFileId: { } replacesId })
+        {
+            var current = await db.LibraryFiles.FindAsync([replacesId], ct);
+            if (current is null)
+            {
+                await FinishJobAsync(job, JobStatus.Failed, "The file it would replace isn't in the library any more", ct);
+                DeleteStaging(job);
+                await SetAsync(request, RequestStatus.Failed, "The file it would replace isn't in the library any more", ct);
+                return Outcome.Stop;
+            }
+            if (verified.Files.Count != 1 || SameFile(Path.Combine(directory, verified.Files[0].Path), Path.Combine(Path.GetFullPath(options.Value.LibraryPath), current.Path)))
+            {
+                job.Verification = VerificationResult.NotBetter;
+                job.VerificationDetail = verified.Files.Count != 1 ? "It isn't one file, to put in the old one's place" : "It's the same file you have";
+                await FinishJobAsync(job, JobStatus.Failed, $"Didn't pass: {job.VerificationDetail}", ct);
+                DeleteStaging(job);
+                return Outcome.NextCandidate;
+            }
+            return await UpgradeAsync(request, job, current, verified.Files[0], actual ?? current.Quality, cutoffs, ct);
+        }
+
         // An upgrade keeps a copy only if it's better than the file it upgrades, by what it is, not what it was said to be.
         if (request.UpgradesFileId is { } upgradesId)
         {
@@ -470,6 +511,35 @@ public sealed class RequestPipeline(
     private static string CutoffName(QualityProfile profile, string? cutoff) =>
         QualityStep.Parse(cutoff ?? profile.Cutoff) is { } step ? step.Name : "quality";
 
+    // The candidates a song's files were fetched from before, by plugin: a replacement passes over them.
+    private async Task<HashSet<(Guid?, string)>> FetchedFromAsync(Guid trackId, CancellationToken ct)
+    {
+        var jobs = await db.Jobs.Where(j => j.Status == JobStatus.Succeeded && j.CandidateJson != null
+                                            && j.Request.TargetKind == EntityKind.Track && j.Request.TargetId == trackId)
+            .Select(j => new { j.PluginInstanceId, j.CandidateJson }).ToListAsync(ct);
+        var fetched = new HashSet<(Guid?, string)>();
+        foreach (var job in jobs)
+            try
+            {
+                if (JsonSerializer.Deserialize<Candidate>(job.CandidateJson!, RetrievalJson.Options) is { } candidate)
+                    fetched.Add((job.PluginInstanceId, candidate.CandidateId));
+            }
+            catch (JsonException)
+            {
+            }
+        return fetched;
+    }
+
+    // Whether two files are the same, byte for byte.
+    private static bool SameFile(string one, string other)
+    {
+        if (!File.Exists(one) || !File.Exists(other) || new FileInfo(one).Length != new FileInfo(other).Length)
+            return false;
+        using var a = File.OpenRead(one);
+        using var b = File.OpenRead(other);
+        return System.Security.Cryptography.SHA256.HashData(a).AsSpan().SequenceEqual(System.Security.Cryptography.SHA256.HashData(b));
+    }
+
     private static bool? Better(QualityProfile profile, FileQuality? quality, FileQuality than) =>
         profile.Position(quality) is { } at && profile.Position(than) is { } old ? at < old : null;
 
@@ -494,12 +564,14 @@ public sealed class RequestPipeline(
             logger.LogError("[{Request}] Couldn't replace the old file: {Reason}", request.Title, e.Message);
             return Outcome.Stop;
         }
-        await FinishJobAsync(job, JobStatus.Succeeded, $"Upgraded {path} to {upgraded.Path}", ct);
+        await FinishJobAsync(job, JobStatus.Succeeded, $"{(request.Replace ? "Replaced" : "Upgraded")} {path} with {upgraded.Path}", ct);
         DeleteStaging(job);
         await DeleteOtherStagingAsync(request.Id, job.Id, ct);
 
         var detail = await NotifyAsync(request, [upgraded], ct);
-        detail = $"Upgraded from {was.Label} to {upgraded.Quality.Label}. {detail}";
+        detail = request.Replace
+            ? $"Replaced the {was.Label} file with a new {upgraded.Quality.Label} one. {detail}"
+            : $"Upgraded from {was.Label} to {upgraded.Quality.Label}. {detail}";
         await SetAsync(request, RequestStatus.InLibrary, detail, ct);
         logger.LogInformation(Diagnostics.LogEvents.Success, "[{Request}] {Detail}", request.Title, detail);
         return Outcome.Imported;

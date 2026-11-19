@@ -445,6 +445,14 @@ public sealed class MelodexClient(HttpClient http)
         await EnsureAsync(response, ct);
     }
 
+    /// <summary>Fetches a new file for a song in place of this one, better or not, passing over the one you have.</summary>
+    public async Task<RequestInfo> ReplaceFileAsync(Guid fileId, CancellationToken ct = default)
+    {
+        using var response = await http.PostAsync($"{Api}/library/files/{fileId}/replace", null, ct);
+        await EnsureAsync(response, ct);
+        return (await response.Content.ReadFromJsonAsync<RequestInfo>(MelodexJson.Options, ct))!;
+    }
+
     /// <summary>The look through the library for upgrades that's going, or null when none is.</summary>
     public async Task<UpgradeRunInfo?> GetUpgradeRunAsync(CancellationToken ct = default)
     {

@@ -85,6 +85,16 @@ public static class UpgradeEndpoints
             .RequireScope(Scopes.Request).WithName("DeleteHeldFile").WithSummary("Delete a replaced file now, instead of when its time is up.")
             .Produces(StatusCodes.Status204NoContent).Produces(StatusCodes.Status404NotFound);
 
+        api.MapPost("/library/files/{id:guid}/replace", async (Guid id, HttpContext http, Upgrades service, Requests.RequestService requests, CancellationToken ct) =>
+                await service.AskToReplaceAsync(id, Caller.Of(http).Requester, ct) is { } request
+                    ? Results.Accepted(null, await requests.ToInfoAsync(request, ct))
+                    : Results.NotFound())
+            .WithTags("Library").RequireScope(Scopes.Request).WithName("ReplaceFile")
+            .WithSummary("Fetch a new file for a matched song in place of this one, better or not, passing over the one you have: for a song "
+                         + "fetched as the wrong recording. The song keeps its place in the library and in playlists, and the old file is held "
+                         + "or deleted as upgrades' are. Returns the request, or the one going for the song already.")
+            .Produces<RequestInfo>(StatusCodes.Status202Accepted).Produces(StatusCodes.Status404NotFound);
+
         return api;
     }
 }
