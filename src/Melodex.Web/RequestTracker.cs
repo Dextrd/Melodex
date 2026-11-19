@@ -127,15 +127,18 @@ public sealed class RequestTracker : IDisposable
     }
 
     /// <summary>
-    /// After asking the server to start some requests itself, such as upgrades: those new since the last look that
-    /// match get a notification when they finish, together.
+    /// Asks the server to start some requests itself, such as upgrades: those it starts that match get a notification
+    /// when they finish, together. What was there before it's asked, however much, isn't counted.
     /// </summary>
-    public async Task WatchNewAsync(Func<RequestInfo, bool> match)
+    public async Task<T> WatchNewAsync<T>(Func<Task<T>> start, Func<RequestInfo, bool> match)
     {
+        await EnsureLoadedAsync();
         var known = _requests.Select(r => r.Id).ToHashSet();
+        var started = await start();
         await RefreshAsync();
         foreach (var asked in _requests.Where(r => r.ParentId is null && !known.Contains(r.Id) && match(r)))
             Watch(asked);
+        return started;
     }
 
     public async Task RefreshAsync()

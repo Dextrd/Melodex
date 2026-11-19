@@ -1825,7 +1825,7 @@ a.button.primary:hover { filter: brightness(1.1); }
 }
 body:has(.player) .toasts { bottom: 6.5rem; }
 .toast {
-    display: flex; align-items: center; gap: .6rem; padding: .6rem .5rem .6rem .8rem; pointer-events: auto;
+    display: flex; align-items: center; gap: .6rem; padding: .6rem .9rem .6rem .8rem; pointer-events: auto;
     background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
     box-shadow: 0 6px 24px rgb(0 0 0 / .18); animation: toast-in .25s ease-out;
 }

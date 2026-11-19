@@ -285,7 +285,8 @@
         _busy = true;
         try
         {
-            var found = await Api.SearchUpgradesAsync(scope);
+            // Only the upgrades this starts get the notification when they're finished.
+            var found = await Tracker.WatchNewAsync(() => Api.SearchUpgradesAsync(scope), r => r.Upgrade);
             var one = scope.Kind == FormatScopeKind.Track;
             var key = $"upgrade:{scope.Kind}:{scope.Id}";
             if (found.Upgradable == 0)
@@ -298,7 +299,6 @@
                 // Another says when they're finished.
                 Say(new Notice(key, NoticeKind.Action, one ? "Looking for a better copy" : $"Looking for better copies of {Format.Count(found.Queued, "song", "songs")}",
                     "Follow it in Activity", "activity/downloads", "upgrade", Cover));
-                await Tracker.WatchNewAsync(r => r.Upgrade);
             }
         }
         catch (Exception e) when (e is HttpRequestException or MelodexApiException)
