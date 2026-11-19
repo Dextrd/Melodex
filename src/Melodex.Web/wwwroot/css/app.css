@@ -1171,7 +1171,8 @@ svg.flip { transform: scaleY(-1); }
 .song-menu:has(> .menu.at-pointer) > .icon-button.on:not(:hover) { border-color: var(--border); color: var(--text); }
 
 /* Sorting: a button that opens the ways to sort, and one that reverses the order. */
-.sort-menu { position: relative; display: inline-flex; gap: .3rem; flex: none; }
+/* Its two buttons as far apart as the toolbar's others. */
+.sort-menu { position: relative; display: inline-flex; gap: inherit; flex: none; }
 .sort-menu svg.flip { transform: scaleY(-1); }
 .menu-backdrop { position: fixed; inset: 0; z-index: 30; }
 .menu {
