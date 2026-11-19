@@ -318,6 +318,7 @@ public sealed class ScanAndReviewTests(RequestFixture fixture)
             task = (await Api.GetTaskAsync(task.Id))!;
         }
         Assert.Equal(TaskState.Succeeded, task.State);
+        await Api.WaitForCatalogueAsync();
         return task;
     }
 }

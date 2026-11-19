@@ -138,8 +138,17 @@ public static class LibraryEndpoints
                 return Results.Accepted(null, TaskQueue.ToInfo(task) with { Title = LibraryScanTask.Title(task.PayloadJson) });
             })
             .RequireScope(Scopes.Scan).WithName("ScanLibrary")
-            .WithSummary("Scan the music folder, match new and changed files and update the catalogue. With rematch, match files already "
+            .WithSummary("Scan the music folder and match new and changed files, then queue a catalogue update if the library settings say so. With rematch, match files already "
                          + "matched or under review again too. The body can be left out. Returns the queued task.")
+            .Produces<TaskInfo>(StatusCodes.Status202Accepted);
+
+        library.MapPost("/catalogue-update", async (TaskQueue queue, CancellationToken ct) =>
+            {
+                var task = await queue.EnqueueAsync(CatalogueUpdateTask.TaskKind, null, ct);
+                return Results.Accepted(null, TaskQueue.ToInfo(task) with { Title = CatalogueUpdateTask.Title });
+            })
+            .RequireScope(Scopes.Scan).WithName("UpdateCatalogue")
+            .WithSummary("Fill in the catalogue for every library artist: their discographies and the editions of their albums. Returns the queued task.")
             .Produces<TaskInfo>(StatusCodes.Status202Accepted);
 
         library.MapGet("/spectrum", (MelodexDbContext db, CancellationToken ct) => SpectrumTask.StatusAsync(db, ct))
@@ -778,6 +787,7 @@ public static class LibraryEndpoints
                 ArtistRefreshTask.TaskKind when t.PayloadJson is not null && names.TryGetValue(JsonSerializer.Deserialize<Guid>(t.PayloadJson), out var name)
                     => $"Catalogue update · {name}",
                 ArtistRefreshTask.TaskKind => "Catalogue update",
+                CatalogueUpdateTask.TaskKind => CatalogueUpdateTask.Title,
                 FormatTask.TaskKind => FormatTask.Title(t.PayloadJson),
                 LyricsTask.TaskKind => LyricsTask.Title,
                 SpectrumTask.TaskKind => SpectrumTask.Title,

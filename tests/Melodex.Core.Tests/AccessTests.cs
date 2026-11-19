@@ -282,6 +282,10 @@ public sealed class AccessTests : IDisposable
 
         await admin.SetAppearanceAsync(new Appearance(ThemeColor.Green, ThemeMode.Black, HighContrast: true));
         Assert.Equal(new Appearance(ThemeColor.Green, ThemeMode.Black, true), (await admin.GetAuthStatusAsync()).Appearance);
+        await admin.SetAppearanceAsync(new Appearance(ThemeColor.Green, ThemeMode.Black, true, DownloadNotices: false));
+        Assert.Equal((true, false, true), (await admin.GetAuthStatusAsync()).Appearance is { } a ? (a.TaskNotices, a.DownloadNotices, a.ActionNotices) : default);
+        // Saved before there were notifications, they're all on.
+        Assert.Equal(new Appearance(ThemeColor.Green), JsonSerializer.Deserialize<Appearance>("""{"color":"green"}""", MelodexJson.Options));
 
         // Someone who may do nothing else may still choose how it looks to them.
         await admin.CreateUserAsync(new CreateUser("nobody", "nobody's password", []));

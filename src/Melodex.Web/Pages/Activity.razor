@@ -263,6 +263,7 @@ else
     private int _shown = Step;
     private ElementReference _end;
     private DotNetObjectReference<Activity>? _self;
+    private bool _disposed;
     private bool _hasEnd;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -274,6 +275,9 @@ else
         }
         await LandAsync();
         if (!_hasEnd)
+            return;
+        // Left while it landed: its reference is gone.
+        if (_disposed)
             return;
         _self ??= DotNetObjectReference.Create(this);
         await Js.InvokeVoidAsync("melodexScroll.atEnd", _end, _self);
@@ -302,7 +306,7 @@ else
     private readonly Dictionary<Guid, bool> _openTasks = [];
 
     // Kinds of task that show what they're doing, row by row.
-    private static readonly HashSet<string> Opens = ["library-scan", "library-format", "library-lyrics", "artist-refresh", "tools-import"];
+    private static readonly HashSet<string> Opens = ["library-scan", "library-format", "library-lyrics", "artist-refresh", "catalogue-update", "tools-import"];
     private static readonly IReadOnlyList<(bool Value, string Label, string? Hint)> Times =
         [(true, "Recent", "Still going, or changed in the last hour"), (false, "Earlier", "Everything before that")];
 
@@ -645,6 +649,7 @@ else
 
     public void Dispose()
     {
+        _disposed = true;
         _self?.Dispose();
         Tracker.Changed -= Refresh;
         Events.Received -= OnEvent;

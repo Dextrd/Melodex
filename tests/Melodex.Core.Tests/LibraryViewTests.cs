@@ -81,6 +81,34 @@ public sealed class LibraryViewTests : IDisposable
     }
 
     [TestLibraryFact]
+    public async Task A_scan_queues_the_catalogue_update_as_its_own_task_unless_the_settings_say_not_to()
+    {
+        await ScanAsync();
+        var update = Assert.Single(await _api.ListTasksAsync(), t => t.Kind == "catalogue-update");
+        Assert.Equal("Catalogue update", update.Title);
+        Assert.Equal(TaskState.Succeeded, update.State);
+        Assert.EndsWith("artists updated", update.Progress);
+        var scan = Assert.Single(await _api.ListTasksAsync(), t => t.Kind == "library-scan");
+        Assert.DoesNotContain("catalogue", scan.Progress, StringComparison.OrdinalIgnoreCase);
+
+        // Turned off, a scan leaves the catalogue alone, and the Scan menu updates it when asked.
+        using (var scope = _factory.Services.CreateScope())
+            await scope.ServiceProvider.GetRequiredService<Melodex.Core.Library.SettingsService>()
+                .SaveLibraryAsync(new LibrarySettings { FetchLyrics = false, UpdateCatalogueAfterScan = false }, default);
+        var again = await _api.ScanLibraryAsync();
+        while (again.Active)
+        {
+            await Task.Delay(100);
+            again = (await _api.GetTaskAsync(again.Id))!;
+        }
+        Assert.Single(await _api.ListTasksAsync(), t => t.Kind == "catalogue-update");
+        var asked = await _api.UpdateCatalogueAsync();
+        Assert.Equal("Catalogue update", asked.Title);
+        await _api.WaitForCatalogueAsync();
+        Assert.Equal(2, (await _api.ListTasksAsync()).Count(t => t.Kind == "catalogue-update" && t.State == TaskState.Succeeded));
+    }
+
+    [TestLibraryFact]
     public async Task Artwork_is_found_through_the_plugins_once_and_forgotten_when_they_change()
     {
         await ScanAsync();
@@ -156,5 +184,6 @@ public sealed class LibraryViewTests : IDisposable
             task = (await _api.GetTaskAsync(task.Id))!;
         }
         Assert.True(task.State == TaskState.Succeeded, task.Error);
+        await _api.WaitForCatalogueAsync();
     }
 }

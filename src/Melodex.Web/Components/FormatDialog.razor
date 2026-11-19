@@ -1,4 +1,5 @@
 @inject MelodexClient Api
+@inject TaskNotices Tasks
 
 @*
     Formats an artist, album, track or the whole library: rewrites matched files' tags from the catalogue, their embedded
@@ -173,6 +174,7 @@
         try
         {
             _started = await Api.StartFormatAsync(new StartFormat(Scope, _options));
+            Tasks.Started(_started);
         }
         catch (Exception e) when (e is HttpRequestException or MelodexApiException)
         {

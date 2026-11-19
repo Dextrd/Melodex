@@ -78,6 +78,14 @@ public sealed class MelodexClient(HttpClient http)
         return (await response.Content.ReadFromJsonAsync<TaskInfo>(MelodexJson.Options, ct))!;
     }
 
+    /// <summary>Queues filling in the catalogue for every library artist.</summary>
+    public async Task<TaskInfo> UpdateCatalogueAsync(CancellationToken ct = default)
+    {
+        using var response = await http.PostAsync($"{Api}/library/catalogue-update", null, ct);
+        response.EnsureSuccessStatusCode();
+        return (await response.Content.ReadFromJsonAsync<TaskInfo>(MelodexJson.Options, ct))!;
+    }
+
     /// <summary>A song's lyrics, as its files have them.</summary>
     public async Task<TrackLyrics> GetTrackLyricsAsync(Guid trackId, CancellationToken ct = default) =>
         (await http.GetFromJsonAsync<TrackLyrics>($"{Api}/library/tracks/{trackId}/lyrics", MelodexJson.Options, ct))!;
@@ -592,6 +600,13 @@ public sealed class MelodexClient(HttpClient http)
 
     public async Task<ServerVersion> GetVersionAsync(CancellationToken ct = default) =>
         (await http.GetFromJsonAsync<ServerVersion>($"{Api}/version", MelodexJson.Options, ct))!;
+
+    /// <summary>Tells the server about an error the app couldn't handle, so it's in the server's log.</summary>
+    public async Task ReportErrorAsync(ClientError error, CancellationToken ct = default)
+    {
+        using var response = await http.PostAsJsonAsync($"{Api}/client-errors", error, MelodexJson.Options, ct);
+        await EnsureAsync(response, ct);
+    }
 
     public async Task<SetupStatus> GetSetupAsync(CancellationToken ct = default) =>
         (await http.GetFromJsonAsync<SetupStatus>($"{Api}/setup", MelodexJson.Options, ct))!;
