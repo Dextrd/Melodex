@@ -136,7 +136,7 @@ else
                             </td>
                             <td class="num muted nowrap">@(on.Disc > 1 ? $"{on.Disc}-" : "")@on.Number</td>
                             <td class="hide-narrow muted">@album.Select(a => a.ReleaseDate).Where(d => d is not null).Order().FirstOrDefault()</td>
-                            <td><StatusBadge Album="on.AlbumStatus" /></td>
+                            <td><StatusBadge Album="on.AlbumStatus" PartlyCovered="on.PartlyCovered" /></td>
                         </tr>
                     }
                 </tbody>
