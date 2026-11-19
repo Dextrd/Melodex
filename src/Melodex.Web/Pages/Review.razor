@@ -34,7 +34,7 @@
         <p class="muted">
             Files that couldn't be matched confidently. They don't count as owned until they're matched. <strong>Exclude</strong> music
             no catalogue knows, such as your own recordings: it's never matched, and the library shows it as its tags say.
-            <strong>Defer</strong> takes a file off this list; each scan tries it again and matches it only when it's confident.
+            <strong>Defer</strong> takes a file off this list; each scan tries it again and matches it only when it's confident. Meanwhile it's in the library as its tags say, if they name an artist and an album.
             <strong>Hide</strong> takes it out of the library altogether. Every file stays in your music folder.
         </p>
         <p class="muted">
@@ -865,7 +865,7 @@ else
     [
         (ReviewList.Incomplete, "Incomplete metadata", "Excluded files without a title or artist, so the library can't show them. Fix their tags, or search for what they are."),
         (ReviewList.Excluded, "Excluded files", "Never matched; the library shows them as their tags say."),
-        (ReviewList.Deferred, "Deferred files", "Each scan tries these again, and matches one only when it's confident."),
+        (ReviewList.Deferred, "Deferred files", "Each scan tries these again, and matches one only when it's confident. Meanwhile those whose tags name an artist and an album are in the library as their tags say."),
         (ReviewList.Hidden, "Hidden files", "Out of the library altogether, though they stay in your music folder."),
     ];
 

@@ -62,7 +62,8 @@ sure the match is, the files' names, their paths or when they last changed; the 
 - **Approve** the suggested match, or **Search** for the right one.
 - **Exclude** it: it's never matched, and the library shows it as its own tags say. Use this for music no catalogue
   knows, such as your own recordings.
-- **Defer** it: it leaves the list, and each scan tries it again, matching it only when it's confident.
+- **Defer** it: it leaves the list, and each scan tries it again, matching it only when it's confident. Meanwhile, if
+  its tags name an artist and an album, it's in the library as they say, as an excluded file is.
 - **Hide** it: it leaves the library altogether.
 
 Songs from an import that couldn't be matched wait under **Matching** too, if you sent them there. Each shows the
