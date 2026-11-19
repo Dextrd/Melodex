@@ -47,6 +47,7 @@ public sealed class QuickPageTests : IDisposable
             task = (await _api.GetTaskAsync(task.Id))!;
         }
         Assert.True(task.State == TaskState.Succeeded, task.Error);
+        await _api.WaitForCatalogueAsync();
 
         // An album whose editions are known, but old.
         var artist = (await _api.GetLibraryArtistsAsync()).First();

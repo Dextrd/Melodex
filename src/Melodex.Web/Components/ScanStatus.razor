@@ -4,7 +4,7 @@
 
 @*
     Shows the scan button, or what the running task is doing, with a menu of the other things done to the whole library:
-    matching files again and formatting. Polls while a task runs.
+    matching files again, updating the catalogue and formatting. Polls while a task runs.
 *@
 <div class="row small scan-status">
     @if (_status?.CurrentTask is { } task)
@@ -30,7 +30,7 @@
     <div class="split-button">
         <button class="primary" disabled="@(_status?.CurrentTask is not null)" title="Read new and changed files, and match them" @onclick="() => ScanAsync(Rematch.None)">Scan</button>
         @* The menu's ways to scan and format wait for the running task too. *@
-        <button class="primary more" disabled="@(_status?.CurrentTask is not null)" title="More ways to scan, and formatting" aria-label="More ways to scan, and formatting" aria-haspopup="menu"
+        <button class="primary more" disabled="@(_status?.CurrentTask is not null)" title="More ways to scan, the catalogue and formatting" aria-label="More ways to scan, the catalogue and formatting" aria-haspopup="menu"
                 aria-expanded="@(_menu ? "true" : "false")" @onclick="() => _menu = !_menu">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>
         </button>
@@ -46,6 +46,10 @@
                 </button>
                 <button type="button" role="menuitem" @onclick="() => Open(Confirm.Rematch)">
                     Match everything again…<span class="muted small">Every file but those you matched, excluded or hid</span>
+                </button>
+                <hr />
+                <button type="button" role="menuitem" @onclick="UpdateCatalogueAsync">
+                    Update catalogue<span class="muted small">Look up your artists' discographies and their albums' editions</span>
                 </button>
                 @if (Auth.May(UserPermissions.Format))
                 {
@@ -170,6 +174,13 @@ else if (_confirm == Confirm.Format)
         await Api.ScanLibraryAsync(rematch);
         Reading = true;
         ReadingChanged?.Invoke();
+        await RefreshAsync();
+    }
+
+    private async Task UpdateCatalogueAsync()
+    {
+        _menu = false;
+        await Api.UpdateCatalogueAsync();
         await RefreshAsync();
     }
 
