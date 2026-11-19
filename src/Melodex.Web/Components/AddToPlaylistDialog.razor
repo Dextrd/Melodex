@@ -134,6 +134,9 @@ else
     /// <summary>What's being added, as the title says it: a song's or album's name.</summary>
     [Parameter, EditorRequired] public string Name { get; set; } = "";
     [Parameter, EditorRequired] public IReadOnlyList<PlaylistItem> Songs { get; set; } = [];
+
+    /// <summary>Their cover, for the notice when they've gone into or out of more than one playlist.</summary>
+    [Parameter] public string? Art { get; set; }
     [Parameter] public EventCallback OnClose { get; set; }
 
     private enum Naming { Playlist, Folder }
@@ -287,6 +290,7 @@ else
                 else if ((await Api.TakeOutOfPlaylistAsync(id, new AddToPlaylist(Songs))).Removed > 0)
                     outOf.Add(name);
             }
+            // One playlist changed: its cover and its page. Several: the songs' cover, as the notice is named for them.
             var only = _wanted.Count == 1 ? _wanted.Keys.First() : (Guid?)null;
             var said = string.Join("; ", new[]
             {
@@ -294,7 +298,7 @@ else
                 outOf.Count > 0 ? $"Taken out of {Names(outOf)}" : null,
             }.OfType<string>());
             Notices.Show(new Notice($"playlists:{Guid.NewGuid()}", NoticeKind.Action, Name, said.Length > 0 ? said : "Nothing to change",
-                only is { } one ? $"playlists/{one}" : "playlists", "playlist", _playlists!.FirstOrDefault(p => p.Id == only)?.Covers.FirstOrDefault()), always: true);
+                only is { } one ? $"playlists/{one}" : "playlists", "playlist", only is null ? Art : _playlists!.FirstOrDefault(p => p.Id == only)?.Covers.FirstOrDefault() ?? Art), always: true);
             await OnClose.InvokeAsync();
         });
     }

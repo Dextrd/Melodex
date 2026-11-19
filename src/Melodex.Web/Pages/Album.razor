@@ -239,7 +239,7 @@ else
 
 @if (_adding is { } adding)
 {
-    <AddToPlaylistDialog Name="@adding.Name" Songs="adding.Songs" OnClose="() => _adding = null" />
+    <AddToPlaylistDialog Name="@adding.Name" Songs="adding.Songs" Art="@_album?.Album.CoverUrl" OnClose="() => _adding = null" />
 }
 
 @if (_formatting && _album is not null)

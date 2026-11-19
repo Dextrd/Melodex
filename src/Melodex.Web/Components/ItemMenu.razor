@@ -109,7 +109,7 @@
 
 @if (_adding && Keep is not null)
 {
-    <AddToPlaylistDialog Name="@Name" Songs="Keep" OnClose="() => _adding = false" />
+    <AddToPlaylistDialog Name="@Name" Songs="Keep" Art="@((Entry ?? Entries?.FirstOrDefault())?.CoverUrl)" OnClose="() => _adding = false" />
 }
 
 @code {
