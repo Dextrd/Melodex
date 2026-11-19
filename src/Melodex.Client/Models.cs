@@ -184,6 +184,12 @@ public sealed record LibrarySettings
     /// <summary>Show covers from your files (an embedded picture, or one like folder.jpg beside them) rather than the catalogue's, wherever there's one.</summary>
     public bool PreferFileCovers { get; init; }
 
+    /// <summary>
+    /// Update the catalogue after each scan: every library artist's discography, and the editions of their albums. It runs
+    /// as its own task, and can be started from the Scan menu any time.
+    /// </summary>
+    public bool UpdateCatalogueAfterScan { get; init; } = true;
+
     /// <summary>Find lyrics for songs in the library that have none, after each scan, through the lyrics plugins.</summary>
     public bool FetchLyrics { get; init; } = true;
 
@@ -327,7 +333,11 @@ public sealed record AlbumSummary(
     string? CoverUrl = null,
     bool Local = false,
     FileQuality? Quality = null,
-    bool MixedQuality = false);
+    bool MixedQuality = false)
+{
+    /// <summary>Not owned, but some of its songs are in the library on other albums: it's still missing, and says so.</summary>
+    public bool PartlyCovered => Status == AlbumStatus.Missing && OwnedTracks > 0;
+}
 
 /// <param name="OwnedEditionId">The edition the library has, if any.</param>
 /// <param name="ShownEditionId">The edition whose tracks are listed: the owned one, the requested one, or the best fit.</param>
@@ -706,6 +716,7 @@ public sealed record TrackDetail(
 /// <param name="Title">The song's title on this edition, which can differ from the recording's.</param>
 /// <param name="InLibrary">A file of the song is filed under this edition.</param>
 /// <param name="AlbumStatus">How much of the album you have, as its artist's page shows it.</param>
+/// <param name="PartlyCovered">Not owned, but some of its songs are in the library on other albums.</param>
 public sealed record TrackAppearance(
     Guid AlbumId,
     string AlbumTitle,
@@ -718,7 +729,8 @@ public sealed record TrackAppearance(
     string Number,
     string Title,
     bool InLibrary,
-    AlbumStatus AlbumStatus);
+    AlbumStatus AlbumStatus,
+    bool PartlyCovered = false);
 
 /// <summary>A file of the song in the library, and the tags it has.</summary>
 /// <param name="Path">Relative to the music folder.</param>

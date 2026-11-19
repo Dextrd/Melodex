@@ -28,6 +28,7 @@
             </p>
         </div>
         @if (_saving) { <span class="spinner"></span> }
+        @Switch
     </header>
     <div class="appearance">
         <div class="field-label">Colour</div>
@@ -60,6 +61,16 @@
                 <span class="muted small">Stronger text and borders, and owned, partial, covered and missing in colours that colour-blind people can tell apart</span>
             </span>
         </label>
+
+        <div class="field-label">Notifications</div>
+        <p class="muted small">They slide in at the bottom right while you use Melodex.</p>
+        @foreach (var (name, hint, on, set) in NoticeKinds)
+        {
+            <label class="dialog-choice">
+                <input type="checkbox" checked="@on(_appearance)" @onchange="e => SaveAsync(set(_appearance, (bool)e.Value!))" />
+                <span><strong>@name</strong><span class="muted small">@hint</span></span>
+            </label>
+        }
         @if (_error is not null) { <p class="error small">@_error</p> }
     </div>
 </section>
@@ -68,18 +79,39 @@
     /// <summary>Everyone's look, rather than your own.</summary>
     [Parameter] public bool ForEveryone { get; set; }
 
+    /// <summary>Shown at the top right, such as the switch between your own look and everyone's.</summary>
+    [Parameter] public RenderFragment? Switch { get; set; }
+
     private Appearance _appearance = new();
     private bool _saving;
     private string? _error;
+
+    private static readonly IReadOnlyList<(string Name, string Hint, Func<Appearance, bool> On, Func<Appearance, bool, Appearance> Set)> NoticeKinds =
+    [
+        ("Long tasks", "When a scan, catalogue update, import or formatting finishes or fails, and when a scan leaves files to review",
+            a => a.TaskNotices, (a, on) => a with { TaskNotices = on }),
+        ("Downloads", "When you ask for something, and when it's in your library, waiting for review, or failed",
+            a => a.DownloadNotices, (a, on) => a with { DownloadNotices = on }),
+        ("Upgrades and menus", "When you look for a better copy or change your wishlist, and when the better copies are in",
+            a => a.ActionNotices, (a, on) => a with { ActionNotices = on }),
+    ];
 
     private string Title => ForEveryone ? "Appearance for everyone" : "Appearance";
 
     // Everyone's look shows as you change it only while you follow it.
     private bool Shown => !ForEveryone || Auth.Status?.OwnAppearance != true;
 
-    protected override async Task OnInitializedAsync()
+    private bool? _loadedFor;
+
+    protected override void OnInitialized() => Auth.Changed += OnAuthChanged;
+
+    // Read again when switched between yours and everyone's, in place, so the switch slides rather than jumps.
+    protected override async Task OnParametersSetAsync()
     {
-        Auth.Changed += OnAuthChanged;
+        if (_loadedFor == ForEveryone)
+            return;
+        _loadedFor = ForEveryone;
+        _error = null;
         _appearance = Auth.Status?.Appearance ?? new Appearance();
         if (ForEveryone)
         {

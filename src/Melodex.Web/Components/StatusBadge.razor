@@ -1,18 +1,30 @@
-@* Shows an album or track status as a coloured label. *@
+@*
+    Shows an album or track status as a coloured label. A missing album some of whose songs you have on other albums
+    says it's partly covered, in partly owned's colour; a song you have on another album is covered, as an album is.
+*@
 <span class="badge @CssClass" title="@Hint">@Label</span>
 
 @code {
     [Parameter] public AlbumStatus? Album { get; set; }
     [Parameter] public TrackStatus? Track { get; set; }
 
-    private string CssClass => Album?.ToString().ToLowerInvariant() ?? Track switch
+    /// <summary>The album's missing, but some of its songs are in the library on other albums.</summary>
+    [Parameter] public bool PartlyCovered { get; set; }
+
+    private bool Partly => PartlyCovered && Album == AlbumStatus.Missing;
+
+    private string CssClass => Partly ? "partial" : Album?.ToString().ToLowerInvariant() ?? Track switch
     {
         TrackStatus.OwnedElsewhere => "ownedElsewhere",
         { } t => t.ToString().ToLowerInvariant(),
         null => "neutral",
     };
 
-    private string? Hint => Track == TrackStatus.Elsewhere
+    private string? Hint => Partly
+        ? "Some of its songs are in your library on other albums; the rest are missing."
+        : Track == TrackStatus.OwnedElsewhere
+        ? "You have it on another album, so it isn't fetched again."
+        : Track == TrackStatus.Elsewhere
         ? "On a release shown in full, or one you have. This kind of release is shown for new songs only (Settings → General), so it doesn't count here."
         : null;
 
@@ -21,11 +33,11 @@
         AlbumStatus.Complete => "Owned",
         AlbumStatus.Partial => "Partly owned",
         AlbumStatus.Covered => "Covered",
-        AlbumStatus.Missing => "Missing",
+        AlbumStatus.Missing => Partly ? "Partly covered" : "Missing",
         _ => Track switch
         {
             TrackStatus.Owned => "Owned",
-            TrackStatus.OwnedElsewhere => "On another album",
+            TrackStatus.OwnedElsewhere => "Covered",
             TrackStatus.Missing => "Missing",
             TrackStatus.Ignored => "Ignored",
             TrackStatus.Elsewhere => "Elsewhere",

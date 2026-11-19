@@ -500,5 +500,6 @@ public sealed class ImportTests : IDisposable
             task = (await _api.GetTaskAsync(task.Id))!;
         }
         Assert.True(task.State == TaskState.Succeeded, task.Error);
+        await _api.WaitForCatalogueAsync();
     }
 }

@@ -350,7 +350,17 @@ details > summary { cursor: pointer; color: var(--muted); margin: 1.5rem 0 .5rem
     display: none; position: fixed; bottom: 0; left: 0; right: 0; padding: .75rem 1rem;
     background: var(--missing-bg); color: var(--missing); z-index: 100;
 }
-#blazor-error-ui .dismiss { cursor: pointer; float: right; }
+#blazor-error-ui .error-line { display: flex; gap: .75rem; align-items: baseline; flex-wrap: wrap; }
+#blazor-error-ui .error-line > span:first-child { flex: 1; min-width: 12rem; overflow-wrap: anywhere; }
+/* Only once there's a message to give. */
+#blazor-error-ui .error-says:has(.error-message:empty) { display: none; }
+#blazor-error-ui button.link { background: none; border: 0; padding: 0; color: inherit; text-decoration: underline; cursor: pointer; font: inherit; }
+#blazor-error-ui .dismiss { text-decoration: none; }
+#blazor-error-ui .error-more { display: none; margin-top: .5rem; }
+#blazor-error-ui.open .error-more { display: block; }
+#blazor-error-ui .error-details { max-height: 12rem; overflow: auto; font-size: .75rem; white-space: pre-wrap; overflow-wrap: anywhere;
+    margin: 0 0 .5rem; padding: .5rem; background: color-mix(in srgb, currentColor 8%, transparent); border-radius: 6px; }
+#blazor-error-ui .error-more p { margin: 0; font-size: .85rem; }
 
 .show-narrow { display: none; }
 @media (max-width: 640px) {
@@ -616,6 +626,7 @@ code { font-size: .85em; background: var(--bg); padding: .05rem .3rem; border-ra
 .plugin-sections { display: flex; flex-direction: column; gap: 1.25rem; }
 .panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
 .panel-head { display: flex; align-items: flex-start; gap: 1rem; padding: .9rem 1.1rem; border-bottom: 1px solid var(--border); }
+.panel-head > .panel-switch { margin-left: auto; flex: none; }
 .panel-title { flex: 1; min-width: 0; }
 .panel-title h2 { margin: 0; font-size: 1.05rem; }
 .panel-title p { margin: .25rem 0 0; }
@@ -1042,6 +1053,14 @@ td.actions > :is(.icon-button, .queue-menu, .song-menu) + .badge, td.actions > .
     background: linear-gradient(100deg, var(--bg) 30%, var(--border) 50%, var(--bg) 70%) 0 0 / 300% 100%;
     animation: shimmer 1.4s linear infinite;
 }
+/* Something still loading on a page that's otherwise there: lines shimmering where it will be. */
+.loading-card { display: flex; flex-direction: column; gap: .7rem; }
+.shimmer-line {
+    display: block; height: .9rem; border-radius: 4px;
+    background: linear-gradient(100deg, var(--bg) 30%, var(--border) 50%, var(--bg) 70%) 0 0 / 300% 100%;
+    animation: shimmer 1.4s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) { .shimmer-line { animation: none; } }
 @keyframes shimmer { from { background-position: 100% 0; } to { background-position: 0 0; } }
 @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
 /* Something on its way: a blank where it'll go, shimmering like a cover does. */
@@ -1171,7 +1190,8 @@ svg.flip { transform: scaleY(-1); }
 .song-menu:has(> .menu.at-pointer) > .icon-button.on:not(:hover) { border-color: var(--border); color: var(--text); }
 
 /* Sorting: a button that opens the ways to sort, and one that reverses the order. */
-.sort-menu { position: relative; display: inline-flex; gap: .3rem; flex: none; }
+/* Its two buttons as far apart as the toolbar's others. */
+.sort-menu { position: relative; display: inline-flex; gap: inherit; flex: none; }
 .sort-menu svg.flip { transform: scaleY(-1); }
 .menu-backdrop { position: fixed; inset: 0; z-index: 30; }
 .menu {
@@ -1221,6 +1241,8 @@ svg.flip { transform: scaleY(-1); }
 .library-bar .toolbar { margin: 0; }
 .toolbar.one-line { flex-wrap: nowrap; }
 .toolbar.one-line > * { flex: none; }
+/* Except the space that pushes what's after it to the right. */
+.toolbar.one-line > .spacer { flex: 1; }
 .toolbar.one-line .filter { flex: 1 1 12rem; min-width: 8rem; max-width: 420px; }
 .toolbar.one-line .count { margin-left: auto; white-space: nowrap; }
 .filter-toggle, .filter-drop { display: none; }
@@ -1344,6 +1366,8 @@ svg.flip { transform: scaleY(-1); }
 /* Settings → Appearance. Each swatch shows its colour's accent in light and dark, half each. */
 .appearance { display: grid; gap: .6rem; padding: 1rem 1.1rem 1.2rem; max-width: 40rem; }
 .appearance .field-label:not(:first-child) { margin-top: .6rem; }
+/* A line saying what a section is sits just under its title, as a choice's hint does. */
+.appearance .field-label + p { margin: -.45rem 0 0; }
 .swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(7.5rem, 1fr)); gap: .5rem; }
 .swatch {
     display: flex; align-items: center; gap: .6rem; padding: .55rem .7rem; font: inherit; color: var(--text); cursor: pointer;
@@ -1819,3 +1843,50 @@ a.button.primary:hover { filter: brightness(1.1); }
 
 /* Use the default, under the qualities it puts back. */
 .toolbar.quality-reset { margin-top: .6rem; }
+.track-file-head { align-items: center; gap: .5rem; margin-bottom: .3rem; flex-wrap: wrap; }
+/* The first file a little below the title row, as h2.section leaves. */
+.section-head + .track-file { margin-top: .5rem; }
+/* The path takes the room the buttons leave. */
+.track-file-head > code { overflow-wrap: anywhere; min-width: 0; flex: 1 1 16rem; }
+
+.notice.upgrade-run { display: flex; align-items: center; gap: .6rem; margin: .5rem 0 1rem; }
+.notice.upgrade-run > span:nth-child(2) { flex: 1; }
+
+
+/* Activity's Recent view: Running, Queued and Completed, each with a heading that opens and closes it. */
+.activity-section { margin: 1.25rem 0 .5rem; font-size: 1rem; }
+.activity-section:first-child { margin-top: .5rem; }
+.activity-section .request-toggle { display: inline-flex; align-items: center; gap: .5rem; padding: 0; border: none; background: none; color: var(--text); font: inherit; font-weight: 600; cursor: pointer; }
+.activity-list .request { position: relative; background: var(--surface); }
+
+/* Notifications: a stack at the bottom right, above the player, the newest at the bottom; full width on a phone. */
+.toasts {
+    position: fixed; right: 1rem; bottom: 1rem; z-index: 25; width: min(22rem, calc(100vw - 2rem));
+    display: flex; flex-direction: column; gap: .5rem; pointer-events: none;
+}
+body:has(.player) .toasts { bottom: 6.5rem; }
+.toast {
+    display: flex; align-items: center; gap: .6rem; padding: .6rem .9rem .6rem .8rem; pointer-events: auto;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+    box-shadow: 0 6px 24px rgb(0 0 0 / .18); animation: toast-in .25s ease-out;
+}
+.toast.failed { border-color: var(--missing); }
+.toast.failed .toast-glyph { color: var(--missing); }
+.toast-glyph { display: inline-grid; place-items: center; width: 2.5rem; height: 2.5rem; border-radius: 6px; flex: none;
+    color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); }
+.toast-glyph svg { width: 1.25rem; height: 1.25rem; }
+.toast.failed .toast-glyph { background: color-mix(in srgb, var(--missing) 14%, transparent); }
+.toast-art { width: 2.5rem; height: 2.5rem; border-radius: 6px; object-fit: cover; flex: none; }
+.toast-body { display: flex; flex-direction: column; min-width: 0; flex: 1; color: var(--text); text-decoration: none; }
+a.toast-body:hover .toast-title { text-decoration: underline; }
+.toast-title { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.toast-text { overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+/* Dismissed as a song is taken out of the queue. */
+.toast-close { flex: none; }
+.toast-more { background: var(--bg); }
+@keyframes toast-in { from { opacity: 0; transform: translateX(1.5rem); } }
+@media (prefers-reduced-motion: reduce) { .toast { animation: none; } }
+@media (max-width: 760px) {
+    .toasts { left: .5rem; right: .5rem; bottom: .5rem; width: auto; }
+    body:has(.player) .toasts { bottom: 5rem; }
+}

@@ -98,6 +98,7 @@ builder.Services.AddSingleton<TaskCancellations>();
 builder.Services.AddScoped<TaskQueue>();
 builder.Services.AddScoped<ITaskHandler, LibraryScanTask>();
 builder.Services.AddScoped<ITaskHandler, ArtistRefreshTask>();
+builder.Services.AddScoped<ITaskHandler, CatalogueUpdateTask>();
 builder.Services.AddScoped<ITaskHandler, FormatTask>();
 builder.Services.AddScoped<ITaskHandler, LyricsTask>();
 builder.Services.AddScoped<ITaskHandler, SpectrumTask>();

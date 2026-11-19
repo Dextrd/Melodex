@@ -227,6 +227,13 @@ public class Request
     /// </summary>
     public Guid? UpgradesFileId { get; set; }
 
+    /// <summary>
+    /// With <see cref="UpgradesFileId"/>, a replacement asked for from the song's page: any copy the quality profile
+    /// allows takes the file's place, better or not, except the one you have, and it's matched by the catalogue's length,
+    /// as the file may be the wrong recording.
+    /// </summary>
+    public bool Replace { get; set; }
+
     /// <summary>Held back by the user: it isn't started until resumed. A request paused mid-fetch starts that fetch again.</summary>
     public bool Paused { get; set; }
 

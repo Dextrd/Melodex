@@ -24,10 +24,10 @@
                         {
                             <span class="muted small"> · @Format.Secondary(album.SecondaryTypes)</span>
                         }
-                        <div class="show-narrow"><StatusBadge Album="album.Status" /></div>
+                        <div class="show-narrow"><StatusBadge Album="album.Status" PartlyCovered="album.PartlyCovered" /></div>
                     </td>
                     <td class="hide-narrow muted">@Format.Year(album.FirstReleaseDate)</td>
-                    <td class="hide-narrow"><StatusBadge Album="album.Status" /></td>
+                    <td class="hide-narrow"><StatusBadge Album="album.Status" PartlyCovered="album.PartlyCovered" /></td>
                     <td class="num hide-narrow muted">@Format.Tracks(album)</td>
                     <td class="num actions">
                         @{
