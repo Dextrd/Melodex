@@ -124,7 +124,7 @@ builder.Services.AddHostedService<UpgradeScheduler>();
 builder.Services.AddScoped<ScheduledTasks>();
 builder.Services.AddHostedService<ScheduleRunner>();
 builder.Services.AddSingleton<StreamSigner>();
-builder.Services.AddSingleton<BarsMaker>();
+builder.Services.AddSingleton<SpectrumMaker>();
 builder.Services.AddSingleton<WebmCopies>();
 builder.Services.AddScoped<ListenNowService>();
 builder.Services.AddHostedService<ListenNowSweeper>();

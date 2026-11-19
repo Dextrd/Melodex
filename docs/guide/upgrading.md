@@ -32,6 +32,10 @@ under the new **Settings → Scheduled tasks**: see [Scheduled tasks](configurat
 schedule moves there as it was: its times and time zone, on the daily schedule if it ran every day, or else the weekly
 one on the first of its days. Nothing else is put on a schedule, so everything runs as it did until you tick it.
 
+If the visualiser's bars are kept beside your songs (**When matching** under **Settings → Playback**), their `.bars`
+files are made again in a fuller format the next time the visualiser's bars are made, after a scan or on a schedule,
+and take about a third more room. Until then, a song's are made as it plays.
+
 ## To 1.1.0: upgrades replace files
 
 1.1.0 upgrades songs below your quality cutoff, replacing their files in your music folder with better copies, and a

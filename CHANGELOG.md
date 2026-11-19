@@ -18,11 +18,18 @@ What changed in each release of Melodex. Versions follow [semantic versioning](h
   missing lyrics now** under **Settings → General**, **Make missing bars now** under **Settings → Playback**, **Retry
   failed** on **Activity → Downloads** and **Get them all** on the wishlist are new (#112).
 - How often playlists sync for changes made in the media server can be set, under **Settings → Scheduled tasks** (#112).
+- Each song's spectrum, which the visualiser's bars are drawn from, is a documented part of the API for any app to
+  use, at `/spectrum` beside a song's stream: each band's level unsmoothed, from 40 Hz to 16 kHz over a wider range of
+  loudness, with each moment's loudness and peak, its waveform's outline and where the beats fall, and a choice of 8,
+  16, 32 or 64 bands. The client guide describes the format (#102).
 - The API has `GET` and `PUT /schedules`, `POST /library/lyrics`, `POST /library/bars`, `POST /requests/retry-failed`
   and `POST /wishlist/get` (#112).
 
 ### Changed
 
+- The visualiser's bars reach 16 kHz, where they stopped at 10 kHz, and a song's spectrum is version 2 of its format.
+  `.bars` files beside songs are made again in it as the visualiser's bars are next made when matching, and take
+  about a third more room. `/bars` still gives version 1, for apps written for it (#102).
 - The upgrade schedule has moved from **Settings → Quality** to **Settings → Scheduled tasks**, as it was set: on the
   daily schedule if it ran every day, or else the weekly one on the first of its days. Nothing else is scheduled on an
   existing install until you tick it. The upgrade settings' `scheduled`, `days`, `from`, `until` and `timeZone` are read

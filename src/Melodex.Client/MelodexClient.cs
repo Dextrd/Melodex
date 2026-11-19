@@ -460,13 +460,16 @@ public sealed class MelodexClient(HttpClient http)
         await EnsureAsync(response, ct);
     }
 
-    /// <summary>The visualiser's bars for a song, by its stream URL: the same, with <c>bars</c> for <c>stream</c>.</summary>
+    /// <summary>A song's spectrum, by its stream URL: the same, with <c>spectrum</c> for <c>stream</c>.</summary>
+    public static string SpectrumUrl(string streamUrl) => streamUrl.Replace("/stream?", "/spectrum?");
+
+    /// <summary>A song's spectrum in version 1 of its format, by its stream URL: the same, with <c>bars</c> for <c>stream</c>.</summary>
     public static string BarsUrl(string streamUrl) => streamUrl.Replace("/stream?", "/bars?");
 
-    /// <summary>Has the server make a song's bars ahead of it being played, by its stream URL.</summary>
-    public async Task WarmBarsAsync(string streamUrl, CancellationToken ct = default)
+    /// <summary>Has the server make a song's spectrum ahead of it being played, by its stream URL.</summary>
+    public async Task WarmSpectrumAsync(string streamUrl, CancellationToken ct = default)
     {
-        using var response = await http.GetAsync(BarsUrl(streamUrl) + "&warm=true", ct);
+        using var response = await http.GetAsync(SpectrumUrl(streamUrl) + "&warm=true", ct);
     }
 
     public async Task<UpgradeStatus> GetUpgradesAsync(CancellationToken ct = default) =>
