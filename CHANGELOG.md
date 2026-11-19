@@ -11,6 +11,46 @@ What changed in each release of Melodex. Versions follow [semantic versioning](h
   those sheets are read; your account's details and listening are left unopened. Songs match by their ISRCs, on the
   album Deezer names, and importing a later copy brings only what's new (#25).
 - A list's song matched by its ISRC is shown on the album the list names, not the first it came out on (#25).
+- **Notifications** at the bottom right, over every page: when a task finishes (a scan says if there's something to
+  review, and goes there), when a download or upgrade finishes or fails, with its album's cover, and for what a song's
+  menu does. Each closes itself after a few seconds, or stays while you point at it, and has a **✕**; clicking one opens
+  what it's about, lit up in Activity. **Settings → Appearance** chooses which kinds you see (#178).
+- **Replace** and **Remove** on a song's page, beside its file. Replace fetches a new file in its place, better or not,
+  passing over the one you have; it's tagged as the old one was and goes where it was, so the song keeps its place in
+  playlists, and the old file is held as an upgrade's is. Remove takes it out of the library (#193).
+- Adding to a playlist opens a list of your playlists with their covers and a round box each, ticked when it has the
+  songs, half-ticked when it has some: tick several to add to them at once, or untick to take the songs out. Folders
+  open one at a time, and **New playlist** and **New folder** below the list make one in the folder open (#201).
+- Playlist folders can be made empty, and are kept until you remove them (#201).
+- Updating the catalogue is a task of its own on Activity, with its own live view, **Update catalogue** in the Scan
+  menu, and a library setting to run one after each scan (on to start with) (#191).
+- A file deferred from Review whose tags name an artist and album shows in the library as they say, until it's matched
+  (#190).
+
+### Changed
+
+- Upgrades keep a few going at a time, **Upgrades at a time** under **Settings → Quality** (5 to start with), asking for
+  the next as each finishes, until every song below its cutoff has been tried or the window closes. The limit per run is
+  gone. A look that's going shows on Settings → Quality and Activity, with **Stop looking** (#147).
+- Activity's Recent view is in **Running**, **Queued** and **Completed** sections, each of which can be closed; rows
+  slide between them as things change (#175).
+- Settings → Appearance is one panel for an admin, with a **You** / **Everyone** switch between their own look and
+  everyone's defaults (#197).
+- A song's lyrics show on its page in a box that scrolls, with their badge beside the title and **Edit** to change them;
+  the separate view of them is gone (#200).
+- A song's page has its file's quality, **Format**, **Cover** and **Quality** on the File title, and **Add to queue** and
+  **Add to playlist** say what they are (#193).
+- A song on another of your albums is badged **Covered**, and an album with some of its songs on your other albums is
+  **Partly covered**, in yellow, rather than **Missing** (#199).
+
+### Fixed
+
+- The **Something went wrong** banner no longer shows when leaving the library or Activity while they load, and when
+  something does go wrong it says what, with the details, and puts it in the server's log (#192).
+- Settings → Quality shows straight away, rather than waiting for the media server; the count of songs below the cutoff
+  shimmers until it's known, and a media server that doesn't answer is given up on after 5 seconds (#196).
+- Review's buttons for every item sit at the right, over each item's own, and the library's sort and quality buttons are
+  evenly spaced (#198).
 
 ## [1.5.2] - 2026-11-18
 
