@@ -220,7 +220,8 @@ public sealed class AccessService(IServiceScopeFactory scopes, ILogger<AccessSer
         return asked.Contains(Scopes.Admin) ? allowed : asked.Where(allowed.Contains).ToHashSet();
     }
 
-    private async Task<Caller?> FromKeyAsync(string key, CancellationToken ct)
+    /// <summary>The app calling with this key; null if it isn't one.</summary>
+    public async Task<Caller?> FromKeyAsync(string key, CancellationToken ct)
     {
         if (!(await KeysAsync(ct)).TryGetValue(HashKey(key), out var record))
             return null;

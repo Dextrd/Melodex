@@ -460,6 +460,22 @@ public sealed class MelodexClient(HttpClient http)
         await EnsureAsync(response, ct);
     }
 
+    public async Task<SubsonicLogin> GetSubsonicLoginAsync(CancellationToken ct = default) =>
+        (await http.GetFromJsonAsync<SubsonicLogin>($"{Api}/auth/subsonic", MelodexJson.Options, ct))!;
+
+    public async Task<SubsonicLogin> NewSubsonicPasswordAsync(CancellationToken ct = default)
+    {
+        using var response = await http.PostAsync($"{Api}/auth/subsonic", null, ct);
+        await EnsureAsync(response, ct);
+        return (await response.Content.ReadFromJsonAsync<SubsonicLogin>(MelodexJson.Options, ct))!;
+    }
+
+    public async Task RemoveSubsonicPasswordAsync(CancellationToken ct = default)
+    {
+        using var response = await http.DeleteAsync($"{Api}/auth/subsonic", ct);
+        await EnsureAsync(response, ct);
+    }
+
     /// <summary>The visualiser's bars for a song, by its stream URL: the same, with <c>bars</c> for <c>stream</c>.</summary>
     public static string BarsUrl(string streamUrl) => streamUrl.Replace("/stream?", "/bars?");
 

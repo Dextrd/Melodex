@@ -115,3 +115,8 @@ public sealed record CreateApiKey(string Name, IReadOnlyList<string> Scopes);
 
 /// <summary>A key just made. <paramref name="Key"/> is shown this once: Melodex keeps only a hash of it.</summary>
 public sealed record CreatedApiKey(ApiKeyInfo Info, string Key);
+
+/// <summary>Your login for Subsonic players (#7).</summary>
+/// <param name="Password">Your app password, apart from your own: null until you make one.</param>
+/// <param name="CreatedAt">When it was made.</param>
+public sealed record SubsonicLogin(string Username, string? Password, DateTime? CreatedAt);

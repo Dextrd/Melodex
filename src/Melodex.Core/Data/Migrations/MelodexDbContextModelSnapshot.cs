@@ -318,6 +318,9 @@ namespace Melodex.Core.Data.Migrations
                     b.Property<TimeSpan?>("Duration")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("Genres")
+                        .HasColumnType("TEXT");
+
                     b.Property<DateTime>("HeldAt")
                         .HasColumnType("TEXT");
 
@@ -537,6 +540,9 @@ namespace Melodex.Core.Data.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("FormattedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Genres")
                         .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("HiddenAt")
@@ -1175,6 +1181,12 @@ namespace Melodex.Core.Data.Migrations
 
                     b.Property<string>("Stamp")
                         .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("SubsonicPassword")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("SubsonicPasswordAt")
                         .HasColumnType("TEXT");
 
                     b.Property<string>("Username")

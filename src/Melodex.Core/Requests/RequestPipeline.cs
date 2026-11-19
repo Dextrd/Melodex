@@ -704,8 +704,9 @@ public sealed class RequestPipeline(
                 row.ModifiedAt = info.LastWriteTimeUtc;
                 try
                 {
-                    var (tags, duration, lyrics, quality) = LibraryScanner.ReadTags(full);
+                    var (tags, duration, lyrics, quality, genres) = LibraryScanner.ReadTags(full);
                     row.TagsJson = tags.ToJson();
+                    row.Genres = genres;
                     row.SetQuality(quality);
                     // Its spectrum, as checked in staging: the music is the same, whatever beets did to its tags.
                     if (cutoffs.TryGetValue(file.Source, out var cutoff))

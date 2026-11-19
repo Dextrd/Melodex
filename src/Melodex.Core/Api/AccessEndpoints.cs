@@ -135,6 +135,45 @@ public static class AccessEndpoints
             .WithSummary("Change your own username or password. A new password signs out your other sessions.")
             .Produces(StatusCodes.Status204NoContent).ProducesValidationProblem();
 
+        // Subsonic players sign in with an app password, apart from the real one (#7).
+        auth.MapGet("/subsonic", async (HttpContext http, MelodexDbContext db, Subsonic.SubsonicAuth subsonic, CancellationToken ct) =>
+                await db.Users.FindAsync([Caller.Of(http).UserId], ct) is { } user
+                    ? Results.Ok(new SubsonicLogin(user.Username, subsonic.Unprotect(user.SubsonicPassword), user.SubsonicPasswordAt))
+                    : Results.NotFound())
+            .RequireScope(Scopes.SignedIn)
+            .WithName("GetSubsonicLogin")
+            .WithSummary("Your login for Subsonic players: your username and app password, if you've made one. Only someone signed in sees it.")
+            .Produces<SubsonicLogin>();
+
+        auth.MapPost("/subsonic", async (HttpContext http, MelodexDbContext db, Subsonic.SubsonicAuth subsonic, CancellationToken ct) =>
+            {
+                if (await db.Users.FindAsync([Caller.Of(http).UserId], ct) is not { } user)
+                    return Results.NotFound();
+                var password = Subsonic.SubsonicAuth.NewPassword();
+                user.SubsonicPassword = subsonic.Protect(password);
+                user.SubsonicPasswordAt = DateTime.UtcNow;
+                await db.SaveChangesAsync(ct);
+                return Results.Ok(new SubsonicLogin(user.Username, password, user.SubsonicPasswordAt));
+            })
+            .RequireScope(Scopes.SignedIn)
+            .WithName("NewSubsonicPassword")
+            .WithSummary("Make you a new app password for Subsonic players, in place of any you had: players still using the old one have to sign in again.")
+            .Produces<SubsonicLogin>();
+
+        auth.MapDelete("/subsonic", async (HttpContext http, MelodexDbContext db, CancellationToken ct) =>
+            {
+                if (await db.Users.FindAsync([Caller.Of(http).UserId], ct) is not { } user)
+                    return Results.NotFound();
+                user.SubsonicPassword = null;
+                user.SubsonicPasswordAt = null;
+                await db.SaveChangesAsync(ct);
+                return Results.NoContent();
+            })
+            .RequireScope(Scopes.SignedIn)
+            .WithName("RemoveSubsonicPassword")
+            .WithSummary("Remove your app password: players signed in with it can't play any more. Players using an API key aren't affected.")
+            .Produces(StatusCodes.Status204NoContent);
+
         auth.MapPut("/appearance", async (Appearance body, HttpContext http, AccessService access, MelodexDbContext db, CancellationToken ct) =>
             {
                 if (await db.Users.FindAsync([Caller.Of(http).UserId], ct) is not { } user)

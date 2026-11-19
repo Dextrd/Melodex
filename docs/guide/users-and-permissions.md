@@ -25,7 +25,7 @@ them out everywhere else.
 | --- | --- |
 | **Browse** | Seeing the library, the catalogue, what's being fetched and what's running |
 | **Request** | Asking for music to be fetched into the library, and ignoring albums and songs; looking for upgrades, approving or rolling them back, replacing files that seem lossy, and keeping a copy turned away for its quality |
-| **Listen** | Playing music, fetching songs to listen to without adding them, and having playlists |
+| **Listen** | Playing music, fetching songs to listen to without adding them, having playlists, and [Subsonic players](subsonic-players.md) |
 | **Review and match** | Approving, matching, excluding, deferring and hiding files on Review, and trusting files that seem lossy to be lossless |
 | **Format** | Rewriting files' tags and covers, and moving them; choosing album and song covers; looking for, choosing, editing and deleting a song's lyrics |
 | **Remove music** | Deleting music from the library, or hiding it |

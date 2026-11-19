@@ -26,30 +26,44 @@ ARG COMMIT=""
 RUN dotnet publish src/Melodex.Core/Melodex.Core.csproj -c Release -o /app --no-restore \
     ${VERSION:+-p:Version=$VERSION} ${COMMIT:+-p:SourceRevisionId=$COMMIT}
 
-# An ffmpeg that only decodes audio, for the visualiser's bars (#89), and repacks Opus in WebM for Safari (#93): about
-# 2 MB, where Debian's is over 400. Like the app, it's built natively, cross-compiled for the image's platform when
-# that's another, and has no GPL parts.
+# A small ffmpeg for audio alone: about 3 MB, where Debian's is over 400. It decodes songs for the visualiser's spectrum
+# (#89, #102), repacks Opus in WebM for Safari (#93), and transcodes to MP3, Opus or AAC for Subsonic players that ask
+# (#7), with LAME and libopus built in. Like the app, it's built natively, cross-compiled for the image's platform when
+# that's another, and has no GPL parts: LAME is LGPL, libopus BSD.
 FROM --platform=$BUILDPLATFORM debian:bookworm-slim AS ffmpeg
 ARG FFMPEG_VERSION=7.1.1
+ARG OPUS_VERSION=1.5.2
+ARG LAME_VERSION=3.100
 ARG TARGETARCH
 ARG BUILDARCH
 RUN case "$TARGETARCH" in arm64) triple=aarch64-linux-gnu ;; *) triple=x86_64-linux-gnu ;; esac \
     && cross=$([ "$TARGETARCH" != "$BUILDARCH" ] && echo "gcc-$(echo $triple | tr _ -) libc6-dev-$TARGETARCH-cross" || true) \
-    && apt-get update && apt-get install -y --no-install-recommends build-essential nasm curl ca-certificates xz-utils $cross \
+    && apt-get update && apt-get install -y --no-install-recommends build-essential nasm curl ca-certificates xz-utils pkg-config $cross \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /src
+# The encoders' libraries, static, for the image's platform.
+RUN case "$TARGETARCH" in arm64) triple=aarch64-linux-gnu ;; *) triple=x86_64-linux-gnu ;; esac \
+    && host=$([ "$TARGETARCH" != "$BUILDARCH" ] && echo "--host=$triple" || true) \
+    && mkdir opus lame \
+    && curl -fsSL https://downloads.xiph.org/releases/opus/opus-${OPUS_VERSION}.tar.gz | tar -xz -C opus --strip-components=1 \
+    && (cd opus && ./configure --prefix=/deps $host --enable-static --disable-shared --disable-doc --disable-extra-programs \
+        && make -j"$(nproc)" && make install) \
+    && curl -fsSL https://downloads.sourceforge.net/project/lame/lame/${LAME_VERSION}/lame-${LAME_VERSION}.tar.gz | tar -xz -C lame --strip-components=1 \
+    && (cd lame && ./configure --prefix=/deps $host --enable-static --disable-shared --disable-frontend --disable-decoder --disable-gtktest \
+        && make -j"$(nproc)" && make install)
 RUN curl -fsSL https://ffmpeg.org/releases/ffmpeg-${FFMPEG_VERSION}.tar.xz | tar -xJ --strip-components=1
 RUN case "$TARGETARCH" in arm64) arch=aarch64 ;; *) arch=x86_64 ;; esac \
     && prefix=$([ "$TARGETARCH" != "$BUILDARCH" ] && echo "$arch-linux-gnu-" || true) \
-    && ./configure --prefix=/out ${prefix:+--enable-cross-compile --arch=$arch --target-os=linux --cross-prefix=$prefix} \
+    && PKG_CONFIG_PATH=/deps/lib/pkgconfig ./configure --prefix=/out ${prefix:+--enable-cross-compile --arch=$arch --target-os=linux --cross-prefix=$prefix} \
+        --pkg-config=pkg-config --pkg-config-flags=--static --extra-cflags=-I/deps/include --extra-ldflags=-L/deps/lib --extra-libs=-lm \
         --disable-everything --disable-autodetect --disable-network --disable-doc --disable-debug \
         --disable-ffplay --disable-ffprobe --disable-avdevice --disable-swscale --disable-postproc \
-        --enable-small --enable-swresample \
+        --enable-small --enable-swresample --enable-libopus --enable-libmp3lame \
         --enable-protocol=file,pipe \
         --enable-demuxer=flac,ogg,mp3,mov,wav,aiff,matroska,aac,w64 \
         --enable-parser=flac,opus,vorbis,mpegaudio,aac \
         --enable-decoder=flac,opus,vorbis,mp3,mp3float,aac,aac_fixed,alac,pcm_s16le,pcm_s24le,pcm_s32le,pcm_f32le,pcm_s16be,pcm_s24be,pcm_s32be \
-        --enable-encoder=pcm_f32le --enable-muxer=pcm_f32le,webm \
+        --enable-encoder=pcm_f32le,libmp3lame,libopus,aac --enable-muxer=pcm_f32le,webm,mp3,ogg,adts \
         --enable-filter=aresample,aformat,anull,amix,pan \
     && make -j"$(nproc)" && make install && ${prefix}strip /out/bin/ffmpeg
 

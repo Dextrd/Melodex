@@ -28,6 +28,13 @@ public class User
     /// <summary>How the web app looks to them, as JSON: see <c>Appearance</c>. Empty for the default.</summary>
     public string? Appearance { get; set; }
 
+    /// <summary>
+    /// Their app password for Subsonic players (#7), encrypted with the data protection keys: players sign in with it,
+    /// or a token made from it, in place of their real password, so it has to be kept, not hashed. Null for none.
+    /// </summary>
+    public string? SubsonicPassword { get; set; }
+    public DateTime? SubsonicPasswordAt { get; set; }
+
     /// <summary>Their own logins on the media servers, for syncing their playlists: one for each server, kept when another takes over.</summary>
     public List<MediaServerLogin> MediaServerLogins { get; set; } = [];
 
