@@ -24,12 +24,20 @@ OpenMediaVault's, edit the stack's compose there), or take the new
 [`docker-compose.yml`](https://github.com/dextrd/Melodex/blob/main/docker-compose.yml) and keep your `.env`. Then pull
 and start it as above. Nothing else changes: your settings, library and data carry on.
 
+## To 1.7.0: scheduled tasks
+
+Scans, catalogue updates, lossless checks, lyrics, failed downloads, wishlists and upgrades can run on a schedule,
+under the new **Settings → Scheduled tasks**: see [Scheduled tasks](configuration.md#scheduled-tasks). Your upgrade
+schedule moves there as it was: its times and time zone, on the daily schedule if it ran every day, or else the weekly
+one on the first of its days. Nothing else is put on a schedule, so everything runs as it did until you tick it.
+
 ## To 1.1.0: upgrades replace files
 
 1.1.0 upgrades songs below your quality cutoff, replacing their files in your music folder with better copies, and a
 scheduled look for them is on from the start (Mondays, 01:00 to 06:00). If you'd rather look before anything is
-replaced, turn **Look through the whole library for upgrades on a schedule** off under **Settings → Quality →
-Upgrades** once it's running; **Look for upgrades** on a song, album or artist still works by hand. A replaced file is
+replaced, untick **Look for upgrades** under **Settings → Scheduled tasks** once it's running (before 1.7.0, **Look
+through the whole library for upgrades on a schedule** under **Settings → Quality → Upgrades**); **Look for upgrades**
+on a song, album or artist still works by hand. A replaced file is
 held for 14 days, and can be put back under **Review → Upgraded** until then.
 
 Your player keeps a song's stars, plays and playlists through an upgrade with Navidrome 0.55 or later; Melodex warns if

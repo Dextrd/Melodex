@@ -46,7 +46,7 @@ public sealed class RequestFixture : IAsyncLifetime
         Retrieval = new FakeRetrieval(Staging);
         Importer = new FakeImporter(Staging, Music);
         Factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder => builder
-            .UseSetting("Melodex:DataPath", Path.Combine(_root, "data"))
+            .UseSetting("Melodex:DataPath", Path.Combine(_root, "data")).UseSetting("Melodex:ScheduledTasks", "false")
             .UseSetting("Melodex:LibraryPath", Music)
             .UseSetting("Melodex:StagingPath", Staging)
             .UseSetting("Melodex:ListenNowPath", ListenNow)
@@ -1048,18 +1048,15 @@ public sealed class RequestTests(RequestFixture fixture, ITestOutputHelper outpu
     public async Task Scheduled_upgrades_keep_a_few_going_and_stop_when_the_window_closes()
     {
         var before = await Api.GetUpgradesAsync();
+        await Api.SaveUpgradeSettingsAsync(before.Settings with { AtATime = 1 });
         var now = DateTime.UtcNow;
-        // All of today, in UTC, one at a time.
-        await Api.SaveUpgradeSettingsAsync(before.Settings with
-        {
-            Days = [now.DayOfWeek], From = new(0, 0), Until = new(0, 0), TimeZone = "UTC", AtATime = 1,
-        });
         using var scope = fixture.Factory.Services.CreateScope();
         var upgrades = scope.ServiceProvider.GetRequiredService<Upgrades>();
         var db = scope.ServiceProvider.GetRequiredService<Melodex.Core.Data.MelodexDbContext>();
         try
         {
-            // The window's open, so a look starts (here, or by the scheduler first), and keeps one going at most.
+            // A window opens, so a look starts, and keeps one going at most.
+            await upgrades.StartScheduledAsync(now.AddHours(-1), now.AddHours(1), now, default);
             await upgrades.RunScheduledAsync(now, default);
             var status = await Api.GetUpgradesAsync();
             Assert.True(status.Running);
@@ -1087,24 +1084,78 @@ public sealed class RequestTests(RequestFixture fixture, ITestOutputHelper outpu
     [InlineData("2026-11-10T03:00:00Z", false)]
     [InlineData("2026-07-06T00:30:00Z", true)]
     [InlineData("2026-07-06T05:30:00Z", false)]
-    public void An_upgrade_window_is_in_its_own_time_zone(string at, bool open)
+    public void A_schedule_window_is_in_its_own_time_zone(string at, bool open)
     {
-        var settings = new UpgradeSettings { TimeZone = "Europe/London" };
-        Assert.Equal(open, UpgradeWindows.Current(settings, DateTime.Parse(at).ToUniversalTime()) is not null);
+        var settings = new ScheduleSettings { TimeZone = "Europe/London" };
+        Assert.Equal(open, ScheduleWindows.Current(settings, ScheduleRepeat.Weekly, DateTime.Parse(at).ToUniversalTime()) is not null);
     }
 
     [Fact]
-    public void An_upgrade_window_can_run_past_midnight_into_the_next_day()
+    public void A_schedule_window_can_run_past_midnight_into_the_next_day()
     {
-        // Fridays and Saturdays, 22:00 until 04:00 the next morning.
-        var settings = new UpgradeSettings { Days = [DayOfWeek.Friday, DayOfWeek.Saturday], From = new(22, 0), Until = new(4, 0) };
-        var saturdayMorning = new DateTime(2026, 11, 14, 3, 0, 0, DateTimeKind.Utc);
-        Assert.Equal((new DateTime(2026, 11, 13, 22, 0, 0), new DateTime(2026, 11, 14, 4, 0, 0)), UpgradeWindows.Current(settings, saturdayMorning));
-        Assert.NotNull(UpgradeWindows.Current(settings, new DateTime(2026, 11, 15, 3, 0, 0, DateTimeKind.Utc)));
-        Assert.Null(UpgradeWindows.Current(settings, new DateTime(2026, 11, 16, 3, 0, 0, DateTimeKind.Utc)));
-        Assert.Equal(new DateTime(2026, 11, 14, 22, 0, 0), UpgradeWindows.Next(settings, saturdayMorning));
-        Assert.Equal(new DateTime(2026, 11, 20, 22, 0, 0), UpgradeWindows.Next(settings, new DateTime(2026, 11, 15, 3, 0, 0, DateTimeKind.Utc)));
-        Assert.Null(UpgradeWindows.Next(settings with { Days = [] }, saturdayMorning));
+        // Saturdays, 22:00 until 04:00 the next morning; and every day the same.
+        var settings = new ScheduleSettings
+        {
+            Weekly = new() { Day = DayOfWeek.Saturday, From = new(22, 0), Until = new(4, 0) },
+            Daily = new() { From = new(22, 0), Until = new(4, 0) },
+        };
+        var sundayMorning = new DateTime(2026, 11, 15, 3, 0, 0, DateTimeKind.Utc);
+        Assert.Equal((new DateTime(2026, 11, 14, 22, 0, 0), new DateTime(2026, 11, 15, 4, 0, 0)), ScheduleWindows.Current(settings, ScheduleRepeat.Weekly, sundayMorning));
+        Assert.Null(ScheduleWindows.Current(settings, ScheduleRepeat.Weekly, new DateTime(2026, 11, 14, 3, 0, 0, DateTimeKind.Utc)));
+        Assert.Null(ScheduleWindows.Current(settings, ScheduleRepeat.Weekly, new DateTime(2026, 11, 15, 4, 0, 0, DateTimeKind.Utc)));
+        Assert.Equal(new DateTime(2026, 11, 21, 22, 0, 0), ScheduleWindows.Next(settings, ScheduleRepeat.Weekly, sundayMorning));
+        Assert.NotNull(ScheduleWindows.Current(settings, ScheduleRepeat.Daily, new DateTime(2026, 11, 11, 23, 0, 0, DateTimeKind.Utc)));
+        Assert.Equal(new DateTime(2026, 11, 15, 22, 0, 0), ScheduleWindows.Next(settings, ScheduleRepeat.Daily, sundayMorning));
+    }
+
+    [Theory]
+    [InlineData(31, "2026-01-31", "2026-02-28", "2026-03-31")]
+    [InlineData(30, "2026-01-30", "2026-02-28", "2026-03-30")]
+    [InlineData(29, "2028-01-29", "2028-02-29", "2028-03-29")]
+    [InlineData(1, "2026-01-01", "2026-02-01", "2026-03-01")]
+    public void A_monthly_schedule_past_a_months_end_runs_on_its_last_day(int day, string january, string february, string march)
+    {
+        var settings = new ScheduleSettings { Monthly = new() { Day = day, From = new(1, 0), Until = new(6, 0) } };
+        var at = DateTime.Parse(january).AddDays(-1);
+        foreach (var expected in new[] { january, february, march })
+        {
+            var next = ScheduleWindows.Next(settings, ScheduleRepeat.Monthly, DateTime.SpecifyKind(at, DateTimeKind.Utc))!.Value;
+            Assert.Equal(DateTime.Parse(expected).AddHours(1), next);
+            at = next.AddHours(6);
+        }
+    }
+
+    [Fact]
+    public void Each_task_is_on_one_schedule_at_most()
+    {
+        var settings = new ScheduleSettings();
+        Assert.Equal(ScheduleRepeat.Daily, settings.WhenRuns(ScheduledTask.Scan));
+        Assert.Equal(ScheduleRepeat.Weekly, settings.WhenRuns(ScheduledTask.Upgrades));
+        Assert.Null((settings with { Weekly = settings.Weekly with { Tasks = [] } }).WhenRuns(ScheduledTask.Upgrades));
+        Assert.Equal(new DateTime(2026, 11, 11, 1, 0, 0), ScheduleWindows.For(settings, ScheduledTask.Scan, new DateTime(2026, 11, 11, 3, 0, 0, DateTimeKind.Utc))?.Start);
+        Assert.Null(ScheduleWindows.For(settings, ScheduledTask.Upgrades, new DateTime(2026, 11, 11, 3, 0, 0, DateTimeKind.Utc)));
+    }
+
+    [Theory]
+    // Every day goes on the daily schedule; fewer, on the weekly one on the first; none, or off, on none.
+    [InlineData(new[] { 0, 1, 2, 3, 4, 5, 6 }, true, ScheduleRepeat.Daily, DayOfWeek.Monday)]
+    [InlineData(new[] { 5, 3 }, true, ScheduleRepeat.Weekly, DayOfWeek.Wednesday)]
+    [InlineData(new[] { 6, 0 }, true, ScheduleRepeat.Weekly, DayOfWeek.Saturday)]
+    [InlineData(new[] { 1 }, false, null, DayOfWeek.Monday)]
+    [InlineData(new int[0], true, null, DayOfWeek.Monday)]
+    public void An_upgrade_schedule_from_before_becomes_scheduled_tasks(int[] days, bool scheduled, ScheduleRepeat? repeat, DayOfWeek weekly)
+    {
+        var upgrades = new UpgradeSettings
+        {
+            Scheduled = scheduled, Days = days.Select(d => (DayOfWeek)d).ToList(), From = new(22, 0), Until = new(4, 0), TimeZone = "Europe/London",
+        };
+        var schedule = SettingsService.FromUpgrades(upgrades);
+        Assert.Equal(repeat, schedule.WhenRuns(ScheduledTask.Upgrades));
+        Assert.Equal(weekly, schedule.Weekly.Day);
+        Assert.Equal("Europe/London", schedule.TimeZone);
+        Assert.All(Enum.GetValues<ScheduleRepeat>(), r => Assert.Equal((new TimeOnly(22, 0), new TimeOnly(4, 0)), (schedule.Of(r).From, schedule.Of(r).Until)));
+        // Nothing else goes on a schedule it wasn't on.
+        Assert.Equal(repeat is null ? 0 : 1, Enum.GetValues<ScheduleRepeat>().Sum(r => schedule.Of(r).Tasks.Count));
     }
 
     [Theory]

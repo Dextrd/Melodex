@@ -152,43 +152,54 @@ public sealed class Upgrades(
     }
 
     /// <summary>
-    /// Keeps a run through the whole library going, run every few seconds: a window that opens starts one, unless one's
-    /// going already or this window's has been. While a run goes it keeps as many upgrades going as the settings say,
-    /// asking for the next as each finishes, until every upgradable song has been tried. One that started in a window
-    /// ends when the window closes, and those not started yet are cancelled. Returns how many it asked for.
+    /// Keeps the run through the whole library that's going, run every few seconds: it keeps as many upgrades going as
+    /// the settings say, asking for the next as each finishes, until every upgradable song has been tried. One in a
+    /// window ends when the window closes, and those not started yet are cancelled. Returns how many it asked for.
     /// </summary>
     public async Task<int> RunScheduledAsync(DateTime utcNow, CancellationToken ct)
     {
-        var upgrades = await settings.GetUpgradesAsync(ct);
         var run = await settings.GetUpgradeRunAsync(ct);
-        var window = upgrades.Scheduled ? UpgradeWindows.Current(upgrades, utcNow) : null;
-        if (window is { } open && !run.Going && run.Window != open.Start)
-            run = new UpgradeRun { Window = open.Start, StartedAt = utcNow };
-        else if (!run.Going)
+        if (!run.Going)
             return 0;
-        if (run.Window is { } started && window?.Start != started)
+        if (run.Until is { } until && utcNow >= until)
         {
             await EndAsync(run, false, utcNow, ct);
             return 0;
         }
-        var (queued, _) = await TopUpAsync(run, upgrades, ct);
+        var (queued, _) = await TopUpAsync(run, await settings.GetUpgradesAsync(ct), ct);
         return queued;
     }
 
     /// <summary>
-    /// Upgrade now: starts a run through the whole library by hand, which ends with the scheduled window if it starts in
-    /// one. While a run's going already, it carries on as it is.
+    /// Starts the scheduled look through the library, in a window that's open, until the window closes. While a look is
+    /// going already, by hand or not, it carries on as it is. Returns how many it asked for first.
+    /// </summary>
+    public async Task<int> StartScheduledAsync(DateTime opens, DateTime closes, DateTime utcNow, CancellationToken ct)
+    {
+        var run = await settings.GetUpgradeRunAsync(ct);
+        if (run.Going)
+            return 0;
+        var (queued, _) = await TopUpAsync(new UpgradeRun { Window = opens, Until = closes, StartedAt = utcNow }, await settings.GetUpgradesAsync(ct), ct);
+        return queued;
+    }
+
+    /// <summary>The scheduled look that started in a window, while it's going; null once it's over or if another's going.</summary>
+    public async Task<UpgradeRun?> ScheduledRunAsync(DateTime opens, CancellationToken ct) =>
+        await settings.GetUpgradeRunAsync(ct) is { Going: true, ByHand: false } run && run.Window == opens ? run : null;
+
+    /// <summary>
+    /// Upgrade now: starts a run through the whole library by hand, which ends with the window upgrades are scheduled
+    /// in if it starts in one. While a run's going already, it carries on as it is.
     /// </summary>
     public async Task<UpgradeSearch> StartAsync(string requester, DateTime utcNow, CancellationToken ct)
     {
         var upgrades = await settings.GetUpgradesAsync(ct);
         var run = await settings.GetUpgradeRunAsync(ct);
         if (!run.Going)
-            run = new UpgradeRun
-            {
-                ByHand = true, Requester = requester, StartedAt = utcNow,
-                Window = upgrades.Scheduled ? UpgradeWindows.Current(upgrades, utcNow)?.Start : null,
-            };
+        {
+            var window = ScheduleWindows.For(await settings.GetScheduleAsync(ct), ScheduledTask.Upgrades, utcNow);
+            run = new UpgradeRun { ByHand = true, Requester = requester, StartedAt = utcNow, Window = window?.Start, Until = window?.End };
+        }
         var (queued, upgradable) = await TopUpAsync(run, upgrades, ct);
         return new UpgradeSearch(upgradable, queued);
     }
@@ -249,13 +260,27 @@ public sealed class Upgrades(
 
     public async Task<UpgradeStatus> StatusAsync(CancellationToken ct)
     {
-        var upgrades = await settings.GetUpgradesAsync(ct);
-        var now = DateTime.UtcNow;
-        var run = await settings.GetUpgradeRunAsync(ct);
-        DateTime? next = upgrades.Scheduled ? UpgradeWindows.Next(upgrades, now) : null;
+        var schedule = await settings.GetScheduleAsync(ct);
+        var upgrades = WithSchedule(await settings.GetUpgradesAsync(ct), schedule);
+        var repeat = schedule.WhenRuns(ScheduledTask.Upgrades);
+        DateTime? next = repeat is { } r ? ScheduleWindows.Next(schedule, r, DateTime.UtcNow) : null;
         var upgradable = await UpgradableAsync(db.LibraryFiles, ct);
         var going = await RunAsync(ct);
         return new UpgradeStatus(upgrades, await WarningAsync(ct), next, upgradable.Count, await HeldAsync(null, ct), going is not null, going);
+    }
+
+    /// <summary>Upgrades' settings, saying when they're scheduled as the schedules have it, for those reading them from before.</summary>
+    public static UpgradeSettings WithSchedule(UpgradeSettings upgrades, ScheduleSettings schedule)
+    {
+        var repeat = schedule.WhenRuns(ScheduledTask.Upgrades);
+        var window = schedule.Of(repeat ?? ScheduleRepeat.Weekly);
+        IReadOnlyList<DayOfWeek> days = window switch
+        {
+            WeeklySchedule weekly => [weekly.Day],
+            DailySchedule => Enum.GetValues<DayOfWeek>(),
+            _ => [],
+        };
+        return upgrades with { Scheduled = repeat is not null, Days = days, From = window.From, Until = window.Until, TimeZone = schedule.TimeZone };
     }
 
     /// <summary>The look through the library that's going, if one is.</summary>
@@ -264,9 +289,7 @@ public sealed class Upgrades(
         var run = await settings.GetUpgradeRunAsync(ct);
         if (!run.Going)
             return null;
-        var upgrades = await settings.GetUpgradesAsync(ct);
-        return new UpgradeRunInfo(run.ByHand, run.Requester, run.Began, run.Asked, await GoingAsync(ct),
-            run.Window is not null ? UpgradeWindows.Current(upgrades, DateTime.UtcNow)?.End : null);
+        return new UpgradeRunInfo(run.ByHand, run.Requester, run.Began, run.Asked, await GoingAsync(ct), run.Until);
     }
 
     /// <summary>Files held after an upgrade, newest first, of one song or all.</summary>
@@ -472,8 +495,9 @@ public sealed class Upgrades(
 }
 
 /// <summary>
-/// Looks through the library for upgrades in their window, when that's on, and deletes held files whose time is up, every
-/// minute; in between, a run that's going gets the next upgrade as soon as one finishes.
+/// Keeps a look through the library for upgrades going, ending it when its window closes, and deletes held files whose
+/// time is up, every minute; in between, a look that's going gets the next upgrade as soon as one finishes. Scheduled
+/// tasks start the scheduled looks.
 /// </summary>
 public sealed class UpgradeScheduler(IServiceScopeFactory scopes, ILogger<UpgradeScheduler> logger) : BackgroundService
 {

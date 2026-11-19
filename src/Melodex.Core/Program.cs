@@ -121,6 +121,8 @@ builder.Services.AddScoped<RequestPlanner>();
 builder.Services.AddScoped<RequestPipeline>();
 builder.Services.AddScoped<Upgrades>();
 builder.Services.AddHostedService<UpgradeScheduler>();
+builder.Services.AddScoped<ScheduledTasks>();
+builder.Services.AddHostedService<ScheduleRunner>();
 builder.Services.AddSingleton<StreamSigner>();
 builder.Services.AddSingleton<BarsMaker>();
 builder.Services.AddSingleton<WebmCopies>();
@@ -216,6 +218,7 @@ api.MapWebhookEndpoints();
 api.MapPlaylistEndpoints();
 api.MapWishlistEndpoints();
 api.MapUpgradeEndpoints();
+api.MapScheduleEndpoints();
 api.MapToolEndpoints();
 
 // The web app: Blazor WebAssembly, served from the same origin and talking only to the public API.

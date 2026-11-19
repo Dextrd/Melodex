@@ -21,20 +21,22 @@ public static class UpgradeEndpoints
                 var errors = new Dictionary<string, string[]>();
                 if (value.AtATime is < 1 or > UpgradeSettings.MostAtATime)
                     errors["atATime"] = [$"Must be between 1 and {UpgradeSettings.MostAtATime}."];
-                if (value.Scheduled && value.Days.Count == 0)
-                    errors["days"] = ["Pick at least one day."];
-                if (!UpgradeWindows.Known(value.TimeZone))
-                    errors["timeZone"] = ["Must be a time zone this server knows, such as Europe/London."];
                 if (value.HoldDays is < 1 or > 365)
                     errors["holdDays"] = ["Must be between 1 and 365."];
                 if (errors.Count > 0)
                     return Results.ValidationProblem(errors);
-                await s.SaveUpgradesAsync(value with { Days = value.Days.Distinct().Order().ToList(), PerRun = null }, ct);
+                // When they run is the schedules' now; what was kept from before stays, as it was.
+                var kept = await s.GetUpgradesAsync(ct);
+                await s.SaveUpgradesAsync(value with
+                {
+                    Scheduled = kept.Scheduled, Days = kept.Days, From = kept.From, Until = kept.Until, TimeZone = kept.TimeZone, PerRun = null,
+                }, ct);
                 return Results.NoContent();
             })
             .RequireScope(Scopes.Settings).WithName("SaveUpgradeSettings")
-            .WithSummary("Whether the whole library is looked through on a schedule, on which days and between which times, how many upgrades "
-                         + "a look keeps going at a time, and whether replaced files are held or deleted.");
+            .WithSummary("How many upgrades a look through the whole library keeps going at a time, and whether replaced files are held or deleted. "
+                         + "When looks are scheduled is set with PUT /schedules: Scheduled, Days, From, Until and TimeZone here are read only, and "
+                         + "left as they are.");
 
         upgrades.MapPost("/search", async (FormatScope scope, HttpContext http, Upgrades service, CancellationToken ct) =>
             {
@@ -48,7 +50,7 @@ public static class UpgradeEndpoints
             .RequireScope(Scopes.Request).WithName("SearchUpgrades")
             .WithSummary("Ask for upgrades of a song's, an album's or an artist's files below their cutoff. For the whole library, start a look "
                          + "that keeps as many going as the settings say, asking for the next as each finishes, until everything's been tried "
-                         + "(or the scheduled window it started in closes); Queued is how many it asked for first. Each is a request on the Activity page.")
+                         + "(or the window upgrades are scheduled in closes, if it started in it); Queued is how many it asked for first. Each is a request on the Activity page.")
             .Produces<UpgradeSearch>();
 
         upgrades.MapGet("/run", async (Upgrades service, CancellationToken ct) =>

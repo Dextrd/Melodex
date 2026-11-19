@@ -19,7 +19,7 @@ public sealed class ImportTests : IDisposable
     {
         var replay = new FakeCoverArt(new ReplayHandler(TestLibrary.MusicBrainzFixtures));
         _factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder => builder
-            .UseSetting("Melodex:DataPath", _dataPath)
+            .UseSetting("Melodex:DataPath", _dataPath).UseSetting("Melodex:ScheduledTasks", "false")
             .UseSetting("Melodex:LibraryPath", TestLibrary.Music)
             .ConfigureServices(services => services.Configure<PluginHttpOptions>(http =>
             {

@@ -151,6 +151,16 @@ public static class LibraryEndpoints
             .WithSummary("Fill in the catalogue for every library artist: their discographies and the editions of their albums. Returns the queued task.")
             .Produces<TaskInfo>(StatusCodes.Status202Accepted);
 
+        library.MapPost("/lyrics", async (TaskQueue queue, CancellationToken ct) =>
+            {
+                var task = await queue.EnqueueAsync(LyricsTask.TaskKind, null, ct);
+                return Results.Accepted(null, TaskQueue.ToInfo(task) with { Title = LyricsTask.Title });
+            })
+            .RequireScope(Scopes.Scan).WithName("FindLyrics")
+            .WithSummary("Look for lyrics for songs without them, through the lyrics plugins, again for those the sources had none for a while ago. "
+                         + "Returns the queued task.")
+            .Produces<TaskInfo>(StatusCodes.Status202Accepted);
+
         library.MapGet("/spectrum", (MelodexDbContext db, CancellationToken ct) => SpectrumTask.StatusAsync(db, ct))
             .WithName("GetSpectrumStatus")
             .WithSummary("How many of the library's lossless files have been checked for lossy music passed off as lossless, and those that seem to be.");

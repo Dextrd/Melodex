@@ -21,7 +21,7 @@ public sealed class UpgradeTests : IDisposable
     }
 
     private WebApplicationFactory<Program> Start() =>
-        new WebApplicationFactory<Program>().WithWebHostBuilder(builder => builder.UseSetting("Melodex:DataPath", _dataPath));
+        new WebApplicationFactory<Program>().WithWebHostBuilder(builder => builder.UseSetting("Melodex:DataPath", _dataPath).UseSetting("Melodex:ScheduledTasks", "false"));
 
     [Fact]
     public async Task A_navidex_database_is_moved_and_its_plugins_and_keys_carry_on()
@@ -69,7 +69,7 @@ public sealed class UpgradeTests : IDisposable
         await File.WriteAllBytesAsync(Path.Combine(music, "01 Song.flac"), [0]);
         await File.WriteAllBytesAsync(Path.Combine(music, "cover.jpg"), [0]);
         using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder => builder
-            .UseSetting("Melodex:DataPath", _dataPath)
+            .UseSetting("Melodex:DataPath", _dataPath).UseSetting("Melodex:ScheduledTasks", "false")
             .UseSetting("Melodex:LibraryPath", Path.Combine(_dataPath, "music")));
         var admin = new MelodexClient(factory.CreateSignedInClient());
 

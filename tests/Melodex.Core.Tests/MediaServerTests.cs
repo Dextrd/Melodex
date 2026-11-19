@@ -27,7 +27,7 @@ public sealed class MediaServerTests : IDisposable
     {
         Directory.CreateDirectory(Path.Combine(_dataPath, "music"));
         _factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder => builder
-            .UseSetting("Melodex:DataPath", _dataPath)
+            .UseSetting("Melodex:DataPath", _dataPath).UseSetting("Melodex:ScheduledTasks", "false")
             .UseSetting("Melodex:LibraryPath", Path.Combine(_dataPath, "music"))
             .ConfigureServices(services => services.Configure<PluginHttpOptions>(http =>
             {

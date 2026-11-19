@@ -73,7 +73,8 @@ Melodex. Plex's accounts are plex.tv's rather than the server's, so playlists do
    login for someone else in the same tab of their **Edit** dialog under **Settings → Users**. Each media server that
    syncs playlists has its own login there, whether or not it's the one in use.
 
-Syncing happens a few seconds after you change a playlist, every 10 minutes for changes made in the media server, and when you
+Syncing happens a few seconds after you change a playlist, every 10 minutes for changes made in the media server (set under
+[**Settings → Scheduled tasks**](configuration.md#scheduled-tasks)), and when you
 click the sync button on the Playlists tab. Each user only ever sees and changes their own playlists: Navidrome's
 public playlists from other users aren't brought over.
 

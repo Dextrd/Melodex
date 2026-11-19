@@ -20,7 +20,7 @@ public sealed class LibraryViewTests : IDisposable
     public LibraryViewTests()
     {
         _factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder => builder
-            .UseSetting("Melodex:DataPath", _dataPath)
+            .UseSetting("Melodex:DataPath", _dataPath).UseSetting("Melodex:ScheduledTasks", "false")
             .UseSetting("Melodex:LibraryPath", TestLibrary.Music)
             .ConfigureServices(services => services.Configure<PluginHttpOptions>(http =>
             {

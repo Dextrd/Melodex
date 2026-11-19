@@ -13,7 +13,7 @@ public sealed class MelodexFactory : WebApplicationFactory<Program>
     private readonly string _dataPath = Path.Combine(Path.GetTempPath(), "melodex-tests", Guid.NewGuid().ToString("N"));
 
     protected override void ConfigureWebHost(IWebHostBuilder builder) =>
-        builder.UseSetting("Melodex:DataPath", _dataPath);
+        builder.UseSetting("Melodex:DataPath", _dataPath).UseSetting("Melodex:ScheduledTasks", "false");
 
     protected override void Dispose(bool disposing)
     {

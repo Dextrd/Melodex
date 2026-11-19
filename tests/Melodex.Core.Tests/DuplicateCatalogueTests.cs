@@ -22,7 +22,7 @@ public sealed class DuplicateCatalogueTests : IDisposable
 
     public DuplicateCatalogueTests()
     {
-        _factory = new WebApplicationFactory<Program>().WithWebHostBuilder(b => b.UseSetting("Melodex:DataPath", _dataPath));
+        _factory = new WebApplicationFactory<Program>().WithWebHostBuilder(b => b.UseSetting("Melodex:DataPath", _dataPath).UseSetting("Melodex:ScheduledTasks", "false"));
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<MelodexDbContext>();
         db.PluginInstances.Add(new PluginInstance

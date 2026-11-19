@@ -88,7 +88,7 @@ else
         @if (_saveError is not null) { <span class="error small" title="@_saveError">@_saveError</span> }
     </div>
 
-    <h2>Lossless that seems lossy</h2>
+    <h2 id="lossless">Lossless that seems lossy</h2>
     <p class="muted small">
         Lossy music is sometimes passed off as lossless: an MP3 saved as FLAC, labelled FLAC, but no better than the MP3. Lossy encoders cut off the highs
         where they give themselves away, about 16.5 kHz for an MP3 at 128 kbps and 20 kHz at 320, so each lossless download, and the library's lossless
@@ -132,6 +132,7 @@ else
                 Files are only read. New and changed ones are checked after each scan; ALAC, APE and WavPack can't be.
                 @if (_checkQueued) { <span>Queued: it's under Tasks in Activity.</span> }
             </div>
+            <ScheduleNote Task="ScheduledTask.LosslessCheck" />
             @if (spectra.Suspects.Count > 0)
             {
                 <div class="small">
@@ -155,46 +156,7 @@ else
             <div class="notice warning" role="status">⚠ @warning</div>
         }
         <div class="card settings-card">
-            <label class="setting-line">
-                <input type="checkbox" checked="@_upgradeSettings!.Scheduled" @onchange="e => SetUpgrades(_upgradeSettings with { Scheduled = (bool)e.Value! })" />
-                Look through the whole library for upgrades on a schedule
-            </label>
-            @if (_upgradeSettings.Scheduled)
-            {
-                <div class="setting-line" role="group" aria-label="Days">
-                    On
-                    <span class="day-toggles">
-                        @foreach (var day in Week)
-                        {
-                            var on = _upgradeSettings.Days.Contains(day);
-                            <button type="button" class="day-toggle @(on ? "on" : "")" aria-pressed="@(on ? "true" : "false")" title="@day"
-                                    @onclick="() => ToggleDay(day)">@day.ToString()[..3]</button>
-                        }
-                    </span>
-                </div>
-                <div class="setting-line">
-                    Between
-                    <input type="time" aria-label="From" value="@_upgradeSettings.From.ToString("HH:mm")"
-                           @onchange="e => SetTime(e.Value, t => _upgradeSettings with { From = t })" />
-                    and
-                    <input type="time" aria-label="Until" value="@_upgradeSettings.Until.ToString("HH:mm")"
-                           @onchange="e => SetTime(e.Value, t => _upgradeSettings with { Until = t })" />
-                    @if (_upgradeSettings.Until <= _upgradeSettings.From)
-                    {
-                        <span class="muted small">the next day</span>
-                    }
-                </div>
-                <div class="muted small">
-                    In the window, the whole library is looked through a few songs at a time: as each finishes, the next is asked for in its
-                    place, until every song below its cutoff has been tried or the window closes; any not started by then wait for the next.
-                    Those looked for longest ago come first, and the worst of those. Each is a request on the Activity page, after anything
-                    asked for by hand; one that finds nothing better just stays as it is. Times are in @(_upgradeSettings.TimeZone)@(_upgradeSettings.TimeZone == BrowserZone ? ", this browser's" : "").
-                    @if (upgrades.NextRun is { } next && !upgrades.Running)
-                    {
-                        <span>Next: @next.ToLocalTime().ToString("dddd d MMMM, HH:mm").</span>
-                    }
-                </div>
-            }
+            <ScheduleNote Task="ScheduledTask.Upgrades" />
             <div class="setting-line">
                 <span>Upgrades at a time</span>
                 <NumberField Value="_upgradeSettings!.AtATime" Min="1" Max="UpgradeSettings.MostAtATime" Label="Upgrades at a time"
@@ -248,7 +210,7 @@ else
                 }
                 else
                 {
-                    <span>Starts now, whatever the time, the same way as a scheduled look: it stops when everything's been tried, or with the window if it starts in one. A song, album or artist can be looked for on its own page.</span>
+                    <span>Starts now, whatever the time, the same way as a scheduled look: it stops when everything's been tried, or with the window upgrades are scheduled in if it starts in it. A song, album or artist can be looked for on its own page.</span>
                     @if (_searched is { Queued: 0 })
                     {
                         <span>Nothing new to look for: the rest are being looked for already.</span>
@@ -353,21 +315,6 @@ else
         }
     }
 
-    // Monday first.
-    private static readonly DayOfWeek[] Week = [.. Enumerable.Range(1, 7).Select(i => (DayOfWeek)(i % 7))];
-
-    // The browser's own time zone, which the schedule is saved in.
-    private static string BrowserZone => TimeZoneInfo.Local.Id;
-
-    private void ToggleDay(DayOfWeek day) =>
-        SetUpgrades(_upgradeSettings! with { Days = _upgradeSettings.Days.Contains(day) ? _upgradeSettings.Days.Where(d => d != day).ToList() : [.. _upgradeSettings.Days, day] });
-
-    private void SetTime(object? value, Func<TimeOnly, UpgradeSettings> with)
-    {
-        if (TimeOnly.TryParse(value?.ToString(), out var time))
-            SetUpgrades(with(time));
-    }
-
     private void SetUpgrades(UpgradeSettings value)
     {
         _upgradeSettings = value;
@@ -402,7 +349,7 @@ else
             _upgradesChanged = false;
             try
             {
-                await Api.SaveUpgradeSettingsAsync(_upgradeSettings! with { TimeZone = BrowserZone });
+                await Api.SaveUpgradeSettingsAsync(_upgradeSettings!);
             }
             catch
             {

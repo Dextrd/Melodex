@@ -22,7 +22,7 @@ public sealed class SetupTests : IDisposable
     public SetupTests()
     {
         _factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder => builder
-            .UseSetting("Melodex:DataPath", _dataPath)
+            .UseSetting("Melodex:DataPath", _dataPath).UseSetting("Melodex:ScheduledTasks", "false")
             .UseSetting("Melodex:LibraryPath", Path.Combine(TestLibrary.Music, "Portishead", "Dummy (1994)"))
             .UseSetting("Melodex:ListenNowPath", Path.Combine(_dataPath, "listen-now")));
     }

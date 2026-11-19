@@ -4,6 +4,29 @@ What changed in each release of Melodex. Versions follow [semantic versioning](h
 
 ## [Unreleased]
 
+### Added
+
+- **Settings → Scheduled tasks**: daily, weekly and monthly windows, each with its own times (running past midnight
+  if it ends earlier than it starts), the weekly one on a day you pick and the monthly one on a day of the month (in a
+  shorter month, its last day), all in one time zone. Tick what each runs: a scan, a catalogue update, the lossless
+  check, a look for missing lyrics, retrying failed downloads, getting what's on wishlists, and upgrades. A window runs
+  them once, in that order, with upgrades last until it closes; each schedule shows when it next runs and how its last
+  run went. New installs scan, update the catalogue and check lossless files daily from 01:00 to 06:00, and do the rest
+  weekly on Mondays (#112).
+- Every scheduled task can still be run straight away where it lives, which says which schedule it's on: **Look for
+  missing lyrics now** under **Settings → General**, **Retry failed** on **Activity → Downloads** and **Get them all** on
+  the wishlist are new (#112).
+- How often playlists sync for changes made in the media server can be set, under **Settings → Scheduled tasks** (#112).
+- The API has `GET` and `PUT /schedules`, `POST /library/lyrics`, `POST /requests/retry-failed` and
+  `POST /wishlist/get` (#112).
+
+### Changed
+
+- The upgrade schedule has moved from **Settings → Quality** to **Settings → Scheduled tasks**, as it was set: on the
+  daily schedule if it ran every day, or else the weekly one on the first of its days. Nothing else is scheduled on an
+  existing install until you tick it. The upgrade settings' `scheduled`, `days`, `from`, `until` and `timeZone` are read
+  only in the API now, saying what the schedules say (#112).
+
 ## [1.6.0] - 2026-11-19
 
 Notifications at the bottom right, Replace and Remove on a song's page, ticking several playlists at once with empty

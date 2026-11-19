@@ -29,7 +29,7 @@ public sealed class AccessTests : IDisposable
     public AccessTests()
     {
         _factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder => builder
-            .UseSetting("Melodex:DataPath", _dataPath)
+            .UseSetting("Melodex:DataPath", _dataPath).UseSetting("Melodex:ScheduledTasks", "false")
             .ConfigureServices(services =>
             {
                 services.AddSingleton<IStartupFilter>(new RemoteAddress());
