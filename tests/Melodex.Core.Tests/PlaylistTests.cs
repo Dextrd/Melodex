@@ -219,6 +219,30 @@ public sealed class PlaylistTests : IDisposable
         Assert.Equal([b.Title, a.Title, a.Title], (await _api.GetPlaylistAsync(id))!.Songs.Select(s => s.Title));
     }
 
+    [TestLibraryFact]
+    public async Task Songs_can_be_ticked_into_and_out_of_several_playlists()
+    {
+        await ScanAsync();
+        var (a, b) = await TwoTracksAsync();
+        var both = new AddToPlaylist([new PlaylistItem(a.TrackId), new PlaylistItem(b.TrackId)]);
+        var one = (await _api.CreatePlaylistAsync(new CreatePlaylist("Has one", Songs: [new PlaylistItem(a.TrackId), new PlaylistItem(a.TrackId)]))).Playlist.Id;
+        var all = (await _api.CreatePlaylistAsync(new CreatePlaylist("Has both", Songs: both.Songs))).Playlist.Id;
+        var none = (await _api.CreatePlaylistAsync(new CreatePlaylist("Has neither"))).Playlist.Id;
+
+        // How much of them each holds, a song in twice counting once; a song not in the library doesn't count.
+        var holding = (await _api.GetPlaylistsHoldingAsync(new AddToPlaylist([.. both.Songs, new PlaylistItem(Guid.NewGuid())]))).ToDictionary(h => h.PlaylistId);
+        Assert.Equal(new PlaylistHolding(one, 1, 2), holding[one]);
+        Assert.Equal(new PlaylistHolding(all, 2, 2), holding[all]);
+        Assert.Equal(new PlaylistHolding(none, 0, 2), holding[none]);
+
+        // Taking them out takes every time each is there, and leaves the rest in order.
+        Assert.Equal(new PlaylistTakenOut(2), await _api.TakeOutOfPlaylistAsync(one, new AddToPlaylist([new PlaylistItem(a.TrackId)])));
+        Assert.Empty((await _api.GetPlaylistAsync(one))!.Songs);
+        Assert.Equal(new PlaylistTakenOut(1), await _api.TakeOutOfPlaylistAsync(all, new AddToPlaylist([new PlaylistItem(a.TrackId)])));
+        Assert.Equal([b.Title], (await _api.GetPlaylistAsync(all))!.Songs.Select(s => s.Title));
+        Assert.Equal(new PlaylistTakenOut(0), await _api.TakeOutOfPlaylistAsync(none, both));
+    }
+
     [Fact]
     public void Names_are_compared_by_their_letters_and_artists()
     {
@@ -263,11 +287,35 @@ public sealed class PlaylistTests : IDisposable
         Assert.Equal(Png(3), await picture.Content.ReadAsByteArrayAsync());
         Assert.Contains("immutable", picture.Headers.CacheControl!.ToString());
 
-        // Renamed, the picture goes with it; emptied, it goes.
+        // Renamed, the picture goes with it; taken away, the folder icon stands for it again, and the folder stays.
         await _api.RenamePlaylistFolderAsync(new RenamePlaylistFolder("Moods", "Feelings", "/"));
         Assert.Equal("Feelings/Calm", Assert.Single(await _api.GetPlaylistFoldersAsync()).Path);
         await _api.SetPlaylistFolderCoverAsync("Feelings/Calm", null);
+        Assert.Null(Assert.Single(await _api.GetPlaylistFoldersAsync()).CoverUrl);
+        await _api.DeletePlaylistFolderAsync("Feelings/Calm");
         Assert.Empty(await _api.GetPlaylistFoldersAsync());
+    }
+
+    [Fact]
+    public async Task Empty_folders_are_kept_until_removed()
+    {
+        var made = await _api.CreatePlaylistFolderAsync("Moods/Calm");
+        Assert.Null(made.CoverUrl);
+        Assert.Equal(made.Id, (await _api.CreatePlaylistFolderAsync("Moods/Calm")).Id);
+        await _api.CreatePlaylistFolderAsync("Feelings");
+        await _api.SetPlaylistFolderCoverAsync("Feelings", Convert.ToBase64String(Png(4)));
+
+        // Renamed onto a folder that's kept already, the two are one, with the picture.
+        await _api.RenamePlaylistFolderAsync(new RenamePlaylistFolder("Moods/Calm", "Feelings", "/"));
+        var kept = Assert.Single(await _api.GetPlaylistFoldersAsync());
+        Assert.Equal("Feelings", kept.Path);
+        Assert.NotNull(kept.CoverUrl);
+
+        // Removing it leaves the playlists in it as they are.
+        await _api.CreatePlaylistAsync(new CreatePlaylist("Feelings/Rain"));
+        await _api.DeletePlaylistFolderAsync("Feelings");
+        Assert.Empty(await _api.GetPlaylistFoldersAsync());
+        Assert.Equal("Feelings/Rain", Assert.Single(await _api.ListPlaylistsAsync()).Name);
     }
 
     [TestLibraryFact]

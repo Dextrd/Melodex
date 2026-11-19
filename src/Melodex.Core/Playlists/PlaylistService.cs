@@ -255,18 +255,28 @@ public sealed class PlaylistService(MelodexDbContext db, SettingsService setting
             playlist.UpdatedAt = DateTime.UtcNow;
             moved++;
         }
-        // Folders' pictures go with them; taking everything out of one leaves it nothing to be the picture of.
-        foreach (var folder in await db.PlaylistFolders.Where(f => f.UserId == userId).ToListAsync(ct))
+        // Folders kept for themselves go with them; taking everything out of one leaves nothing to keep it for.
+        var folders = await db.PlaylistFolders.Where(f => f.UserId == userId).ToListAsync(ct);
+        var staying = folders.Where(f => f.Path != from && !f.Path.StartsWith(prefix, StringComparison.Ordinal)).ToDictionary(f => f.Path);
+        foreach (var folder in folders.Except(staying.Values))
         {
-            if (folder.Path != from && !folder.Path.StartsWith(prefix, StringComparison.Ordinal))
-                continue;
-            if (to.Length == 0 && folder.Path == from)
+            var path = folder.Path == from ? to : to.Length == 0 ? folder.Path[prefix.Length..] : to + body.Delimiter + folder.Path[prefix.Length..];
+            if (path.Length == 0)
             {
                 covers.Remove(folder);
                 db.PlaylistFolders.Remove(folder);
             }
+            // Into a folder that's kept already: the two are one now, with its picture, or else this one's.
+            else if (staying.TryGetValue(path, out var there))
+            {
+                if (there.CoverFile is null)
+                    (there.CoverFile, there.CoverType, there.CoverHash) = (folder.CoverFile, folder.CoverType, folder.CoverHash);
+                else
+                    covers.Remove(folder);
+                db.PlaylistFolders.Remove(folder);
+            }
             else
-                folder.Path = folder.Path == from ? to : to.Length == 0 ? folder.Path[prefix.Length..] : to + body.Delimiter + folder.Path[prefix.Length..];
+                folder.Path = path;
         }
         await db.SaveChangesAsync(ct);
         if (moved > 0)
@@ -293,10 +303,37 @@ public sealed class PlaylistService(MelodexDbContext db, SettingsService setting
 
     // ---- Folders ----
 
-    /// <summary>The user's folders that have pictures of their own.</summary>
+    /// <summary>The user's folders that are kept for themselves: those made empty, and those with pictures of their own.</summary>
     public async Task<IReadOnlyList<PlaylistFolderInfo>> FoldersAsync(Guid userId, CancellationToken ct) =>
-        (await db.PlaylistFolders.AsNoTracking().Where(f => f.UserId == userId && f.CoverFile != null).OrderBy(f => f.Path).ToListAsync(ct))
+        (await db.PlaylistFolders.AsNoTracking().Where(f => f.UserId == userId).OrderBy(f => f.Path).ToListAsync(ct))
         .Select(Info).ToList();
+
+    /// <summary>Makes a folder, so it's there before any playlist is in it. Making one that's there already changes nothing.</summary>
+    public async Task<PlaylistFolderInfo> CreateFolderAsync(Guid userId, string path, CancellationToken ct)
+    {
+        path = path.Trim();
+        if (path.Length == 0)
+            throw new PlaylistRefusedException("path", "Say what to call the folder.");
+        var folder = await db.PlaylistFolders.FirstOrDefaultAsync(f => f.UserId == userId && f.Path == path, ct);
+        if (folder is null)
+        {
+            db.PlaylistFolders.Add(folder = new PlaylistFolder { UserId = userId, Path = path });
+            await db.SaveChangesAsync(ct);
+        }
+        return Info(folder);
+    }
+
+    /// <summary>Forgets a folder kept for itself, and its picture. The playlists in it are left as they are.</summary>
+    public async Task<bool> DeleteFolderAsync(Guid userId, string path, CancellationToken ct)
+    {
+        path = path.Trim();
+        if (await db.PlaylistFolders.FirstOrDefaultAsync(f => f.UserId == userId && f.Path == path, ct) is not { } folder)
+            return false;
+        covers.Remove(folder);
+        db.PlaylistFolders.Remove(folder);
+        await db.SaveChangesAsync(ct);
+        return true;
+    }
 
     private static PlaylistFolderInfo Info(PlaylistFolder folder) =>
         new(folder.Id, folder.Path, folder.CoverHash is { } hash ? $"api/v1/playlists/folders/{folder.Id}/cover?v={hash[..12]}" : null);
@@ -321,10 +358,11 @@ public sealed class PlaylistService(MelodexDbContext db, SettingsService setting
         {
             if (folder is null)
                 return new PlaylistFolderInfo(Guid.Empty, path, null);
+            // The folder stays, even empty: only its picture goes.
             covers.Remove(folder);
-            db.PlaylistFolders.Remove(folder);
+            folder.CoverFile = folder.CoverType = folder.CoverHash = null;
             await db.SaveChangesAsync(ct);
-            return new PlaylistFolderInfo(folder.Id, path, null);
+            return Info(folder);
         }
         var (data, type) = Picture(upload);
         if (folder is null)
@@ -336,6 +374,57 @@ public sealed class PlaylistService(MelodexDbContext db, SettingsService setting
 
     private Task<Playlist?> FindAsync(Guid userId, Guid id, CancellationToken ct) =>
         db.Playlists.Include(p => p.Entries).FirstOrDefaultAsync(p => p.Id == id && p.UserId == userId && p.DeletedAt == null, ct);
+
+    /// <summary>How many of these songs each of the user's playlists holds.</summary>
+    public async Task<IReadOnlyList<PlaylistHolding>> HoldingAsync(Guid userId, IReadOnlyList<PlaylistItem> items, CancellationToken ct)
+    {
+        var (tracks, files) = await SongsOfAsync(items, ct);
+        // Only songs in the library can be added, so only they count towards being all there.
+        var owned = await OwnedAsync(tracks, ct);
+        var of = tracks.Count(owned.Contains) + files.Count;
+        var entries = await db.PlaylistEntries.AsNoTracking()
+            .Where(e => e.Playlist.UserId == userId && e.Playlist.DeletedAt == null
+                        && (e.TrackId != null && tracks.Contains(e.TrackId.Value) || e.TrackId == null && e.FileId != null && files.Contains(e.FileId.Value)))
+            .Select(e => new { e.PlaylistId, e.TrackId, e.FileId })
+            .ToListAsync(ct);
+        var ids = await db.Playlists.AsNoTracking().Where(p => p.UserId == userId && p.DeletedAt == null).Select(p => p.Id).ToListAsync(ct);
+        var held = entries.GroupBy(e => e.PlaylistId).ToDictionary(g => g.Key, g => g.Select(e => e.TrackId ?? e.FileId).Distinct().Count());
+        return ids.Select(id => new PlaylistHolding(id, held.GetValueOrDefault(id), of)).ToList();
+    }
+
+    /// <summary>Takes these songs out of the playlist, every time each is in it. Null if it isn't the user's.</summary>
+    public async Task<PlaylistTakenOut?> TakeOutAsync(Guid userId, Guid id, IReadOnlyList<PlaylistItem> items, CancellationToken ct)
+    {
+        if (await FindAsync(userId, id, ct) is not { } playlist)
+            return null;
+        var (tracks, files) = await SongsOfAsync(items, ct);
+        var going = playlist.Entries
+            .Where(e => e.TrackId is { } t ? tracks.Contains(t) : e.FileId is { } f && files.Contains(f)).ToList();
+        if (going.Count == 0)
+            return new PlaylistTakenOut(0);
+        db.PlaylistEntries.RemoveRange(going);
+        var position = 0;
+        foreach (var entry in playlist.Entries.Except(going).OrderBy(e => e.Position))
+            entry.Position = position++;
+        await ChangedAsync(playlist, ct);
+        return new PlaylistTakenOut(going.Count);
+    }
+
+    // The songs these are, as playlists hold them: catalogue tracks, and files of your own for those no catalogue knows.
+    private async Task<(HashSet<Guid> Tracks, HashSet<Guid> Files)> SongsOfAsync(IReadOnlyList<PlaylistItem> items, CancellationToken ct)
+    {
+        var tracks = items.Where(i => i.FileId is null).Select(i => i.TrackId).OfType<Guid>().ToHashSet();
+        var fileIds = items.Select(i => i.FileId).OfType<Guid>().ToList();
+        var files = new HashSet<Guid>();
+        foreach (var file in await db.LibraryFiles.AsNoTracking().Where(f => fileIds.Contains(f.Id)).Select(f => new { f.Id, f.TrackId }).ToListAsync(ct))
+        {
+            if (file.TrackId is { } track)
+                tracks.Add(track);
+            else
+                files.Add(file.Id);
+        }
+        return (tracks, files);
+    }
 
     private async Task ChangedAsync(Playlist playlist, CancellationToken ct)
     {

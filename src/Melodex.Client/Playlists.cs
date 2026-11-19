@@ -99,6 +99,15 @@ public sealed record AddToPlaylist(IReadOnlyList<PlaylistItem> Songs, bool Dupli
 /// <param name="NotFound">Songs that aren't in your library.</param>
 public sealed record PlaylistAdded(int Added, int AlreadyThere, int NotFound);
 
+/// <summary>How much of some songs one of your playlists holds, from <c>POST /playlists/holding</c>.</summary>
+/// <param name="Has">How many of them are in it.</param>
+/// <param name="Of">How many songs were asked about: those in your library.</param>
+public sealed record PlaylistHolding(Guid PlaylistId, int Has, int Of);
+
+/// <summary>What taking songs out of a playlist did.</summary>
+/// <param name="Removed">Entries taken out: every one of each song, if it was in more than once.</param>
+public sealed record PlaylistTakenOut(int Removed);
+
 /// <summary>Body of <c>PUT /playlists/{id}/songs</c>: the songs to keep, by entry, in their new order.</summary>
 public sealed record ArrangePlaylist(IReadOnlyList<Guid> EntryIds);
 
@@ -132,7 +141,11 @@ public sealed record MediaServerAccount(Guid ServerId, string Server, bool InUse
     public bool Linked => Username is not null;
 }
 
-/// <summary>A folder of playlists with a picture of its own.</summary>
+/// <summary>Body of <c>POST /playlists/folders</c>: a folder to make, kept even while it's empty.</summary>
+/// <param name="Path">The folder's whole name, its parents' too, joined by your separator.</param>
+public sealed record CreatePlaylistFolder(string Path);
+
+/// <summary>A folder of playlists kept for itself: made before anything was in it, or with a picture of its own.</summary>
 /// <param name="Path">The folder's path, its parents' names and its own joined by your separator.</param>
 /// <param name="CoverUrl">Its picture; null when the folder icon stands for it.</param>
 public sealed record PlaylistFolderInfo(Guid Id, string Path, string? CoverUrl);

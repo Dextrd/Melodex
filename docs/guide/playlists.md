@@ -57,6 +57,9 @@ In the list, open and close folders, make a playlist in one with its **+**, and 
 everything in it. Renaming a folder with the separator in the new name moves it into another; leaving the name empty
 takes what's in it out of the folder.
 
+A folder can also be made before anything is in it, with **New folder** when adding songs to playlists. It's kept in
+Melodex, empty, until you remove it, and shows like any other folder here.
+
 ## Syncing with your media server
 
 With Navidrome or Jellyfin, your playlists can be the same in both places, both ways: make or change one in Melodex

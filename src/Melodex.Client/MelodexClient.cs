@@ -938,6 +938,22 @@ public sealed class MelodexClient(HttpClient http)
         return (await response.Content.ReadFromJsonAsync<PlaylistAdded>(MelodexJson.Options, ct))!;
     }
 
+    /// <summary>How much of these songs each of your playlists holds.</summary>
+    public async Task<IReadOnlyList<PlaylistHolding>> GetPlaylistsHoldingAsync(AddToPlaylist songs, CancellationToken ct = default)
+    {
+        using var response = await http.PostAsJsonAsync($"{Api}/playlists/holding", songs, MelodexJson.Options, ct);
+        await EnsureAsync(response, ct);
+        return (await response.Content.ReadFromJsonAsync<List<PlaylistHolding>>(MelodexJson.Options, ct))!;
+    }
+
+    /// <summary>Takes these songs out of a playlist, wherever they are in it.</summary>
+    public async Task<PlaylistTakenOut> TakeOutOfPlaylistAsync(Guid id, AddToPlaylist songs, CancellationToken ct = default)
+    {
+        using var response = await http.PostAsJsonAsync($"{Api}/playlists/{id}/songs/remove", songs, MelodexJson.Options, ct);
+        await EnsureAsync(response, ct);
+        return (await response.Content.ReadFromJsonAsync<PlaylistTakenOut>(MelodexJson.Options, ct))!;
+    }
+
     public async Task<PlaylistDetail> ArrangePlaylistAsync(Guid id, ArrangePlaylist arrangement, CancellationToken ct = default)
     {
         using var response = await http.PutAsJsonAsync($"{Api}/playlists/{id}/songs", arrangement, MelodexJson.Options, ct);
@@ -962,9 +978,25 @@ public sealed class MelodexClient(HttpClient http)
     }
 
     /// <summary>Gives the playlist a picture of its own, or with null, takes it away.</summary>
-    /// <summary>Your folders of playlists that have pictures of their own.</summary>
+    /// <summary>Your folders of playlists kept for themselves: those made empty, and those with pictures of their own.</summary>
     public async Task<IReadOnlyList<PlaylistFolderInfo>> GetPlaylistFoldersAsync(CancellationToken ct = default) =>
         (await http.GetFromJsonAsync<IReadOnlyList<PlaylistFolderInfo>>($"{Api}/playlists/folders", MelodexJson.Options, ct))!;
+
+    /// <summary>Makes a folder of playlists, kept even while it's empty.</summary>
+    public async Task<PlaylistFolderInfo> CreatePlaylistFolderAsync(string path, CancellationToken ct = default)
+    {
+        using var response = await http.PostAsJsonAsync($"{Api}/playlists/folders", new CreatePlaylistFolder(path), MelodexJson.Options, ct);
+        await EnsureAsync(response, ct);
+        return (await response.Content.ReadFromJsonAsync<PlaylistFolderInfo>(MelodexJson.Options, ct))!;
+    }
+
+    /// <summary>Forgets a folder kept for itself, and its picture; the playlists in it stay.</summary>
+    public async Task DeletePlaylistFolderAsync(string path, CancellationToken ct = default)
+    {
+        using var response = await http.DeleteAsync($"{Api}/playlists/folders?path={Uri.EscapeDataString(path)}", ct);
+        if (response.StatusCode != System.Net.HttpStatusCode.NotFound)
+            await EnsureAsync(response, ct);
+    }
 
     /// <summary>Gives a folder of playlists a picture of its own, or with null takes it away.</summary>
     public async Task<PlaylistFolderInfo> SetPlaylistFolderCoverAsync(string path, string? upload, CancellationToken ct = default)

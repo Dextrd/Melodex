@@ -178,7 +178,7 @@
     @* Inside, so it shows in full screen too. *@
     @if (_adding is { } adding && PlaylistNames.ItemOf(adding) is { } item)
     {
-        <AddToPlaylistDialog Name="@adding.Title" Songs="[item]" OnClose="() => _adding = null" />
+        <AddToPlaylistDialog Name="@adding.Title" Songs="[item]" Art="@adding.CoverUrl" OnClose="() => _adding = null" />
     }
 </div>
 
