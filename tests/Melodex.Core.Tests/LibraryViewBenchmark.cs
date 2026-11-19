@@ -32,7 +32,7 @@ public sealed class LibraryViewBenchmark(ITestOutputHelper output) : IDisposable
             return;
         // BENCHMARK_DATA: a data folder holding a copy of a real melodex.db, timed as it is instead of a made-up library.
         var real = Environment.GetEnvironmentVariable("BENCHMARK_DATA");
-        await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(b => b.UseSetting("Melodex:DataPath", real ?? _dataPath));
+        await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(b => b.UseSetting("Melodex:DataPath", real ?? _dataPath).UseSetting("Melodex:ScheduledTasks", "false"));
         _ = factory.Server;
         if (real is null)
             using (var scope = factory.Services.CreateScope())

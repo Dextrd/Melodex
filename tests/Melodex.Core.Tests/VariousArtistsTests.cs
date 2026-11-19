@@ -17,7 +17,7 @@ public sealed class VariousArtistsTests : IDisposable
 
     public VariousArtistsTests()
     {
-        _factory = new WebApplicationFactory<Program>().WithWebHostBuilder(b => b.UseSetting("Melodex:DataPath", _dataPath));
+        _factory = new WebApplicationFactory<Program>().WithWebHostBuilder(b => b.UseSetting("Melodex:DataPath", _dataPath).UseSetting("Melodex:ScheduledTasks", "false"));
         _ = _factory.Server;
     }
 

@@ -4,6 +4,8 @@
 @inject Player Player
 @inject ServerEvents Events
 @inject Preferences Prefs
+@inject MelodexClient Api
+@inject Notices Notices
 
 <PageTitle>Wishlist · Melodex</PageTitle>
 
@@ -19,10 +21,17 @@
     <SortMenu Options="SortOptions" Value="@_sort" Descending="_descending" DirectionHint="@DirectionHint"
               OnChange="@(key => SortAsync(key, key == "newest"))" OnReverse="() => SortAsync(_sort, !_descending)" />
     @if (_error is not null) { <span class="error small" title="@_error">@_error</span> }
+    <span class="spacer"></span>
+    @if (Wishlist.CanFetch && Wishlist.Loaded && Shown.Count > 0)
+    {
+        <IconButton Icon="get" Requires="@UserPermissions.Request" Label="Get them all" Disabled="_getting"
+                    Title="Ask for everything on your wishlist, as Get does for each" OnClick="GetAllAsync" />
+    }
 </div>
 <p class="muted small">
     Songs and albums you'd like, kept until your library has them.
     @if (!Wishlist.CanFetch) { <span>Nothing can fetch them now: turn on a retriever in <a href="settings/plugins">Plugins</a> to get them or listen to them.</span> }
+    <ScheduleNote Task="ScheduledTask.Wishlist" />
 </p>
 
 @if (!Wishlist.Loaded)
@@ -83,6 +92,25 @@ else
 }
 
 @code {
+    private bool _getting;
+
+    private async Task GetAllAsync()
+    {
+        _getting = true;
+        try
+        {
+            var asked = (await Api.GetWishlistItemsAsync()).Asked;
+            Notices.Show(new Notice($"wishlist:{Guid.NewGuid()}", NoticeKind.Action, "Your wishlist",
+                asked == 0 ? "Everything on it is being fetched already" : $"Asked for {Format.Count(asked, "song or album", "songs and albums")}",
+                "activity/downloads", "get"), always: true);
+        }
+        catch (Exception e) when (e is HttpRequestException or MelodexApiException)
+        {
+            _error = e.Message;
+        }
+        _getting = false;
+    }
+
     private RenderFragment Menu(WishlistItem item) =>
         @<ItemMenu What="@(item.Kind == RequestKind.Album ? "album" : "song")" Name="@item.Title" EditionId="item.EditionId"
                    ListenTrackId="@(item.Kind == RequestKind.Track ? item.TargetId : null)"

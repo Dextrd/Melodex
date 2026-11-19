@@ -28,4 +28,7 @@ public class MelodexOptions
     /// Other users, API keys and everything else are kept. Turn it off again afterwards.
     /// </summary>
     public bool ResetLogin { get; set; }
+
+    /// <summary>Run scheduled tasks as their windows open. Only tests turn it off, to run them when they choose.</summary>
+    public bool ScheduledTasks { get; set; } = true;
 }

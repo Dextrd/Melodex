@@ -86,6 +86,31 @@ public sealed class MelodexClient(HttpClient http)
         return (await response.Content.ReadFromJsonAsync<TaskInfo>(MelodexJson.Options, ct))!;
     }
 
+    /// <summary>Looks for lyrics for songs without them, through the lyrics plugins.</summary>
+    public async Task<TaskInfo> FindLyricsAsync(CancellationToken ct = default)
+    {
+        using var response = await http.PostAsync($"{Api}/library/lyrics", null, ct);
+        await EnsureAsync(response, ct);
+        return (await response.Content.ReadFromJsonAsync<TaskInfo>(MelodexJson.Options, ct))!;
+    }
+
+    /// <summary>Makes the visualiser's bars for songs without them; the queued task.</summary>
+    public async Task<TaskInfo> MakeBarsAsync(CancellationToken ct = default)
+    {
+        using var response = await http.PostAsync($"{Api}/library/bars", null, ct);
+        await EnsureAsync(response, ct);
+        return (await response.Content.ReadFromJsonAsync<TaskInfo>(MelodexJson.Options, ct))!;
+    }
+
+    public async Task<ScheduleStatus> GetSchedulesAsync(CancellationToken ct = default) =>
+        (await http.GetFromJsonAsync<ScheduleStatus>($"{Api}/schedules", MelodexJson.Options, ct))!;
+
+    public async Task SaveSchedulesAsync(ScheduleSettings settings, CancellationToken ct = default)
+    {
+        using var response = await http.PutAsJsonAsync($"{Api}/schedules", settings, MelodexJson.Options, ct);
+        await EnsureAsync(response, ct);
+    }
+
     /// <summary>A song's lyrics, as its files have them.</summary>
     public async Task<TrackLyrics> GetTrackLyricsAsync(Guid trackId, CancellationToken ct = default) =>
         (await http.GetFromJsonAsync<TrackLyrics>($"{Api}/library/tracks/{trackId}/lyrics", MelodexJson.Options, ct))!;
@@ -330,6 +355,14 @@ public sealed class MelodexClient(HttpClient http)
         using var response = await http.PostAsync($"{Api}/requests/{id}/retry", null, ct);
         await EnsureAsync(response, ct);
         return (await response.Content.ReadFromJsonAsync<RequestInfo>(MelodexJson.Options, ct))!;
+    }
+
+    /// <summary>Queues every failed download again; how many were.</summary>
+    public async Task<AskedAgain> RetryFailedRequestsAsync(CancellationToken ct = default)
+    {
+        using var response = await http.PostAsync($"{Api}/requests/retry-failed", null, ct);
+        await EnsureAsync(response, ct);
+        return (await response.Content.ReadFromJsonAsync<AskedAgain>(MelodexJson.Options, ct))!;
     }
 
     public async Task<RequestInfo> ChooseCandidateAsync(Guid id, ChooseCandidate choice, CancellationToken ct = default)
@@ -898,6 +931,14 @@ public sealed class MelodexClient(HttpClient http)
     /// <summary>Your wishlist, less what the library has now.</summary>
     public async Task<Wishlist> GetWishlistAsync(CancellationToken ct = default) =>
         (await http.GetFromJsonAsync<Wishlist>($"{Api}/wishlist", MelodexJson.Options, ct))!;
+
+    /// <summary>Asks for everything on your wishlist; how many were asked for.</summary>
+    public async Task<AskedAgain> GetWishlistItemsAsync(CancellationToken ct = default)
+    {
+        using var response = await http.PostAsync($"{Api}/wishlist/get", null, ct);
+        await EnsureAsync(response, ct);
+        return (await response.Content.ReadFromJsonAsync<AskedAgain>(MelodexJson.Options, ct))!;
+    }
 
     public async Task AddToWishlistAsync(AddToWishlist add, CancellationToken ct = default)
     {

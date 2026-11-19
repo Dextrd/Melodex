@@ -61,7 +61,16 @@
         <IconButton Icon="cancel" Label="@($"Cancel {which}")" Title="@($"Cancel {Format.Count(Changeable.Count, Noun, Nouns)}")" Disabled="_busy"
                     OnClick="() => _confirmCancel = true" />
     }
+    @if (_loaded && Shown != "tasks" && Auth.May(UserPermissions.Request) && FailedCount > 0)
+    {
+        <IconButton Icon="retry" Label="Retry failed" Title="@($"Ask again for {Format.Count(FailedCount, "download that failed", "downloads that failed")}, as Retry does for each")"
+                    Disabled="_busy" OnClick="RetryFailedAsync" />
+    }
 </div>
+@if (_loaded && Shown != "tasks" && Auth.May(UserPermissions.Request) && FailedCount > 0)
+{
+    <ScheduleNote Task="ScheduledTask.RetryFailed" />
+}
 
 @if (Shown == "downloads" && _upgradeRun is { } run)
 {
@@ -357,6 +366,26 @@ else
     private List<Item> Changeable => Visible.Where(i => i.Active).ToList();
     private string Noun => Shown == "tasks" ? "task" : "download";
     private string Nouns => Shown == "tasks" ? "tasks" : "downloads";
+
+    // Failed downloads asked for into the library, which Retry failed asks for again: not upgrades, replacements or listening.
+    private int FailedCount => Tracker.Requests.Count(r => r.State == RequestState.Failed && r.ParentId is null && !r.ListenNow && !r.Upgrade && !r.Replace);
+
+    private async Task RetryFailedAsync()
+    {
+        _busy = true;
+        try
+        {
+            await Api.RetryFailedRequestsAsync();
+            await Tracker.RefreshAsync();
+        }
+        catch (Exception e) when (e is HttpRequestException or MelodexApiException)
+        {
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
 
     private async Task ChangeAsync(BulkAction action)
     {

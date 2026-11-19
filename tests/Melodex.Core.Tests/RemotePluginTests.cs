@@ -32,7 +32,7 @@ public sealed class RemotePluginTests : IDisposable
     public RemotePluginTests()
     {
         _factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder => builder
-            .UseSetting("Melodex:DataPath", _dataPath)
+            .UseSetting("Melodex:DataPath", _dataPath).UseSetting("Melodex:ScheduledTasks", "false")
             .ConfigureServices(services =>
             {
                 services.Configure<PluginHttpOptions>(http =>

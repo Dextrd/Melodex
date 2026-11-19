@@ -18,7 +18,7 @@ public sealed class QueueTests : IDisposable
 
     public QueueTests()
     {
-        _factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder => builder.UseSetting("Melodex:DataPath", _dataPath));
+        _factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder => builder.UseSetting("Melodex:DataPath", _dataPath).UseSetting("Melodex:ScheduledTasks", "false"));
         _api = new MelodexClient(_factory.CreateSignedInClient());
     }
 

@@ -20,7 +20,7 @@ public sealed class ReleaseShowingTests : IDisposable
     private readonly WebApplicationFactory<Program> _factory;
 
     public ReleaseShowingTests() =>
-        _factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder => builder.UseSetting("Melodex:DataPath", _dataPath));
+        _factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder => builder.UseSetting("Melodex:DataPath", _dataPath).UseSetting("Melodex:ScheduledTasks", "false"));
 
     public void Dispose()
     {

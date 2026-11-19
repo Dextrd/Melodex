@@ -79,12 +79,13 @@ cutoff is met.
 - **Look for upgrades** from **Quality** on a song's, album's or artist's page, or for the whole library under
   **Settings → Quality**. Each song is its own request on the Activity page, marked **Upgrade**; an album is upgraded a
   song at a time, so it can be of mixed quality for a while.
-- **On a schedule** the whole library is looked through: on the days you pick (Mondays to start with), between two
-  times (01:00 and 06:00 to start with, in your browser's time zone; a window can run past midnight). A look keeps a
+- **On a schedule** the whole library is looked through, in the window of the schedule **Look for upgrades** is ticked
+  on under [**Settings → Scheduled tasks**](configuration.md#scheduled-tasks) (weekly, Mondays from 01:00 to 06:00, to
+  start with), after the window's other tasks. A look keeps a
   few upgrades going at a time, **Upgrades at a time** under **Settings → Quality** (5 to start with): as each finishes,
   the next is asked for in its place, so one slow upgrade doesn't hold up the rest. It carries on until every song below
   its cutoff has been tried or the window closes; any not started by then are cancelled and wait for the next. Those
-  looked for longest ago go first, and the worst of those. It's on from the start, and can be turned off. Upgrades go
+  looked for longest ago go first, and the worst of those. It's on from the start, and can be unticked. Upgrades go
   after anything you ask for.
 - **Look for upgrades now** starts a look the same way, whatever the time: it stops when everything's been tried, or
   with the window if it starts in one. While a look is going, **Settings → Quality** and **Activity → Downloads** say
@@ -143,7 +144,8 @@ is under **Activity → Downloads**.
 that adds it to your wishlist or takes it off.
 
 The wishlist can be filtered and sorted, newest first by default. Once a retriever is on, each has **Listen** and
-**Get** beside it. A song leaves the wishlist by itself once your library has it, and an album once you have all of it.
+**Get** beside it, and **Get them all** asks for everything on it at once; [a schedule](configuration.md#scheduled-tasks)
+can do that for everyone's. A song leaves the wishlist by itself once your library has it, and an album once you have all of it.
 An album goes on as one entry, so getting it from there gets the whole album.
 
 ## The player

@@ -32,7 +32,7 @@ public sealed class AlbumByRecordingsTests : IAsyncLifetime
         Retag(Path.Combine("Daft Punk", "Discovery (2001)"), Path.Combine("Daft Punk", "Discovery (Remastered Japan Edition)"), "ディスカバリー");
 
         _factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder => builder
-            .UseSetting("Melodex:DataPath", Path.Combine(_root, "data"))
+            .UseSetting("Melodex:DataPath", Path.Combine(_root, "data")).UseSetting("Melodex:ScheduledTasks", "false")
             .UseSetting("Melodex:LibraryPath", Music)
             .ConfigureServices(services => services.Configure<PluginHttpOptions>(http =>
             {

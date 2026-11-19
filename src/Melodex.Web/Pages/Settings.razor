@@ -1,6 +1,7 @@
 @page "/settings"
 @layout SettingsLayout
 @inject MelodexClient Api
+@inject TaskNotices Tasks
 
 <PageTitle>Settings · Melodex</PageTitle>
 
@@ -65,6 +66,8 @@ else
                 <span class="muted small">Looks up your artists' discographies and their albums' editions, as its own task, so the missing view stays current. The Scan menu's <em>Update catalogue</em> starts one any time.</span>
             </span>
         </label>
+        <ScheduleNote Task="ScheduledTask.Scan" />
+        <ScheduleNote Task="ScheduledTask.CatalogueUpdate" />
     </div>
 
     <h2>File metadata</h2>
@@ -87,7 +90,7 @@ else
         <div class="muted small">Files you exclude from matching always show as their own tags and pictures say.</div>
     </div>
 
-    <h2>Lyrics</h2>
+    <h2 id="lyrics">Lyrics</h2>
     <p class="muted small">Found through the lyrics plugins, set up on the <a href="settings/plugins">Plugins</a> page, and written by the beets worker.</p>
     <div class="card settings-card">
         <label class="dialog-choice">
@@ -97,6 +100,12 @@ else
                 <span class="muted small">For songs without them. A song no source has lyrics for is asked about again after a month. Each song's page can look for them any time.</span>
             </span>
         </label>
+        <div class="setting-line">
+            <ScheduleNote Task="ScheduledTask.Lyrics" />
+            <span class="spacer"></span>
+            <button disabled="@_findingLyrics" @onclick="FindLyricsAsync">@if (_findingLyrics) { <span class="spinner"></span> }Look for missing lyrics now</button>
+        </div>
+        @if (_lyricsError is not null) { <div class="error small">@_lyricsError</div> }
         <div class="muted small">Where lyrics go:</div>
         @foreach (var (storage, name, hint) in LyricsStorages)
         {
@@ -175,6 +184,24 @@ else
 }
 
 @code {
+    private bool _findingLyrics;
+    private string? _lyricsError;
+
+    private async Task FindLyricsAsync()
+    {
+        _findingLyrics = true;
+        _lyricsError = null;
+        try
+        {
+            Tasks.Started(await Api.FindLyricsAsync());
+        }
+        catch (Exception e) when (e is HttpRequestException or MelodexApiException)
+        {
+            _lyricsError = e.Message;
+        }
+        _findingLyrics = false;
+    }
+
     private static readonly (LyricsStorage Storage, string Name, string Hint)[] LyricsStorages =
     [
         (LyricsStorage.Sidecar, "Beside each song", "An .lrc file with the song's name. Navidrome and most players read these, and the music files themselves aren't changed."),

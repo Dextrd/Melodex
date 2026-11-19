@@ -513,13 +513,11 @@ public sealed class PlaylistSync(MelodexDbContext db, ConnectorPlugins connector
 }
 
 /// <summary>
-/// Syncs playlists in the background: a few seconds after a user changes theirs, and every user's every
-/// <see cref="Every"/>, to bring over changes made on the media server.
+/// Syncs playlists in the background: a few seconds after a user changes theirs, and every user's as often as the
+/// schedules say (every 10 minutes to start with), to bring over changes made on the media server.
 /// </summary>
 public sealed class PlaylistSyncer(IServiceScopeFactory scopes, ILogger<PlaylistSyncer> logger) : BackgroundService
 {
-    public static readonly TimeSpan Every = TimeSpan.FromMinutes(10);
-
     /// <summary>How long after a change to wait for more before syncing, so a run of edits goes in one sync.</summary>
     public static readonly TimeSpan Settle = TimeSpan.FromSeconds(3);
 
@@ -535,9 +533,10 @@ public sealed class PlaylistSyncer(IServiceScopeFactory scopes, ILogger<Playlist
         while (!stoppingToken.IsCancellationRequested)
         {
             var users = new HashSet<Guid?>();
+            var every = await EveryAsync(stoppingToken);
             using (var wait = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken))
             {
-                wait.CancelAfter(Every);
+                wait.CancelAfter(every);
                 try
                 {
                     users.Add(await _wanted.Reader.ReadAsync(wait.Token));
@@ -568,6 +567,22 @@ public sealed class PlaylistSyncer(IServiceScopeFactory scopes, ILogger<Playlist
             {
                 logger.LogWarning(e, "Couldn't sync playlists");
             }
+        }
+    }
+
+    // How long between syncs of everyone's, as the schedules have it now.
+    private async Task<TimeSpan> EveryAsync(CancellationToken ct)
+    {
+        try
+        {
+            await using var scope = scopes.CreateAsyncScope();
+            var minutes = (await scope.ServiceProvider.GetRequiredService<Library.SettingsService>().GetScheduleAsync(ct)).PlaylistSyncMinutes;
+            return TimeSpan.FromMinutes(Math.Clamp(minutes, 1, ScheduleSettings.MostPlaylistSyncMinutes));
+        }
+        catch (Exception e) when (e is not OperationCanceledException)
+        {
+            logger.LogWarning("Couldn't read how often to sync playlists: {Message}", e.Message);
+            return TimeSpan.FromMinutes(10);
         }
     }
 }

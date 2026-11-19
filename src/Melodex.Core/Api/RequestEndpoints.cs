@@ -104,6 +104,12 @@ public static class RequestEndpoints
                          + "queue separately. 409 for a finished request, a part, or a before that isn't in the same queue.")
             .Produces(StatusCodes.Status204NoContent).Produces(StatusCodes.Status409Conflict);
 
+        requests.MapPost("/retry-failed", async (ScheduledTasks scheduled, CancellationToken ct) => Results.Ok(new AskedAgain(await scheduled.RetryFailedAsync(ct))))
+            .RequireScope(Scopes.Request).WithName("RetryFailedRequests")
+            .WithSummary("Queue every failed download again, with the parts of it that aren't in the library: those asked for into the library, "
+                         + "not upgrades or replacements. Asked says how many.")
+            .Produces<AskedAgain>();
+
         requests.MapPost("/{id:guid}/retry", async (Guid id, MelodexDbContext db, RequestService service, CancellationToken ct) =>
             {
                 if (await db.Requests.FindAsync([id], ct) is not { } request)

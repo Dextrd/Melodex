@@ -119,7 +119,7 @@ public sealed class GapFillingTests : IAsyncLifetime
         }
 
         _factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder => builder
-            .UseSetting("Melodex:DataPath", Path.Combine(_root, "data"))
+            .UseSetting("Melodex:DataPath", Path.Combine(_root, "data")).UseSetting("Melodex:ScheduledTasks", "false")
             .UseSetting("Melodex:LibraryPath", Music)
             .UseSetting("Melodex:StagingPath", Path.Combine(_root, "staging"))
             .UseSetting("Melodex:ListenNowPath", Path.Combine(_root, "listen-now"))

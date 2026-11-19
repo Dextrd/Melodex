@@ -2,6 +2,7 @@
 @layout SettingsLayout
 @inject MelodexClient Api
 @inject Player Player
+@inject TaskNotices Tasks
 
 <PageTitle>Playback · Melodex</PageTitle>
 
@@ -36,7 +37,7 @@ else
         }
     </div>
 
-    <h2>Visualiser</h2>
+    <h2 id="visualiser">Visualiser</h2>
     <p class="muted small">
         The bars that move with the music under the cover in the full-screen player. The server works them out from each song, so your browser doesn't
         download it twice to draw them.
@@ -61,6 +62,16 @@ else
                     <button class="link small" @onclick="() => _deleting = true">Delete them</button>
                 }
             </div>
+        }
+        @* Only while bars sit beside songs: made as songs play, or with no visualiser, there are none to make. *@
+        @if (_status.Settings.Visualiser == VisualiserBars.WhenMatching)
+        {
+            <div class="setting-line">
+                <ScheduleNote Task="ScheduledTask.Bars" />
+                <span class="spacer"></span>
+                <button disabled="@_makingBars" @onclick="MakeBarsAsync">@if (_makingBars) { <span class="spinner"></span> }Make missing bars now</button>
+            </div>
+            @if (_barsError is not null) { <div class="error small">@_barsError</div> }
         }
     </div>
 
@@ -143,6 +154,23 @@ else
     private bool _warning, _deleting, _leaving, _deleteBarsFiles;
     private AutoSave? _saver;
     private bool _gaplessWorks = true;
+    private bool _makingBars;
+    private string? _barsError;
+
+    private async Task MakeBarsAsync()
+    {
+        _makingBars = true;
+        _barsError = null;
+        try
+        {
+            Tasks.Started(await Api.MakeBarsAsync());
+        }
+        catch (Exception e) when (e is HttpRequestException or MelodexApiException)
+        {
+            _barsError = e.Message;
+        }
+        _makingBars = false;
+    }
 
     protected override async Task OnInitializedAsync()
     {

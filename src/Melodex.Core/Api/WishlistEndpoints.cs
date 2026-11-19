@@ -28,6 +28,24 @@ public static class WishlistEndpoints
             .WithSummary("Put a song or album on your wishlist. Adding one already there does nothing more.")
             .Produces(StatusCodes.Status204NoContent).ProducesValidationProblem();
 
+        wishlist.MapPost("/get", async (HttpContext http, Melodex.Core.Library.ScheduledTasks scheduled, CancellationToken ct) =>
+            {
+                if (Owner(http) is not { } user)
+                    return NoOwner();
+                try
+                {
+                    return Results.Ok(new AskedAgain(await scheduled.GetWishlistsAsync(user, ct)));
+                }
+                catch (Melodex.Core.Library.LibraryBusyException e)
+                {
+                    return Results.Problem(e.Message, statusCode: StatusCodes.Status409Conflict, title: "The library is busy");
+                }
+            })
+            .RequireScope(Scopes.Request).WithName("GetWishlistItems")
+            .WithSummary("Ask for everything on your wishlist, in your name. Those being fetched already are left as they are; Asked says how many "
+                         + "were asked for.")
+            .Produces<AskedAgain>().Produces(StatusCodes.Status409Conflict);
+
         wishlist.MapDelete("/{targetId:guid}", async (Guid targetId, HttpContext http, WishlistService service, CancellationToken ct) =>
                 Owner(http) is { } user ? await service.RemoveAsync(user, targetId, ct) ? Results.NoContent() : Results.NotFound() : NoOwner())
             .WithName("RemoveFromWishlist")

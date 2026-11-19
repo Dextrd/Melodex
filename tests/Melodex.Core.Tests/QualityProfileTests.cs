@@ -126,7 +126,7 @@ public sealed class QualityProfileTests
     {
         var root = Path.Combine(Path.GetTempPath(), "melodex-tests", Guid.NewGuid().ToString("N"));
         await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(b => b
-            .UseSetting("Melodex:DataPath", Path.Combine(root, "data")).UseSetting("Melodex:LibraryPath", Path.Combine(root, "music")));
+            .UseSetting("Melodex:DataPath", Path.Combine(root, "data")).UseSetting("Melodex:ScheduledTasks", "false").UseSetting("Melodex:LibraryPath", Path.Combine(root, "music")));
         var api = new MelodexClient(factory.CreateSignedInClient());
         Guid artistId, albumId, trackId;
         using (var scope = factory.Services.CreateScope())
@@ -168,7 +168,7 @@ public sealed class QualityProfileTests
     {
         var root = Path.Combine(Path.GetTempPath(), "melodex-tests", Guid.NewGuid().ToString("N"));
         await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(b => b
-            .UseSetting("Melodex:DataPath", Path.Combine(root, "data")).UseSetting("Melodex:LibraryPath", Path.Combine(root, "music")));
+            .UseSetting("Melodex:DataPath", Path.Combine(root, "data")).UseSetting("Melodex:ScheduledTasks", "false").UseSetting("Melodex:LibraryPath", Path.Combine(root, "music")));
         var api = new MelodexClient(factory.CreateSignedInClient());
         var profile = await api.GetQualityProfileAsync();
         var off = profile with { Steps = profile.Ordered().Select(s => new ProfileStep(s.Step.Key, s.Step.Key != profile.Cutoff)).ToList() };

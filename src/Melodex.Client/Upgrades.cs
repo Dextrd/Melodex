@@ -18,19 +18,22 @@ public enum OldFiles
 /// </summary>
 public sealed record UpgradeSettings
 {
-    /// <summary>Look through the whole library for upgrades on a schedule: on <see cref="Days"/>, between <see cref="From"/> and <see cref="Until"/>.</summary>
+    // When upgrades run is set with the other scheduled tasks now, under /schedules. These say where they are, and are
+    // still read from an older install's settings to move them across; saving them here changes nothing.
+
+    /// <summary>Upgrades are on a schedule. Read only: set with <c>PUT /schedules</c>.</summary>
     public bool Scheduled { get; init; } = true;
 
-    /// <summary>The days a look starts on: one for weekly, all seven for daily.</summary>
+    /// <summary>The days their schedule's window opens on: all seven when it's the daily one. Read only.</summary>
     public IReadOnlyList<DayOfWeek> Days { get; init; } = [DayOfWeek.Monday];
 
-    /// <summary>When on those days upgrades may start being asked for.</summary>
+    /// <summary>When their schedule's window opens. Read only.</summary>
     public TimeOnly From { get; init; } = new(1, 0);
 
-    /// <summary>When no more are: it's the next day when it's earlier than <see cref="From"/>, as 22:00 to 04:00 is.</summary>
+    /// <summary>When it closes: the next day when it's earlier than <see cref="From"/>, as 22:00 to 04:00 is. Read only.</summary>
     public TimeOnly Until { get; init; } = new(6, 0);
 
-    /// <summary>The time zone the days and times are in, as the browser that saved them names it (IANA); UTC if it's unknown.</summary>
+    /// <summary>The schedules' time zone, as a browser names it (IANA). Read only.</summary>
     public string TimeZone { get; init; } = "UTC";
 
     /// <summary>The most <see cref="AtATime"/> may be.</summary>
@@ -54,7 +57,7 @@ public sealed record UpgradeSettings
 
 /// <summary>Upgrades' settings and where they stand.</summary>
 /// <param name="Warning">Why an upgrade may lose stars, plays and playlists in the connected media server; null when it keeps them.</param>
-/// <param name="NextRun">When the scheduled look through the library next starts, while it's on.</param>
+/// <param name="NextRun">When the window upgrades are scheduled in next opens, while they're on a schedule.</param>
 /// <param name="Running">Whether a look through the library is going now.</param>
 /// <param name="Run">The look that's going, if one is.</param>
 /// <param name="Upgradable">Matched files below their cutoff.</param>
