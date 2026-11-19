@@ -36,7 +36,8 @@ public sealed class ScheduleTests : IDisposable
     public async Task A_new_install_scans_daily_and_upgrades_weekly_and_upgrades_say_so()
     {
         var status = await _api.GetSchedulesAsync();
-        Assert.Equal([ScheduledTask.Scan, ScheduledTask.CatalogueUpdate, ScheduledTask.LosslessCheck], status.Settings.Daily.Tasks);
+        Assert.Equal([ScheduledTask.Scan, ScheduledTask.CatalogueUpdate, ScheduledTask.LosslessCheck, ScheduledTask.Bars], status.Settings.Daily.Tasks);
+        Assert.Equal(5, status.Settings.DownloadsAtATime);
         Assert.Equal([ScheduledTask.Lyrics, ScheduledTask.RetryFailed, ScheduledTask.Wishlist, ScheduledTask.Upgrades], status.Settings.Weekly.Tasks);
         Assert.Empty(status.Settings.Monthly.Tasks);
         Assert.NotNull(status.Windows.Single(w => w.Repeat == ScheduleRepeat.Daily).Next);
@@ -62,6 +63,7 @@ public sealed class ScheduleTests : IDisposable
     [InlineData("month")]
     [InlineData("twice")]
     [InlineData("sync")]
+    [InlineData("downloads")]
     public async Task A_schedule_that_cant_run_is_refused(string wrong)
     {
         var settings = (await _api.GetSchedulesAsync()).Settings;
@@ -70,7 +72,8 @@ public sealed class ScheduleTests : IDisposable
             "zone" => settings with { TimeZone = "Nowhere/Atlantis" },
             "month" => settings with { Monthly = settings.Monthly with { Day = 32 } },
             "twice" => settings with { Monthly = settings.Monthly with { Tasks = [ScheduledTask.Scan] } },
-            _ => settings with { PlaylistSyncMinutes = 0 },
+            "sync" => settings with { PlaylistSyncMinutes = 0 },
+            _ => settings with { DownloadsAtATime = 21 },
         };
         var refused = await Assert.ThrowsAsync<MelodexApiException>(() => _api.SaveSchedulesAsync(settings));
         Assert.Equal(HttpStatusCode.BadRequest, refused.Status);
@@ -168,6 +171,56 @@ public sealed class ScheduleTests : IDisposable
         // The same window doesn't run again.
         await tasks.TickAsync(now.AddMinutes(1), default);
         Assert.Null((await _api.GetSchedulesAsync()).Running);
+    }
+
+    [Fact]
+    public async Task Failed_downloads_are_retried_a_few_at_a_time_until_the_window_closes()
+    {
+        // Without the request worker, what's retried stays queued until the test says otherwise.
+        using var factory = _factory.WithWebHostBuilder(builder => builder.ConfigureServices(services =>
+        {
+            foreach (var worker in services.Where(d => d.ImplementationType == typeof(Melodex.Core.Requests.RequestWorker)).ToList())
+                services.Remove(worker);
+        }));
+        var api = new MelodexClient(factory.CreateSignedInClient());
+        var settings = (await api.GetSchedulesAsync()).Settings;
+        var now = DateTime.UtcNow;
+        await api.SaveSchedulesAsync(settings with
+        {
+            TimeZone = "UTC", DownloadsAtATime = 2,
+            Daily = new DailySchedule { From = TimeOnly.FromDateTime(now.AddHours(-1)), Until = TimeOnly.FromDateTime(now.AddHours(1)), Tasks = [ScheduledTask.RetryFailed] },
+            Weekly = settings.Weekly with { Tasks = [] },
+        });
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<MelodexDbContext>();
+        var failed = Enumerable.Range(0, 5).Select(i => new Request
+        {
+            TargetKind = EntityKind.Track, TargetId = Guid.NewGuid(), Title = $"Song {i}", Requester = "admin", Status = RequestStatus.Failed, QueueOrder = i,
+        }).ToList();
+        db.Requests.AddRange(failed);
+        await db.SaveChangesAsync();
+        var tasks = scope.ServiceProvider.GetRequiredService<ScheduledTasks>();
+        async Task<List<Guid>> QueuedAsync() => await db.Requests.AsNoTracking().Where(r => r.Status == RequestStatus.Queued).Select(r => r.Id).ToListAsync();
+
+        // Two at a time, the first in the queue first.
+        await tasks.TickAsync(now, default);
+        Assert.Equal(failed.Take(2).Select(r => r.Id).Order(), (await QueuedAsync()).Order());
+        var step = (await api.GetSchedulesAsync()).Running!.Steps.Single();
+        Assert.Equal((ScheduledStepState.Running, "Asked again for 2 downloads so far, 2 going"), (step.State, step.Detail));
+        await tasks.TickAsync(now, default);
+        Assert.Equal(2, (await QueuedAsync()).Count);
+
+        // As those finish, failing again, the next two go in their place; neither is asked for again.
+        await db.Requests.Where(r => r.Status == RequestStatus.Queued).ExecuteUpdateAsync(u => u.SetProperty(r => r.Status, RequestStatus.Failed));
+        await tasks.TickAsync(now, default);
+        Assert.Equal(failed.Skip(2).Take(2).Select(r => r.Id).Order(), (await QueuedAsync()).Order());
+
+        // The window closes: those not started are failed again, for the next window, and the last is left as it was.
+        await tasks.TickAsync(now.AddHours(2), default);
+        Assert.Empty(await QueuedAsync());
+        Assert.Equal(2, await db.Requests.CountAsync(r => r.Status == RequestStatus.Failed && r.Detail != null && r.Detail.Contains("not started before its window closed")));
+        var last = (await api.GetSchedulesAsync()).Windows.Single(w => w.Repeat == ScheduleRepeat.Daily).Last!.Steps.Single();
+        Assert.Equal((ScheduledStepState.Done, "Asked again for 2 downloads before the window closed; 2 not started wait for the next"), (last.State, last.Detail));
     }
 
     [Fact]

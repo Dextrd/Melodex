@@ -40,12 +40,16 @@ ticking it on one takes it off another; one on none only runs when you start it.
 - **Update the catalogue**: look up every library artist's discography.
 - **Check lossless files**: look for lossy music passed off as lossless in files not checked yet.
 - **Look for missing lyrics**: look again for songs without lyrics.
-- **Retry failed downloads**: ask again for downloads that failed.
+- **Make the visualiser's bars**: for songs without them, while **Settings → Playback** makes them when matching;
+  otherwise it's skipped, saying why.
+- **Retry failed downloads**: ask again for downloads that failed. Any not started when the window closes go back to
+  failed, for the next window.
 - **Get what's on wishlists**: ask for what's on everyone's wishlist, each in the name of whoever wished for it, when a
-  retriever is on to fetch it.
+  retriever is on to fetch it. Any not started when the window closes are cancelled, and stay on the wishlist.
 - **Look for upgrades**: look through the whole library for [upgrades](requests-and-listening.md#upgrades).
 
-To start with, the daily window is 01:00 to 06:00 and scans, updates the catalogue and checks lossless files; the
+To start with, the daily window is 01:00 to 06:00 and scans, updates the catalogue, checks lossless files and makes
+the visualiser's bars; the
 weekly one is Mondays at the same times, for lyrics, failed downloads, wishlists and upgrades; nothing is monthly.
 
 - **Each window has its own times.** One that ends earlier than it starts runs past midnight: 22:00 to 04:00 ends the
@@ -53,19 +57,22 @@ weekly one is Mondays at the same times, for lyrics, failed downloads, wishlists
 - **The weekly one runs on a day you pick, the monthly one on a day of the month, 1 to 31.** In a month shorter than
   that, it runs on the month's last day: 31 is the last day of every month.
 - **All three are in one time zone**, the server's UTC to start with: **Use this browser's** sets yours.
-- **A window runs its tasks once, in order**: scan, catalogue, lossless check, lyrics, then failed downloads,
-  wishlists and upgrades. The first four are tasks on **Activity**, one after another; the rest wait for them, as
-  nothing can be asked for while a scan reads the library. Upgrades go last because they fill what's left of the
-  window, and stop when it closes. Anything that hasn't started by then waits for the next window. Downloads asked for
-  before then carry on.
+- **A window runs its tasks once, in order**: scan, catalogue, lossless check, lyrics, the visualiser's bars, then
+  failed downloads, wishlists and upgrades. The first five are tasks on **Activity**, one after another; the rest wait
+  for them, as nothing can be asked for while a scan reads the library.
+- **Downloads go a few at a time.** Retries and wishlists keep **Downloads at a time** going (5 to start with), and
+  upgrades their own **Upgrades at a time**: as each finishes, the next is asked for in its place, so the queue never
+  fills with a window's worth at once. Each waits for its downloads to finish before the next starts, and upgrades go
+  last, filling what's left of the window. When the window closes, nothing more is asked for; those not started wait
+  for the next window, and those under way carry on.
 - **The windows take turns.** When two open on the same day, daily goes first, then weekly, then monthly, as long as
   its window is still open.
 
 Below each schedule are when it next runs, and how its last run went, a line for each task, with a link to its task on
 Activity. Every task can still be run straight away from its own place, which says which schedule it's on and links
 here: **Scan** and **Update catalogue** in the Library page's Scan menu, **Look for missing lyrics now** under **Settings →
-General → Lyrics**, **Check the rest** of the lossless files and **Look for upgrades now** under **Settings → Quality**, **Retry
-failed** on **Activity → Downloads**, and **Get them all** on the wishlist.
+General → Lyrics**, **Make missing bars now** under **Settings → Playback**, **Check the rest** of the lossless files and **Look for upgrades now** under **Settings → Quality**, **Retry
+failed** on **Activity → Downloads**, and **Get them all** on the wishlist. Those last two ask for everything at once.
 
 **Sync playlists every** sets how often playlists sync with the media server for changes made there, from 1 minute to
 a day (10 minutes to start with).

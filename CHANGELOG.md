@@ -9,16 +9,17 @@ What changed in each release of Melodex. Versions follow [semantic versioning](h
 - **Settings → Scheduled tasks**: daily, weekly and monthly windows, each with its own times (running past midnight
   if it ends earlier than it starts), the weekly one on a day you pick and the monthly one on a day of the month (in a
   shorter month, its last day), all in one time zone. Tick what each runs: a scan, a catalogue update, the lossless
-  check, a look for missing lyrics, retrying failed downloads, getting what's on wishlists, and upgrades. A window runs
-  them once, in that order, with upgrades last until it closes; each schedule shows when it next runs and how its last
-  run went. New installs scan, update the catalogue and check lossless files daily from 01:00 to 06:00, and do the rest
-  weekly on Mondays (#112).
+  check, a look for missing lyrics, the visualiser's bars, retrying failed downloads, getting what's on wishlists, and
+  upgrades. A window runs them once, in that order; retries and wishlists keep **Downloads at a time** going (5 to start
+  with), as upgrades keep theirs, until all have been asked for or the window closes. Each schedule shows when it next
+  runs and how its last run went. New installs scan, update the catalogue, check lossless files and make the
+  visualiser's bars daily from 01:00 to 06:00, and do the rest weekly on Mondays (#112).
 - Every scheduled task can still be run straight away where it lives, which says which schedule it's on: **Look for
-  missing lyrics now** under **Settings → General**, **Retry failed** on **Activity → Downloads** and **Get them all** on
-  the wishlist are new (#112).
+  missing lyrics now** under **Settings → General**, **Make missing bars now** under **Settings → Playback**, **Retry
+  failed** on **Activity → Downloads** and **Get them all** on the wishlist are new (#112).
 - How often playlists sync for changes made in the media server can be set, under **Settings → Scheduled tasks** (#112).
-- The API has `GET` and `PUT /schedules`, `POST /library/lyrics`, `POST /requests/retry-failed` and
-  `POST /wishlist/get` (#112).
+- The API has `GET` and `PUT /schedules`, `POST /library/lyrics`, `POST /library/bars`, `POST /requests/retry-failed`
+  and `POST /wishlist/get` (#112).
 
 ### Changed
 

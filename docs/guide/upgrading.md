@@ -26,7 +26,8 @@ and start it as above. Nothing else changes: your settings, library and data car
 
 ## To 1.7.0: scheduled tasks
 
-Scans, catalogue updates, lossless checks, lyrics, failed downloads, wishlists and upgrades can run on a schedule,
+Scans, catalogue updates, lossless checks, lyrics, the visualiser's bars, failed downloads, wishlists and upgrades can
+run on a schedule,
 under the new **Settings → Scheduled tasks**: see [Scheduled tasks](configuration.md#scheduled-tasks). Your upgrade
 schedule moves there as it was: its times and time zone, on the daily schedule if it ran every day, or else the weekly
 one on the first of its days. Nothing else is put on a schedule, so everything runs as it did until you tick it.

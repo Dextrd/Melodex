@@ -94,6 +94,14 @@ public sealed class MelodexClient(HttpClient http)
         return (await response.Content.ReadFromJsonAsync<TaskInfo>(MelodexJson.Options, ct))!;
     }
 
+    /// <summary>Makes the visualiser's bars for songs without them; the queued task.</summary>
+    public async Task<TaskInfo> MakeBarsAsync(CancellationToken ct = default)
+    {
+        using var response = await http.PostAsync($"{Api}/library/bars", null, ct);
+        await EnsureAsync(response, ct);
+        return (await response.Content.ReadFromJsonAsync<TaskInfo>(MelodexJson.Options, ct))!;
+    }
+
     public async Task<ScheduleStatus> GetSchedulesAsync(CancellationToken ct = default) =>
         (await http.GetFromJsonAsync<ScheduleStatus>($"{Api}/schedules", MelodexJson.Options, ct))!;
 

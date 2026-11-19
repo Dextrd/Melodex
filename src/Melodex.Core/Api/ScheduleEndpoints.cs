@@ -27,6 +27,8 @@ public static class ScheduleEndpoints
                     errors["monthly.day"] = ["Must be between 1 and 31."];
                 if (value.PlaylistSyncMinutes is < 1 or > ScheduleSettings.MostPlaylistSyncMinutes)
                     errors["playlistSyncMinutes"] = [$"Must be between 1 and {ScheduleSettings.MostPlaylistSyncMinutes}."];
+                if (value.DownloadsAtATime is < 1 or > ScheduleSettings.MostDownloadsAtATime)
+                    errors["downloadsAtATime"] = [$"Must be between 1 and {ScheduleSettings.MostDownloadsAtATime}."];
                 var twice = Enum.GetValues<ScheduleRepeat>().SelectMany(r => value.Of(r).Tasks.Distinct()).GroupBy(t => t).Where(g => g.Count() > 1).Select(g => g.Key).ToList();
                 if (twice.Count > 0)
                     errors["tasks"] = [$"A task can be on one schedule at most: {string.Join(", ", twice)} is on more than one."];
@@ -45,8 +47,9 @@ public static class ScheduleEndpoints
             .RequireScope(Scopes.Settings).WithName("SaveSchedules")
             .WithSummary("Set when scheduled tasks run: each of the daily, weekly and monthly windows' times (one ending earlier than it starts runs "
                          + "past midnight), the weekly one's day, the monthly one's day of the month (in a shorter month, its last day), the tasks "
-                         + "each runs (a task on one at most), the time zone, and how often playlists sync. A window runs its tasks once, in order: "
-                         + "scan, catalogue update, lossless check, lyrics, then failed downloads, wishlists and upgrades.")
+                         + "each runs (a task on one at most), the time zone, how many downloads retries and wishlists keep going, and how often "
+                         + "playlists sync. A window runs its tasks once, in order: scan, catalogue update, lossless check, lyrics, the visualiser's "
+                         + "bars, then failed downloads, wishlists and upgrades, each keeping a few going until done or the window closes.")
             .Produces(StatusCodes.Status204NoContent).ProducesValidationProblem();
 
         return api;

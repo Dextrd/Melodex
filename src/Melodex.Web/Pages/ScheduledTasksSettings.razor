@@ -140,6 +140,20 @@ else
         </div>
     }
 
+    <h2>Downloads</h2>
+    <div class="card settings-card">
+        <div class="setting-line">
+            Keep
+            <NumberField Value="_settings.DownloadsAtATime" Min="1" Max="ScheduleSettings.MostDownloadsAtATime" Label="Downloads at a time"
+                         ValueChanged="n => Set(_settings with { DownloadsAtATime = n })" />
+            @(_settings.DownloadsAtATime == 1 ? "download" : "downloads") going at a time when retrying failed downloads and getting wishlists
+        </div>
+        <div class="muted small">
+            As each finishes, the next is asked for in its place, until all have been or the window closes. Upgrades keep their own number, under
+            <a href="settings/quality#upgrades">Quality</a>. <strong>Retry failed</strong> and <strong>Get them all</strong> by hand ask for them all at once.
+        </div>
+    </div>
+
     <h2>Playlist sync</h2>
     <div class="card settings-card">
         <div class="setting-line">

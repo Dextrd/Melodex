@@ -174,4 +174,15 @@ public sealed record ScheduleRuns
     public ScheduleRunInfo? Current { get; init; }
 
     public Dictionary<ScheduleRepeat, ScheduleRunInfo> Last { get; init; } = [];
+
+    /// <summary>The downloads the current run's retries or wishlists have asked for, and what they've tried.</summary>
+    public ScheduleDownloads Downloads { get; init; } = new();
+}
+
+/// <summary>Where a run's retries or wishlists stand, as they keep a few downloads going.</summary>
+/// <param name="Asked">The requests asked for, to tell how many are still going and which haven't started.</param>
+/// <param name="Tried">What's been asked for already: a retried request's ID, or a wished-for song or album, so none is twice.</param>
+public sealed record ScheduleDownloads(IReadOnlyList<Guid> Asked, IReadOnlyList<string> Tried)
+{
+    public ScheduleDownloads() : this([], []) { }
 }

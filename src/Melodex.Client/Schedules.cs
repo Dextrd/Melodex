@@ -15,10 +15,13 @@ public enum ScheduledTask
     /// <summary>Look again for lyrics for songs without them.</summary>
     Lyrics,
 
-    /// <summary>Ask again for downloads that failed.</summary>
+    /// <summary>Make the visualiser's bars for songs without them, while they're made ahead.</summary>
+    Bars,
+
+    /// <summary>Ask again for downloads that failed, a few at a time, until all have been or the window closes.</summary>
     RetryFailed,
 
-    /// <summary>Ask for what's on everyone's wishlist.</summary>
+    /// <summary>Ask for what's on everyone's wishlist, a few at a time, until all of it has been or the window closes.</summary>
     Wishlist,
 
     /// <summary>Look through the whole library for upgrades, until everything's been tried or the window closes.</summary>
@@ -66,7 +69,10 @@ public sealed record ScheduleSettings
     /// <summary>The time zone the days and times are in, as a browser names it (IANA); UTC if it's unknown.</summary>
     public string TimeZone { get; init; } = "UTC";
 
-    public DailySchedule Daily { get; init; } = new() { Tasks = [ScheduledTask.Scan, ScheduledTask.CatalogueUpdate, ScheduledTask.LosslessCheck] };
+    public DailySchedule Daily { get; init; } = new()
+    {
+        Tasks = [ScheduledTask.Scan, ScheduledTask.CatalogueUpdate, ScheduledTask.LosslessCheck, ScheduledTask.Bars],
+    };
 
     public WeeklySchedule Weekly { get; init; } = new()
     {
@@ -80,6 +86,15 @@ public sealed record ScheduleSettings
 
     /// <summary>The most <see cref="PlaylistSyncMinutes"/> may be: a day.</summary>
     public const int MostPlaylistSyncMinutes = 1440;
+
+    /// <summary>
+    /// How many downloads a window's retries and wishlists keep going at once, from 1 to 20: as each finishes, the next
+    /// is asked for in its place. Upgrades keep their own number, <see cref="UpgradeSettings.AtATime"/>.
+    /// </summary>
+    public int DownloadsAtATime { get; init; } = 5;
+
+    /// <summary>The most <see cref="DownloadsAtATime"/> may be.</summary>
+    public const int MostDownloadsAtATime = 20;
 
     /// <summary>The schedule a repeat names.</summary>
     public ScheduleWindow Of(ScheduleRepeat repeat) => repeat switch
