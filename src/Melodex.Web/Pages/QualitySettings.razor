@@ -265,6 +265,14 @@ else
             </p>
         }
     }
+    else if (_upgradesLoading)
+    {
+        <div class="card settings-card loading-card" aria-busy="true" aria-label="Loading upgrades">
+            <span class="shimmer-line" style="width: 70%"></span>
+            <span class="shimmer-line" style="width: 45%"></span>
+            <span class="shimmer-line" style="width: 55%"></span>
+        </div>
+    }
 
     <AutoSave @ref="_saver" Save="SaveAsync" />
 }
@@ -299,10 +307,21 @@ else
         (SuspectLossless.Keep, "Keep it as what it seems", "It's filed if the profile allows the quality it seems to be, and counts as that, below the cutoff, for upgrades."),
     ];
 
+    private bool _upgradesLoading = true;
+
     protected override async Task OnInitializedAsync()
     {
         _profile = await Api.GetQualityProfileAsync();
         _steps = _profile.Ordered().ToList();
+        // The list shows at once; the rest fills in as it comes, upgrades shimmering until then, as they ask the media
+        // server which version it is.
+        StateHasChanged();
+        await Task.WhenAll(LoadSpectraAsync(), DrawnAsync(LoadUpgradesAsync()));
+        _upgradesLoading = false;
+    }
+
+    private async Task LoadSpectraAsync()
+    {
         try
         {
             _spectra = await Api.GetSpectrumStatusAsync();
@@ -311,7 +330,14 @@ else
         {
             // Shown without it.
         }
-        await LoadUpgradesAsync();
+        StateHasChanged();
+    }
+
+    private async Task DrawnAsync(Task loading)
+    {
+        await loading;
+        _upgradesLoading = false;
+        StateHasChanged();
     }
 
     private async Task LoadUpgradesAsync()
