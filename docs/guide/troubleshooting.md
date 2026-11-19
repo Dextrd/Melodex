@@ -19,6 +19,10 @@ owner: set `PUID` and `PGID`.
 **Navidrome doesn't show new music.** Check **Settings → Plugins → Navidrome → Test**. Melodex needs a Navidrome user
 that may start a scan (an admin).
 
+**"Something went wrong" at the bottom of the page.** The web app hit an error it couldn't handle. It says what the
+error was; **Details** shows the rest, to copy into an issue. The app often goes on working, and **Reload** starts it
+afresh. The error is in **Settings → Log** and the server's log too, as "The web app hit an error".
+
 **I'm locked out.** See [a lost admin password](users-and-permissions.md#a-lost-admin-password).
 
 **I want to start again.** The admin can reset Melodex at the bottom of **Settings → General**, typing `reset` to

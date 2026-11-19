@@ -593,6 +593,13 @@ public sealed class MelodexClient(HttpClient http)
     public async Task<ServerVersion> GetVersionAsync(CancellationToken ct = default) =>
         (await http.GetFromJsonAsync<ServerVersion>($"{Api}/version", MelodexJson.Options, ct))!;
 
+    /// <summary>Tells the server about an error the app couldn't handle, so it's in the server's log.</summary>
+    public async Task ReportErrorAsync(ClientError error, CancellationToken ct = default)
+    {
+        using var response = await http.PostAsJsonAsync($"{Api}/client-errors", error, MelodexJson.Options, ct);
+        await EnsureAsync(response, ct);
+    }
+
     public async Task<SetupStatus> GetSetupAsync(CancellationToken ct = default) =>
         (await http.GetFromJsonAsync<SetupStatus>($"{Api}/setup", MelodexJson.Options, ct))!;
 

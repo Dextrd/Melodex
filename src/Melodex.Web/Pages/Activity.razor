@@ -239,12 +239,16 @@ else
     private int _shown = Step;
     private ElementReference _end;
     private DotNetObjectReference<Activity>? _self;
+    private bool _disposed;
     private bool _hasEnd;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         await LandAsync();
         if (!_hasEnd)
+            return;
+        // Left while it landed: its reference is gone.
+        if (_disposed)
             return;
         _self ??= DotNetObjectReference.Create(this);
         await Js.InvokeVoidAsync("melodexScroll.atEnd", _end, _self);
@@ -546,6 +550,7 @@ else
 
     public void Dispose()
     {
+        _disposed = true;
         _self?.Dispose();
         Tracker.Changed -= Refresh;
         Events.Received -= OnEvent;
