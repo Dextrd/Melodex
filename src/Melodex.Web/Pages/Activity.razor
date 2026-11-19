@@ -63,6 +63,20 @@
     }
 </div>
 
+@if (Shown == "downloads" && _upgradeRun is { } run)
+{
+    <div class="notice upgrade-run" role="status">
+        <span class="spinner" aria-hidden="true"></span>
+        <span>
+            Looking through the library for upgrades@(run.ByHand ? "" : " on the schedule"): @Format.Count(run.Asked, "song", "songs") asked for so far@(run.Until is { } until ? $", until {until.ToLocalTime():HH:mm}" : "").
+        </span>
+        @if (Auth.May(UserPermissions.Request))
+        {
+            <button class="small" disabled="@_busy" @onclick="StopUpgradesAsync">Stop looking</button>
+        }
+    </div>
+}
+
 @if (_confirmCancel)
 {
     <Dialog Title="@($"Cancel {Format.Count(Changeable.Count, Noun, Nouns)}?")" OnClose="() => _confirmCancel = false" Alert="true">
@@ -413,6 +427,42 @@ else
         }
     }
 
+    // The look through the library for upgrades that's going, read now and then as downloads change.
+    private UpgradeRunInfo? _upgradeRun;
+    private DateTime _upgradeRunRead;
+
+    private async Task LoadUpgradeRunAsync(bool now = false)
+    {
+        if (!now && DateTime.UtcNow - _upgradeRunRead < TimeSpan.FromSeconds(10))
+            return;
+        _upgradeRunRead = DateTime.UtcNow;
+        try
+        {
+            _upgradeRun = await Api.GetUpgradeRunAsync();
+        }
+        catch (Exception e) when (e is HttpRequestException or MelodexApiException)
+        {
+        }
+    }
+
+    private async Task StopUpgradesAsync()
+    {
+        _busy = true;
+        try
+        {
+            await Api.StopUpgradesAsync();
+            await LoadUpgradeRunAsync(now: true);
+            await Tracker.RefreshAsync();
+        }
+        catch (Exception e) when (e is HttpRequestException or MelodexApiException)
+        {
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
     // Newest: what's going in the order it runs, the next first, then the rest as they last changed. The others by name.
     private IEnumerable<Item> Sorted(IEnumerable<Item> items)
     {
@@ -490,7 +540,7 @@ else
         _closed = [.. await Prefs.GetAsync<List<string>>(ClosedKey, [])];
         Tracker.Changed += Refresh;
         Events.Received += OnEvent;
-        await Task.WhenAll(Tracker.RefreshAsync(), LoadTasksAsync());
+        await Task.WhenAll(Tracker.RefreshAsync(), LoadTasksAsync(), LoadUpgradeRunAsync(now: true));
         _loaded = true;
         // Tasks are polled here; requests by the tracker. Quicker while something's running.
         _timer = new Timer(_ => InvokeAsync(async () =>
@@ -614,6 +664,7 @@ else
             if (Tracker.Requests.FirstOrDefault(r => r.Id == id) is not { Active: false } || _open[id] is { Active: true }
                 || _open[id]?.Children?.Any(c => c.Active) == true)
                 _open[id] = await Api.GetRequestAsync(id);
+        await LoadUpgradeRunAsync();
         await RedrawAsync();
     });
 

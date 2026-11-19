@@ -445,6 +445,25 @@ public sealed class MelodexClient(HttpClient http)
         await EnsureAsync(response, ct);
     }
 
+    /// <summary>The look through the library for upgrades that's going, or null when none is.</summary>
+    public async Task<UpgradeRunInfo?> GetUpgradeRunAsync(CancellationToken ct = default)
+    {
+        using var response = await http.GetAsync($"{Api}/upgrades/run", ct);
+        await EnsureAsync(response, ct);
+        return response.StatusCode == System.Net.HttpStatusCode.NoContent ? null
+            : await response.Content.ReadFromJsonAsync<UpgradeRunInfo>(MelodexJson.Options, ct);
+    }
+
+    /// <summary>Stops the look through the library for upgrades that's going. False if none is.</summary>
+    public async Task<bool> StopUpgradesAsync(CancellationToken ct = default)
+    {
+        using var response = await http.PostAsync($"{Api}/upgrades/stop", null, ct);
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            return false;
+        await EnsureAsync(response, ct);
+        return true;
+    }
+
     /// <summary>Asks for upgrades of a song's, album's or artist's files below their cutoff, or the whole library's.</summary>
     public async Task<UpgradeSearch> SearchUpgradesAsync(FormatScope scope, CancellationToken ct = default)
     {
