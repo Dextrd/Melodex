@@ -184,38 +184,23 @@ else
                         <span class="muted small">the next day</span>
                     }
                 </div>
-                <div class="setting-line">
-                    @if (_upgradeSettings.PerRun is { } most)
-                    {
-                        <span>Asking for at most</span>
-                        <NumberField Value="most" Min="1" Max="500" Label="Songs each time" ValueChanged="n => SetUpgrades(_upgradeSettings with { PerRun = n })" />
-                        <span>songs each time</span>
-                    }
-                    else
-                    {
-                        <span>Asking for as many songs as there's time for</span>
-                    }
-                    <label class="small">
-                        <input type="checkbox" checked="@(_upgradeSettings.PerRun is null)"
-                               @onchange="e => SetUpgrades(_upgradeSettings with { PerRun = (bool)e.Value! ? null : 25 })" />
-                        No limit
-                    </label>
-                </div>
                 <div class="muted small">
-                    In the window, a few songs are looked for at a time, as many as fetches run at once, more as each finishes, until the limit, the
-                    last song or the end of the window; any not started by then wait for the next. Those looked for longest ago come first, and
-                    the worst of those. Each is a request on the Activity page, after anything asked for by hand; one that finds nothing better just
-                    stays as it is. Times are in @(_upgradeSettings.TimeZone)@(_upgradeSettings.TimeZone == BrowserZone ? ", this browser's" : "").
-                    @if (upgrades.Running)
-                    {
-                        <span>Looking now.</span>
-                    }
-                    else if (upgrades.NextRun is { } next)
+                    In the window, the whole library is looked through a few songs at a time: as each finishes, the next is asked for in its
+                    place, until every song below its cutoff has been tried or the window closes; any not started by then wait for the next.
+                    Those looked for longest ago come first, and the worst of those. Each is a request on the Activity page, after anything
+                    asked for by hand; one that finds nothing better just stays as it is. Times are in @(_upgradeSettings.TimeZone)@(_upgradeSettings.TimeZone == BrowserZone ? ", this browser's" : "").
+                    @if (upgrades.NextRun is { } next && !upgrades.Running)
                     {
                         <span>Next: @next.ToLocalTime().ToString("dddd d MMMM, HH:mm").</span>
                     }
                 </div>
             }
+            <div class="setting-line">
+                <span>Upgrades at a time</span>
+                <NumberField Value="_upgradeSettings!.AtATime" Min="1" Max="UpgradeSettings.MostAtATime" Label="Upgrades at a time"
+                             ValueChanged="n => SetUpgrades(_upgradeSettings with { AtATime = n })" />
+            </div>
+            <div class="muted small">How many a look through the library keeps going, scheduled or now. One slow upgrade doesn't hold up the rest.</div>
             @foreach (var (value, label) in OldFileOptions)
             {
                 <label class="dialog-choice">
@@ -243,13 +228,31 @@ else
                     @(upgrades.Upgradable == 1 ? "1 song is below its cutoff." : $"{upgrades.Upgradable} songs are below their cutoff.")
                 </span>
                 <span class="spacer"></span>
-                <button @onclick="SearchUpgradesAsync" disabled="@(_searching || upgrades.Upgradable == 0)">Look for upgrades now</button>
+                @if (upgrades.Run is not null)
+                {
+                    <button @onclick="StopUpgradesAsync" disabled="@_searching">Stop looking</button>
+                }
+                else
+                {
+                    <button @onclick="SearchUpgradesAsync" disabled="@(_searching || upgrades.Upgradable == 0)">Look for upgrades now</button>
+                }
             </div>
             <div class="muted small">
-                As many as a scheduled look asks for (500 at most), starting now, whatever the time. A song, album or artist can be looked for on its own page.
-                @if (_searched is { } found)
+                @if (upgrades.Run is { } run)
                 {
-                    <span>@(found.Queued == 0 ? "Nothing new to look for: the rest are being looked for already." : $"Looking for {found.Queued}: they're in Activity.")</span>
+                    <span>
+                        Looking now@(run.ByHand ? "" : ", on the schedule"): @Format.Count(run.Asked, "song", "songs") asked for so far, @run.Going going
+                        @(run.Until is { } until ? $", until {until.ToLocalTime():HH:mm}" : "").
+                        <a href="activity/downloads">Follow it in Activity</a>.
+                    </span>
+                }
+                else
+                {
+                    <span>Starts now, whatever the time, the same way as a scheduled look: it stops when everything's been tried, or with the window if it starts in one. A song, album or artist can be looked for on its own page.</span>
+                    @if (_searched is { Queued: 0 })
+                    {
+                        <span>Nothing new to look for: the rest are being looked for already.</span>
+                    }
                 }
             </div>
         </div>
@@ -391,6 +394,26 @@ else
         try
         {
             _searched = await Api.SearchUpgradesAsync(new FormatScope(FormatScopeKind.Library));
+            await LoadUpgradesAsync();
+        }
+        catch (Exception e) when (e is HttpRequestException or MelodexApiException)
+        {
+            _upgradeError = e.Message;
+        }
+        finally
+        {
+            _searching = false;
+        }
+    }
+
+    private async Task StopUpgradesAsync()
+    {
+        _searching = true;
+        try
+        {
+            await Api.StopUpgradesAsync();
+            _searched = null;
+            await LoadUpgradesAsync();
         }
         catch (Exception e) when (e is HttpRequestException or MelodexApiException)
         {

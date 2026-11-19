@@ -188,6 +188,7 @@ public sealed class GapFillingTests : IAsyncLifetime
             task = (await _api.GetTaskAsync(task.Id))!;
         }
         Assert.Equal(TaskState.Succeeded, task.State);
+        await _api.WaitForCatalogueAsync();
     }
 
     /// <summary>

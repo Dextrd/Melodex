@@ -2,6 +2,7 @@
 @inject AuthState Auth
 @inject MelodexClient Api
 @inject RequestTracker Tracker
+@inject Notices Notices
 @inject NavigationManager Nav
 @inject WishlistStore Wishlist
 
@@ -69,25 +70,14 @@
                 }
                 @if (UpgradeScope is { } scope)
                 {
-                    @if (_upgrade is null)
-                    {
-                        <button type="button" role="menuitem" disabled="@_busy" @onclick="() => UpgradeAsync(scope)">
-                            @if (_busy) { <span class="spinner"></span> } else { <Icon Name="upgrade" /> }Look for @(scope.Kind == FormatScopeKind.Track ? "an upgrade" : "upgrades")
-                        </button>
-                    }
+                    <button type="button" role="menuitem" disabled="@_busy" @onclick="() => UpgradeAsync(scope)">
+                        @if (_busy) { <span class="spinner"></span> } else { <Icon Name="upgrade" /> }Look for @(scope.Kind == FormatScopeKind.Track ? "an upgrade" : "upgrades")
+                    </button>
                 }
             }
             @if (OnDelete.HasDelegate)
             {
                 <button type="button" role="menuitem" class="menu-danger" @onclick="() => Do(() => OnDelete.InvokeAsync())"><Icon Name="discard" />Delete now</button>
-            }
-            @if (_note is { } note)
-            {
-                <div class="menu-note muted small">@note</div>
-            }
-            @if (_upgrade is { } said)
-            {
-                <div class="menu-note muted small">@said</div>
             }
             @if (OnMove.HasDelegate)
             {
@@ -204,7 +194,6 @@
     [Parameter] public string? Class { get; set; }
 
     private bool _open, _adding, _busy;
-    private string? _upgrade, _note;
 
     private IReadOnlyList<PlayerEntry>? Playing => Entries ?? (Entry is null ? null : [Entry]);
 
@@ -216,7 +205,6 @@
         if (!_open && (Wish is not null || ListenTrackId is not null || AlbumId is not null))
             await Wishlist.EnsureLoadedAsync();
         _open = !_open;
-        _upgrade = _note = null;
     }
 
     private async Task WishAsync((RequestKind Kind, Guid Id) wish, bool add)
@@ -228,19 +216,30 @@
                 await Wishlist.AddAsync(wish.Kind, wish.Id, EditionId);
             else
                 await Wishlist.RemoveAsync(wish.Id);
-            _note = add ? "On your wishlist: it's under Library → Wishlist." : "Taken off your wishlist.";
+            Say(new Notice($"wish:{wish.Id}", NoticeKind.Action, Name is "" ? (add ? "On your wishlist" : "Taken off your wishlist") : Name,
+                add ? "On your wishlist, under Library → Wishlist" : "Taken off your wishlist", add ? "library/wishlist" : null, add ? "wished" : "wish", Cover));
         }
         catch (Exception e) when (e is HttpRequestException or MelodexApiException)
         {
-            _note = e.Message;
+            Failed($"wish:{wish.Id}", add ? "Couldn't add it to your wishlist" : "Couldn't take it off your wishlist", e.Message);
         }
         finally
         {
             _busy = false;
+            _open = false;
         }
     }
 
     private void Close() => _open = false;
+
+    // What the menu's about: its cover, for its notifications.
+    private string? Cover => Playing?.FirstOrDefault()?.CoverUrl;
+
+    private void Say(Notice notice, bool always = false) => Notices.Show(notice, always);
+
+    // Something done here went wrong: it's said whatever kinds are turned off.
+    private void Failed(string key, string title, string why) =>
+        Notices.Show(new Notice(key, NoticeKind.Action, title, why, Icon: "attention", Failed: true), always: true);
 
     private void Key(KeyboardEventArgs e)
     {
@@ -265,16 +264,19 @@
         _busy = true;
         try
         {
-            await Tracker.CreateAsync(new CreateRequest(Get!.Value.Kind, Get.Value.Id, EditionId));
-            _note = "Asked for: it's in Activity.";
+            var asked = await Tracker.CreateAsync(new CreateRequest(Get!.Value.Kind, Get.Value.Id, EditionId));
+            // Another says when it's finished.
+            Say(new Notice($"asked:{asked.Id}", NoticeKind.Download, asked.Title, "Asked for: follow it in Activity",
+                $"activity/downloads?open={asked.Id}", "get", asked.Target?.CoverUrl ?? Cover));
         }
-        catch (MelodexApiException e)
+        catch (Exception e) when (e is HttpRequestException or MelodexApiException)
         {
-            _note = e.Message;
+            Failed($"asked:{Get!.Value.Id}", "Couldn't ask for it", e.Message);
         }
         finally
         {
             _busy = false;
+            _open = false;
         }
     }
 
@@ -283,21 +285,35 @@
         _busy = true;
         try
         {
-            var found = await Api.SearchUpgradesAsync(scope);
-            _upgrade = found switch
+            // Only the upgrades this starts get the notification when they're finished.
+            var (found, asked) = await Tracker.WatchNewAsync(() => Api.SearchUpgradesAsync(scope), r => r.Upgrade);
+            var one = scope.Kind == FormatScopeKind.Track;
+            var key = $"upgrade:{scope.Kind}:{scope.Id}";
+            if (found.Upgradable == 0)
+                Say(new Notice(key, NoticeKind.Action, one ? "Nothing better to look for" : "Every song is at its cutoff",
+                    one ? "It's at its cutoff already" : "So there's nothing better to look for", Icon: "upgrade", Art: Cover), always: true);
+            else if (found.Queued == 0)
             {
-                { Upgradable: 0 } => scope.Kind == FormatScopeKind.Track ? "It's at its cutoff already, so there's nothing better to look for." : "Every song is at its cutoff already.",
-                { Queued: 0 } => "Better copies are being looked for already.",
-                _ => scope.Kind == FormatScopeKind.Track ? "Looking for a better copy: it's in Activity." : $"Looking for better copies of {found.Queued}: they're in Activity.",
-            };
+                // To the one already going, for a song.
+                var going = one ? Tracker.Requests.FirstOrDefault(r => r.Upgrade && r.Active && r.TargetId == scope.Id) : null;
+                Say(new Notice(key, NoticeKind.Action, "Better copies are being looked for already", "Follow them in Activity",
+                    going is not null ? $"activity/downloads?open={going.Id}" : "activity/downloads", "upgrade", Cover), always: true);
+            }
+            else
+            {
+                // Another says when they're finished.
+                Say(new Notice(key, NoticeKind.Action, one ? "Looking for a better copy" : $"Looking for better copies of {Format.Count(found.Queued, "song", "songs")}",
+                    "Follow it in Activity", asked.Count > 0 ? $"activity/downloads?open={asked[0].Id}" : "activity/downloads", "upgrade", Cover));
+            }
         }
         catch (Exception e) when (e is HttpRequestException or MelodexApiException)
         {
-            _upgrade = e.Message;
+            Failed($"upgrade:{scope.Kind}:{scope.Id}", "Couldn't look for an upgrade", e.Message);
         }
         finally
         {
             _busy = false;
+            _open = false;
         }
     }
 }

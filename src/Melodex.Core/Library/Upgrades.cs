@@ -30,9 +30,6 @@ public sealed class Upgrades(
     /// <summary>Who scheduled upgrades are asked for by, on the Activity page.</summary>
     public const string ScheduledRequester = "Scheduled upgrades";
 
-    /// <summary>The most a look through the whole library by hand asks for.</summary>
-    public const int MostByHand = 500;
-
     // Upgrades go after anything asked for by hand, made before or after them: they're never in a hurry.
     private const double Later = 1e10;
 
@@ -155,45 +152,99 @@ public sealed class Upgrades(
     }
 
     /// <summary>
-    /// The scheduled look through the whole library, run every minute. While a window is open it keeps as many upgrades
-    /// going as fetches run at once, asking for more as they finish, until it's asked for as many as a look may, there
-    /// are none left, or the window closes; then those not started yet are cancelled. Returns how many it asked for.
+    /// Keeps a run through the whole library going, run every few seconds: a window that opens starts one, unless one's
+    /// going already or this window's has been. While a run goes it keeps as many upgrades going as the settings say,
+    /// asking for the next as each finishes, until every upgradable song has been tried. One that started in a window
+    /// ends when the window closes, and those not started yet are cancelled. Returns how many it asked for.
     /// </summary>
     public async Task<int> RunScheduledAsync(DateTime utcNow, CancellationToken ct)
     {
         var upgrades = await settings.GetUpgradesAsync(ct);
         var run = await settings.GetUpgradeRunAsync(ct);
         var window = upgrades.Scheduled ? UpgradeWindows.Current(upgrades, utcNow) : null;
-        if (window is not { } open)
+        if (window is { } open && !run.Going && run.Window != open.Start)
+            run = new UpgradeRun { Window = open.Start, StartedAt = utcNow };
+        else if (!run.Going)
+            return 0;
+        if (run.Window is { } started && window?.Start != started)
         {
-            if (run.Window is not null && !run.Closed)
-            {
-                var cancelled = await db.Requests.Where(r => r.Requester == ScheduledRequester && r.Status == RequestStatus.Queued)
-                    .ExecuteUpdateAsync(u => u.SetProperty(r => r.Status, RequestStatus.Cancelled)
-                        .SetProperty(r => r.Detail, "Not started before the upgrade window closed").SetProperty(r => r.UpdatedAt, utcNow), ct);
-                await settings.SaveUpgradeRunAsync(run with { Closed = true }, ct);
-                logger.LogInformation("The upgrade window closed, having asked for {Asked} upgrades ({Cancelled} not started)", run.Asked, cancelled);
-            }
+            await EndAsync(run, false, utcNow, ct);
             return 0;
         }
-        if (run.Window != open.Start)
-            run = new UpgradeRun { Window = open.Start };
-        if (run.Done)
-            return 0;
+        var (queued, _) = await TopUpAsync(run, upgrades, ct);
+        return queued;
+    }
 
-        var active = await db.Requests.CountAsync(r => r.Requester == ScheduledRequester && !RequestService.Finished.Contains(r.Status), ct);
-        var slots = Math.Clamp((await settings.GetFetchAsync(ct)).ParallelFetches, 1, 8) - active;
-        var take = upgrades.PerRun is { } most ? Math.Min(slots, Math.Clamp(most, 1, 500) - run.Asked) : slots;
-        var queued = 0;
-        if (upgrades.PerRun is { } limit && run.Asked >= Math.Clamp(limit, 1, 500))
-            run = run with { Done = true };
-        else if (take > 0)
+    /// <summary>
+    /// Upgrade now: starts a run through the whole library by hand, which ends with the scheduled window if it starts in
+    /// one. While a run's going already, it carries on as it is.
+    /// </summary>
+    public async Task<UpgradeSearch> StartAsync(string requester, DateTime utcNow, CancellationToken ct)
+    {
+        var upgrades = await settings.GetUpgradesAsync(ct);
+        var run = await settings.GetUpgradeRunAsync(ct);
+        if (!run.Going)
+            run = new UpgradeRun
+            {
+                ByHand = true, Requester = requester, StartedAt = utcNow,
+                Window = upgrades.Scheduled ? UpgradeWindows.Current(upgrades, utcNow)?.Start : null,
+            };
+        var (queued, upgradable) = await TopUpAsync(run, upgrades, ct);
+        return new UpgradeSearch(upgradable, queued);
+    }
+
+    /// <summary>Stops the run that's going: those not started yet are cancelled. False if none is.</summary>
+    public async Task<bool> StopAsync(CancellationToken ct)
+    {
+        var run = await settings.GetUpgradeRunAsync(ct);
+        if (!run.Going)
+            return false;
+        await EndAsync(run, true, DateTime.UtcNow, ct);
+        return true;
+    }
+
+    /// <summary>Whether the run going has room for more upgrades, so it's worth topping up before the next minute.</summary>
+    public async Task<bool> WantsMoreAsync(CancellationToken ct)
+    {
+        var run = await settings.GetUpgradeRunAsync(ct);
+        return run.Going && await GoingAsync(ct) < AtATime(await settings.GetUpgradesAsync(ct));
+    }
+
+    private static int AtATime(UpgradeSettings upgrades) => Math.Clamp(upgrades.AtATime, 1, UpgradeSettings.MostAtATime);
+
+    // Upgrades not finished, whoever asked: each takes a place.
+    private Task<int> GoingAsync(CancellationToken ct) =>
+        db.Requests.CountAsync(r => r.UpgradesFileId != null && !r.Replace && r.Mode == RequestMode.Permanent && !RequestService.Finished.Contains(r.Status), ct);
+
+    // Asks for upgrades into the places free, and saves the run; it's done once there's nothing left to try or going.
+    private async Task<(int Queued, int Upgradable)> TopUpAsync(UpgradeRun run, UpgradeSettings upgrades, CancellationToken ct)
+    {
+        var going = await GoingAsync(ct);
+        var places = AtATime(upgrades) - going;
+        var found = new UpgradeSearch(0, 0);
+        if (places > 0)
         {
-            queued = (await SearchAsync(new FormatScope(FormatScopeKind.Library), take, ScheduledRequester, ct, lookedBefore: open.Start)).Queued;
-            run = run with { Asked = run.Asked + queued, Done = queued == 0 && active == 0 };
+            found = await SearchAsync(new FormatScope(FormatScopeKind.Library), places, run.Requester, ct, lookedBefore: run.Began);
+            run = run with { Asked = run.Asked + found.Queued, Done = found.Queued == 0 && going == 0 };
+            if (run.Done)
+                logger.LogInformation("The look for upgrades is done, having asked for {Asked}", run.Asked);
         }
         await settings.SaveUpgradeRunAsync(run, ct);
-        return queued;
+        return (found.Queued, found.Upgradable);
+    }
+
+    // Ends a run, its window closed or stopped, cancelling those it asked for that haven't started.
+    private async Task EndAsync(UpgradeRun run, bool stopped, DateTime utcNow, CancellationToken ct)
+    {
+        var why = stopped ? "Not started before the look for upgrades was stopped" : "Not started before the upgrade window closed";
+        var began = run.Began;
+        var cancelled = await db.Requests
+            .Where(r => r.Requester == run.Requester && r.UpgradesFileId != null && !r.Replace && r.Status == RequestStatus.Queued && r.CreatedAt >= began)
+            .ExecuteUpdateAsync(u => u.SetProperty(r => r.Status, RequestStatus.Cancelled)
+                .SetProperty(r => r.Detail, why).SetProperty(r => r.UpdatedAt, utcNow), ct);
+        await settings.SaveUpgradeRunAsync(run with { Closed = true, Stopped = stopped }, ct);
+        logger.LogInformation(stopped ? "The look for upgrades was stopped, having asked for {Asked} ({Cancelled} not started)"
+            : "The upgrade window closed, having asked for {Asked} upgrades ({Cancelled} not started)", run.Asked, cancelled);
     }
 
     public async Task<UpgradeStatus> StatusAsync(CancellationToken ct)
@@ -201,10 +252,21 @@ public sealed class Upgrades(
         var upgrades = await settings.GetUpgradesAsync(ct);
         var now = DateTime.UtcNow;
         var run = await settings.GetUpgradeRunAsync(ct);
-        var running = upgrades.Scheduled && UpgradeWindows.Current(upgrades, now) is { } open && !(run.Window == open.Start && run.Done);
         DateTime? next = upgrades.Scheduled ? UpgradeWindows.Next(upgrades, now) : null;
         var upgradable = await UpgradableAsync(db.LibraryFiles, ct);
-        return new UpgradeStatus(upgrades, await WarningAsync(ct), next, upgradable.Count, await HeldAsync(null, ct), running);
+        var going = await RunAsync(ct);
+        return new UpgradeStatus(upgrades, await WarningAsync(ct), next, upgradable.Count, await HeldAsync(null, ct), going is not null, going);
+    }
+
+    /// <summary>The look through the library that's going, if one is.</summary>
+    public async Task<UpgradeRunInfo?> RunAsync(CancellationToken ct)
+    {
+        var run = await settings.GetUpgradeRunAsync(ct);
+        if (!run.Going)
+            return null;
+        var upgrades = await settings.GetUpgradesAsync(ct);
+        return new UpgradeRunInfo(run.ByHand, run.Requester, run.Began, run.Asked, await GoingAsync(ct),
+            run.Window is not null ? UpgradeWindows.Current(upgrades, DateTime.UtcNow)?.End : null);
     }
 
     /// <summary>Files held after an upgrade, newest first, of one song or all.</summary>
@@ -403,22 +465,33 @@ public sealed class Upgrades(
     }
 }
 
-/// <summary>Looks through the library for upgrades in their window, when that's on, and deletes held files whose time is up.</summary>
+/// <summary>
+/// Looks through the library for upgrades in their window, when that's on, and deletes held files whose time is up, every
+/// minute; in between, a run that's going gets the next upgrade as soon as one finishes.
+/// </summary>
 public sealed class UpgradeScheduler(IServiceScopeFactory scopes, ILogger<UpgradeScheduler> logger) : BackgroundService
 {
     public static readonly TimeSpan Interval = TimeSpan.FromMinutes(1);
+    public static readonly TimeSpan TopUp = TimeSpan.FromSeconds(5);
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        using var timer = new PeriodicTimer(Interval);
+        using var timer = new PeriodicTimer(TopUp);
+        var full = DateTime.MinValue;
         do
         {
             try
             {
                 using var scope = scopes.CreateScope();
                 var upgrades = scope.ServiceProvider.GetRequiredService<Upgrades>();
-                await upgrades.SweepAsync(stoppingToken);
-                await upgrades.RunScheduledAsync(DateTime.UtcNow, stoppingToken);
+                if (DateTime.UtcNow >= full)
+                {
+                    full = DateTime.UtcNow + Interval;
+                    await upgrades.SweepAsync(stoppingToken);
+                    await upgrades.RunScheduledAsync(DateTime.UtcNow, stoppingToken);
+                }
+                else if (await upgrades.WantsMoreAsync(stoppingToken))
+                    await upgrades.RunScheduledAsync(DateTime.UtcNow, stoppingToken);
             }
             catch (Exception e) when (e is not OperationCanceledException)
             {

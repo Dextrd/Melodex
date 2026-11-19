@@ -10,15 +10,12 @@ using Melodex.Core.Tasks;
 namespace Melodex.Core.Library;
 
 /// <summary>
-/// Scans the music folder, matches new and changed files, then fills in the catalogue for every library artist:
-/// their discography and the editions of each album the missing view might show, which reveals bootleg-only albums
-/// and albums covered by tracks owned elsewhere. Then, if the settings say so, it queues finding lyrics for songs
-/// without them, and making the visualiser's bars for them.
+/// Scans the music folder and matches new and changed files. Then, if the settings say so, it queues a catalogue update,
+/// finding lyrics for songs without them, and making the visualiser's bars for them.
 /// </summary>
 public sealed class LibraryScanTask(
     LibraryScanner scanner,
     LibraryMatcher matcher,
-    CatalogueRefresher refresher,
     LibraryReading reading,
     ScanFeed feed,
     LyricsFinder lyrics,
@@ -57,9 +54,7 @@ public sealed class LibraryScanTask(
             match = await matcher.MatchPendingAsync(progress, ct);
         }
 
-        var artists = await db.Artists.Where(a => a.InLibrary).Select(a => a.Id).ToListAsync(ct);
-        var failures = await refresher.RefreshArtistsAsync(artists, progress, ct);
-        // A scan can add a lot to the catalogue, which changes how best to read it.
+        // A scan can add a lot to the library, which changes how best to read it.
         await db.OptimiseAsync(ct);
         var notes = new List<string>();
         if (scan.SkippedFolders > 0)
@@ -72,11 +67,12 @@ public sealed class LibraryScanTask(
             notes.Add(Count(match.NoCatalogue, "file", "files") + " shown as their tags say, as no catalogue is set up");
         if (match.StillDeferred > 0)
             notes.Add(Count(match.StillDeferred, "deferred file", "deferred files") + " still not a confident match");
-        if (failures > 0)
-            notes.Add(Count(failures, "catalogue update", "catalogue updates") + " failed and will be retried next scan");
         progress.Report($"{scan.Files} files: {match.Matched} newly matched, {match.Review} to review" + string.Concat(notes.Select(n => "; " + n)));
 
-        if ((await settings.GetLibraryAsync(ct)).FetchLyrics && await lyrics.HaveSourcesAsync(ct) && await lyrics.Wanting().AnyAsync(ct))
+        var library = await settings.GetLibraryAsync(ct);
+        if (library.UpdateCatalogueAfterScan)
+            await queue.EnqueueAsync(CatalogueUpdateTask.TaskKind, null, ct);
+        if (library.FetchLyrics && await lyrics.HaveSourcesAsync(ct) && await lyrics.Wanting().AnyAsync(ct))
             await queue.EnqueueAsync(LyricsTask.TaskKind, null, ct);
         // While they're made when matching, new songs get the visualiser's bars.
         if ((await settings.GetPlaybackAsync(ct)).Visualiser == VisualiserBars.WhenMatching)
@@ -115,6 +111,29 @@ public sealed class LibraryScanTask(
     }
 }
 
+/// <summary>
+/// Fills in the catalogue for every library artist: their discography and the editions of each album the missing view
+/// might show, which reveals bootleg-only albums and albums covered by tracks owned elsewhere. Queued after each scan if
+/// the settings say so, or from the Scan menu.
+/// </summary>
+public sealed class CatalogueUpdateTask(CatalogueRefresher refresher, TaskFeed feed, MelodexDbContext db) : ITaskHandler
+{
+    public const string TaskKind = "catalogue-update";
+    public const string Title = "Catalogue update";
+
+    public string Kind => TaskKind;
+
+    public async Task RunAsync(BackgroundTask task, IProgress<string> progress, CancellationToken ct)
+    {
+        var artists = await db.Artists.Where(a => a.InLibrary).OrderBy(a => a.SortName ?? a.Name).Select(a => a.Id).ToListAsync(ct);
+        var failures = await refresher.RefreshArtistsAsync(artists, progress, ct, feed.Start(task));
+        // An update can add a lot to the catalogue, which changes how best to read it.
+        await db.OptimiseAsync(ct);
+        progress.Report(LibraryMatcher.Plural(artists.Count, "artist", "artists") + " updated"
+                        + (failures > 0 ? $"; {LibraryMatcher.Plural(failures, "lookup", "lookups")} failed and will be tried again next update" : ""));
+    }
+}
+
 /// <summary>Fills in one artist's catalogue after their page is opened, so non-library artists get full statuses.</summary>
 public sealed class ArtistRefreshTask(CatalogueRefresher refresher, TaskFeed feed) : ITaskHandler
 {
@@ -131,7 +150,7 @@ public sealed class ArtistRefreshTask(CatalogueRefresher refresher, TaskFeed fee
 /// <summary>
 /// Fills in the catalogue for library artists: discographies, then editions of the albums the missing view shows (editions
 /// say whether an album has an official release). An artist or album the source is too busy for goes to the back of its
-/// queue, up to the attempts the settings allow; after that it stays stale for the next scan. Nothing fails the scan.
+/// queue, up to the attempts the settings allow; after that it stays stale for the next update. Nothing fails the update.
 /// </summary>
 public sealed class CatalogueRefresher(
     MelodexDbContext db,
@@ -172,7 +191,7 @@ public sealed class CatalogueRefresher(
                 case Outcome.Busy or Outcome.Failed:
                     done++;
                     failures++;
-                    rows?.Put(next.Id.ToString(), TaskRowState.Failed, name, null, "Couldn't be looked up; tried again next scan", href, LibraryView.ArtistImageUrl(next.Id));
+                    rows?.Put(next.Id.ToString(), TaskRowState.Failed, name, null, "Couldn't be looked up; tried again next update", href, LibraryView.ArtistImageUrl(next.Id));
                     continue;
             }
 
@@ -214,7 +233,7 @@ public sealed class CatalogueRefresher(
             rows?.Put(next.Id.ToString(), albumFailures > 0 ? TaskRowState.Failed : changes is null && total == 0 ? TaskRowState.Skipped : TaskRowState.Done,
                 name, changes,
                 (total == 0 ? "Up to date" : $"{LibraryMatcher.Plural(total, "album", "albums")} checked")
-                + (albumFailures > 0 ? $"; {albumFailures} couldn't be looked up, tried again next scan" : ""), href, LibraryView.ArtistImageUrl(next.Id));
+                + (albumFailures > 0 ? $"; {albumFailures} couldn't be looked up, tried again next update" : ""), href, LibraryView.ArtistImageUrl(next.Id));
             if (total == 0)
                 logger.LogInformation("[{Done}/{Total} artists] The catalogue for {Artist} is up to date", done, artistIds.Count, name);
             else
@@ -249,14 +268,14 @@ public sealed class CatalogueRefresher(
             db.ChangeTracker.Clear();
             if (!LibraryMatcher.IsUnavailable(e, ct))
             {
-                logger.LogWarning(e, "Couldn't update {What}; it will be tried again on the next scan", what);
+                logger.LogWarning(e, "Couldn't update {What}; it will be tried again on the next update", what);
                 return Outcome.Failed;
             }
             if (attempt < attempts)
                 logger.LogWarning("The catalogue source is busy; {What} goes to the back of the queue (attempt {Attempt} of {Attempts}): {Reason}",
                     what, attempt, attempts, e.Message);
             else
-                logger.LogWarning("Gave up on {What} for this scan after {Attempts}; the next scan tries again: {Reason}",
+                logger.LogWarning("Gave up on {What} for this update after {Attempts}; the next update tries again: {Reason}",
                     what, LibraryMatcher.Plural(attempts, "attempt", "attempts"), e.Message);
             await backoff.UnavailableAsync(progress, status, ct);
             return Outcome.Busy;

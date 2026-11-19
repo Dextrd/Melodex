@@ -80,6 +80,7 @@ public sealed class RequestFixture : IAsyncLifetime
         }
         if (task.State != TaskState.Succeeded)
             throw new InvalidOperationException($"The scan failed: {task.Error}");
+        await Api.WaitForCatalogueAsync();
 
         var albums = new List<AlbumSummary>();
         foreach (var artist in await Api.GetLibraryArtistsAsync())
@@ -788,6 +789,56 @@ public sealed class RequestTests(RequestFixture fixture, ITestOutputHelper outpu
     }
 
     [TestLibraryFact]
+    public async Task A_look_through_the_library_keeps_a_few_upgrades_going_until_its_stopped()
+    {
+        var saved = (await Api.GetUpgradesAsync()).Settings;
+        var started = DateTime.UtcNow;
+        try
+        {
+            await Api.SaveUpgradeSettingsAsync(saved with { Scheduled = false, AtATime = 2 });
+            var found = await Api.SearchUpgradesAsync(new FormatScope(FormatScopeKind.Library));
+            Assert.Equal(2, found.Queued);
+            Assert.True(found.Upgradable > 3, $"{found.Upgradable} upgradable");
+            var run = await Api.GetUpgradeRunAsync();
+            Assert.NotNull(run);
+            Assert.True(run.ByHand);
+            Assert.Null(run.Until);
+
+            // With nothing to fetch from, each fails at once, and the next is asked for in its place: never more than two
+            // at a time, and no limit to how many.
+            var deadline = DateTime.UtcNow + TimeSpan.FromMinutes(1);
+            while (run is { Asked: <= 3 } && DateTime.UtcNow < deadline)
+            {
+                Assert.True(run.Going <= 2, $"{run.Going} going");
+                await Task.Delay(250);
+                run = await Api.GetUpgradeRunAsync();
+            }
+            Assert.True(run?.Asked > 3, $"Asked for {run?.Asked}");
+
+            // Stopped, it asks for no more, and those not started are cancelled.
+            Assert.True(await Api.StopUpgradesAsync());
+            Assert.Null(await Api.GetUpgradeRunAsync());
+            Assert.False(await Api.StopUpgradesAsync());
+            using var scope = fixture.Factory.Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<MelodexDbContext>();
+            Assert.False(await db.Requests.AnyAsync(r => r.UpgradesFileId != null && r.CreatedAt >= started && r.Status == Melodex.Core.Data.RequestStatus.Queued));
+            var asked = await db.Requests.CountAsync(r => r.UpgradesFileId != null && r.CreatedAt >= started);
+            await Task.Delay(TimeSpan.FromSeconds(6));
+            Assert.Equal(asked, await db.Requests.CountAsync(r => r.UpgradesFileId != null && r.CreatedAt >= started));
+        }
+        finally
+        {
+            await Api.StopUpgradesAsync();
+            await Api.SaveUpgradeSettingsAsync(saved);
+            using var scope = fixture.Factory.Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<MelodexDbContext>();
+            await fixture.SettleRequestsAsync();
+            db.Requests.RemoveRange(await db.Requests.Where(r => r.UpgradesFileId != null && r.CreatedAt >= started).ToListAsync());
+            await db.SaveChangesAsync();
+        }
+    }
+
+    [TestLibraryFact]
     public async Task An_owned_mp3_is_upgraded_in_its_place_its_old_file_held_and_put_back()
     {
         await fixture.AddSourceAsync(new FakeSource("better") { Candidates = 1, BitrateKbps = null, FileName = "better.wav" });
@@ -988,34 +1039,38 @@ public sealed class RequestTests(RequestFixture fixture, ITestOutputHelper outpu
         Assert.StartsWith("No media server is connected", status.Warning);
         Assert.True(status.Settings.Scheduled);
         Assert.Equal([DayOfWeek.Monday], status.Settings.Days);
-        Assert.Equal((25, OldFiles.Hold, 14), (status.Settings.PerRun, status.Settings.OldFiles, status.Settings.HoldDays));
+        Assert.Equal((5, OldFiles.Hold, 14), (status.Settings.AtATime, status.Settings.OldFiles, status.Settings.HoldDays));
+        Assert.Null(status.Settings.PerRun);
         Assert.NotNull(status.NextRun);
     }
 
     [TestLibraryFact]
-    public async Task Scheduled_upgrades_ask_for_no_more_than_the_limit_and_stop_when_the_window_closes()
+    public async Task Scheduled_upgrades_keep_a_few_going_and_stop_when_the_window_closes()
     {
         var before = await Api.GetUpgradesAsync();
         var now = DateTime.UtcNow;
-        // All of today, in UTC.
+        // All of today, in UTC, one at a time.
         await Api.SaveUpgradeSettingsAsync(before.Settings with
         {
-            Days = [now.DayOfWeek], From = new(0, 0), Until = new(0, 0), TimeZone = "UTC", PerRun = 1
+            Days = [now.DayOfWeek], From = new(0, 0), Until = new(0, 0), TimeZone = "UTC", AtATime = 1,
         });
         using var scope = fixture.Factory.Services.CreateScope();
         var upgrades = scope.ServiceProvider.GetRequiredService<Upgrades>();
         var db = scope.ServiceProvider.GetRequiredService<Melodex.Core.Data.MelodexDbContext>();
         try
         {
-            Assert.True((await Api.GetUpgradesAsync()).Running);
-            Assert.Equal(1, await upgrades.RunScheduledAsync(now, default));
-            Assert.Equal(0, await upgrades.RunScheduledAsync(now.AddMinutes(1), default));
-            await Api.SaveUpgradeSettingsAsync((await Api.GetUpgradesAsync()).Settings with { PerRun = null });
-            Assert.Null((await Api.GetUpgradesAsync()).Settings.PerRun);
+            // The window's open, so a look starts (here, or by the scheduler first), and keeps one going at most.
+            await upgrades.RunScheduledAsync(now, default);
+            var status = await Api.GetUpgradesAsync();
+            Assert.True(status.Running);
+            Assert.Equal((false, Upgrades.ScheduledRequester), (status.Run!.ByHand, status.Run.Requester));
+            Assert.NotNull(status.Run.Until);
+            Assert.True(await db.Requests.CountAsync(r => r.Requester == Upgrades.ScheduledRequester && !RequestService.Finished.Contains(r.Status)) <= 1);
 
             // Two days on, the window has closed: nothing more is asked for, and any not started never will be.
             Assert.Equal(0, await upgrades.RunScheduledAsync(now.AddDays(2), default));
             Assert.False(await db.Requests.AnyAsync(r => r.Requester == Upgrades.ScheduledRequester && r.Status == Melodex.Core.Data.RequestStatus.Queued));
+            Assert.False((await Api.GetUpgradesAsync()).Running);
         }
         finally
         {

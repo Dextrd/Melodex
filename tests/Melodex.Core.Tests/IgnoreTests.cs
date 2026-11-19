@@ -45,6 +45,7 @@ public sealed class IgnoreTests : IDisposable
             task = (await _api.GetTaskAsync(task.Id))!;
         }
         Assert.True(task.State == TaskState.Succeeded, task.Error);
+        await _api.WaitForCatalogueAsync();
 
         var partial = await FindAsync(a => a.Status == AlbumStatus.Partial);
         Assert.NotNull(partial);

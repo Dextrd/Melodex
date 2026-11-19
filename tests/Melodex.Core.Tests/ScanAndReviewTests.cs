@@ -1,3 +1,5 @@
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Melodex.Client;
 using Melodex.Core.Tests.Support;
 
@@ -223,6 +225,41 @@ public sealed class ScanAndReviewTests(RequestFixture fixture)
         Assert.Null(await Api.GetLocalAlbumAsync(album.Id));
     }
 
+    [TestLibraryFact]
+    public async Task A_deferred_file_is_in_the_library_as_its_tags_say_until_its_matched()
+    {
+        var path = await CopyAsync("Deferred Music/Copy", withArtwork: false);
+        var file = await FileAsync(path);
+        // A copy of a song the library has is matched confidently; this one is left unmatched, as one deferred from review is.
+        using (var scope = fixture.Factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<Melodex.Core.Data.MelodexDbContext>();
+            await db.LibraryFiles.Where(f => f.Id == file).ExecuteUpdateAsync(u => u
+                .SetProperty(f => f.TrackId, (Guid?)null).SetProperty(f => f.EditionId, (Guid?)null)
+                .SetProperty(f => f.DeferredAt, DateTime.UtcNow).SetProperty(f => f.MatchMethod, Melodex.Core.Data.MatchMethod.Unmatched));
+        }
+        try
+        {
+            // Under the artist and album its tags name, as an excluded file is.
+            var album = await EventuallyAsync(async () => (await Api.GetLibraryAlbumsAsync()).FirstOrDefault(a => a.Album.Local)?.Album);
+            Assert.Equal(("Dummy", "Portishead"), (album.Title, album.ArtistCredit));
+            Assert.Equal(path, Assert.Single((await Api.GetLocalAlbumAsync(album.Id))!.Tracks).Path);
+
+            // Matched, it's the catalogue's song, and the album of its own goes.
+            var dummy = await fixture.AlbumAsync("Portishead", "Dummy");
+            var trackId = (await Api.GetAlbumAsync(dummy.Id))!.Tracks.First().TrackId;
+            await Api.MatchFileAsync(file, new MatchFile(trackId));
+            for (var i = 0; i < 50 && await Api.GetLocalAlbumAsync(album.Id) is not null; i++)
+                await Task.Delay(100);
+            Assert.Null(await Api.GetLocalAlbumAsync(album.Id));
+        }
+        finally
+        {
+            Directory.Delete(Path.Combine(fixture.Music, "Deferred Music"), recursive: true);
+            await ScanAsync();
+        }
+    }
+
     private static async Task<T> EventuallyAsync<T>(Func<Task<T?>> find) where T : class
     {
         for (var i = 0; i < 50; i++)
@@ -318,6 +355,7 @@ public sealed class ScanAndReviewTests(RequestFixture fixture)
             task = (await Api.GetTaskAsync(task.Id))!;
         }
         Assert.Equal(TaskState.Succeeded, task.State);
+        await Api.WaitForCatalogueAsync();
         return task;
     }
 }

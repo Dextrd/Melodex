@@ -305,7 +305,8 @@ else
         _replaceError = null;
         try
         {
-            await Api.ReplaceFileAsync(file.Id);
+            // A notification says when it's replaced.
+            Tracker.Watch(await Api.ReplaceFileAsync(file.Id));
             await Tracker.RefreshAsync();
         }
         catch (Exception e) when (e is HttpRequestException or MelodexApiException)
