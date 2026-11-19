@@ -5,7 +5,8 @@
 @*
     Puts songs in your playlists, or takes them out: a folder at a time, each playlist with its cover and a box, ticked
     when it has them all, half-ticked when it has some. Ticking and unticking are saved together. A new playlist or
-    folder is named in a dialog of its own, then shown here: the playlist ticked, the folder opened.
+    folder is named in a dialog of its own, in the folder open to begin with, then shown here: the playlist ticked, the
+    folder opened. A folder made here is kept even while it's empty.
 *@
 @if (_naming is { } naming)
 {
@@ -15,13 +16,9 @@
             <label class="field-label" for="playlist-name">Name</label>
             <input id="playlist-name" type="text" @bind="_name" @bind:event="oninput" @onkeydown="EnterAsync" />
             <span class="muted small">
-                @if (folder)
+                @if (Delimiter.Length > 0)
                 {
-                    @(_path.Length > 0 ? $"In {string.Join(" › ", Parts(_path))}. " : "")@("It's kept once a playlist is made in it.")
-                }
-                else if (Delimiter.Length > 0)
-                {
-                    @($"Put it in folders with {Delimiter}, as in Moods{Delimiter}Calm.")
+                    @($"Put it in {(folder ? "other folders" : "folders")} with {Delimiter}, as in Moods{Delimiter}Calm.")
                 }
             </span>
         </div>
@@ -75,6 +72,7 @@ else
                     {
                         <li @key="path">
                             <button class="plain picker-row" @onclick="() => _path = path">
+                                <svg viewBox="0 0 24 24" class="chevron" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>
                                 @if (_folderCovers.GetValueOrDefault(path) is { } url) { <Cover Url="@url" /> }
                                 else
                                 {
@@ -86,7 +84,6 @@ else
                                     <span class="ellipsis">@name</span>
                                     <span class="muted small ellipsis">Folder · @(count == 0 ? "empty" : Format.Count(count, "playlist", "playlists"))</span>
                                 </span>
-                                <svg viewBox="0 0 24 24" class="chevron" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>
                             </button>
                         </li>
                     }
@@ -124,7 +121,7 @@ else
             <IconButton Icon="plus" Label="New playlist" Disabled="_busy || _playlists is null" Title="Make a playlist, in this folder" OnClick="() => StartNaming(Naming.Playlist)" />
             @if (Delimiter.Length > 0)
             {
-                <IconButton Icon="add" Label="New folder" Disabled="_busy || _playlists is null" Title="Make a folder in this one, to make a playlist in" OnClick="() => StartNaming(Naming.Folder)" />
+                <IconButton Icon="add" Label="New folder" Disabled="_busy || _playlists is null" Title="Make a folder, in this one" OnClick="() => StartNaming(Naming.Folder)" />
             }
             <span class="spacer"></span>
             <button disabled="@_busy" @onclick="OnClose">Cancel</button>
@@ -144,14 +141,16 @@ else
     private List<PlaylistSummary>? _playlists;
     private Dictionary<Guid, int> _has = [];
     private Dictionary<string, string> _folderCovers = [];
+
+    // Folders kept for themselves, so they're here even with nothing in them.
+    private HashSet<string> _keptFolders = [];
     private int _of;
 
     // What's been ticked (true) or unticked (false), by playlist; the rest stay as they are.
     private readonly Dictionary<Guid, bool> _wanted = [];
 
-    // The folder open, "" for the top; and folders made here that have no playlist yet.
+    // The folder open, "" for the top.
     private string _path = "";
-    private readonly HashSet<string> _madeFolders = [];
 
     private Naming? _naming;
     private string _name = "";
@@ -180,7 +179,7 @@ else
         if (Delimiter.Length == 0)
             return [];
         var depth = Parts(_path).Count;
-        var paths = _playlists!.Select(FolderOf).Where(f => f.Length > 0).Concat(_madeFolders)
+        var paths = _playlists!.Select(FolderOf).Where(f => f.Length > 0).Concat(_keptFolders)
             .Where(f => IsWithin(f, _path, Delimiter) && Parts(f).Count > depth)
             .Select(f => string.Join(Delimiter, Parts(f).Take(depth + 1)))
             .Distinct();
@@ -199,7 +198,9 @@ else
             var held = await holding;
             _has = held.ToDictionary(h => h.PlaylistId, h => h.Has);
             _of = held.FirstOrDefault()?.Of ?? Songs.Count;
-            _folderCovers = (await folders).Where(f => f.CoverUrl is not null).ToDictionary(f => f.Path, f => f.CoverUrl!);
+            var kept = await folders;
+            _keptFolders = kept.Select(f => f.Path).ToHashSet();
+            _folderCovers = kept.Where(f => f.CoverUrl is not null).ToDictionary(f => f.Path, f => f.CoverUrl!);
         }
         catch (Exception e) when (e is HttpRequestException or MelodexApiException)
         {
@@ -228,12 +229,12 @@ else
             _wanted[id] = next;
     }
 
-    // A new playlist is named in the folder open; a new folder goes in it.
+    // A new playlist or folder is named in the folder open, as that's most likely where it's wanted.
     private void StartNaming(Naming naming)
     {
         _naming = naming;
         _error = null;
-        _name = naming == Naming.Playlist && _path.Length > 0 ? _path + Delimiter : "";
+        _name = _path.Length > 0 ? _path + Delimiter : "";
     }
 
     private Task EnterAsync(KeyboardEventArgs e) => e.Key == "Enter" ? NameAsync() : Task.CompletedTask;
@@ -243,22 +244,26 @@ else
         var name = _name.Trim();
         if (name.Length == 0)
             return;
-        if (_naming == Naming.Folder)
-        {
-            // Opened, to make a playlist in; it's only kept once one is.
-            var path = string.Join(Delimiter, Parts(_path).Concat(Parts(name).Select(p => p.Trim()).Where(p => p.Length > 0)));
-            _madeFolders.Add(path);
-            _path = path;
-            _naming = null;
-            return;
-        }
         await RunAsync(async () =>
         {
+            if (_naming == Naming.Folder)
+            {
+                // Kept, and opened to make a playlist in.
+                var path = string.Join(Delimiter, Parts(name).Select(p => p.Trim()).Where(p => p.Length > 0));
+                if (path.Length == 0)
+                    return;
+                var made = (await Api.CreatePlaylistFolderAsync(path)).Path;
+                _keptFolders.Add(made);
+                _path = made;
+                _filter = "";
+                _naming = null;
+                return;
+            }
             // Made empty and ticked, so it gets the songs with everything else on Save.
-            var made = await Api.CreatePlaylistAsync(new CreatePlaylist(name));
-            _playlists!.Add(made.Playlist);
-            _wanted[made.Playlist.Id] = true;
-            _path = FolderOf(made.Playlist);
+            var playlist = (await Api.CreatePlaylistAsync(new CreatePlaylist(name))).Playlist;
+            _playlists!.Add(playlist);
+            _wanted[playlist.Id] = true;
+            _path = FolderOf(playlist);
             _filter = "";
             _naming = null;
         });

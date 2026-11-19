@@ -287,11 +287,35 @@ public sealed class PlaylistTests : IDisposable
         Assert.Equal(Png(3), await picture.Content.ReadAsByteArrayAsync());
         Assert.Contains("immutable", picture.Headers.CacheControl!.ToString());
 
-        // Renamed, the picture goes with it; emptied, it goes.
+        // Renamed, the picture goes with it; taken away, the folder icon stands for it again, and the folder stays.
         await _api.RenamePlaylistFolderAsync(new RenamePlaylistFolder("Moods", "Feelings", "/"));
         Assert.Equal("Feelings/Calm", Assert.Single(await _api.GetPlaylistFoldersAsync()).Path);
         await _api.SetPlaylistFolderCoverAsync("Feelings/Calm", null);
+        Assert.Null(Assert.Single(await _api.GetPlaylistFoldersAsync()).CoverUrl);
+        await _api.DeletePlaylistFolderAsync("Feelings/Calm");
         Assert.Empty(await _api.GetPlaylistFoldersAsync());
+    }
+
+    [Fact]
+    public async Task Empty_folders_are_kept_until_removed()
+    {
+        var made = await _api.CreatePlaylistFolderAsync("Moods/Calm");
+        Assert.Null(made.CoverUrl);
+        Assert.Equal(made.Id, (await _api.CreatePlaylistFolderAsync("Moods/Calm")).Id);
+        await _api.CreatePlaylistFolderAsync("Feelings");
+        await _api.SetPlaylistFolderCoverAsync("Feelings", Convert.ToBase64String(Png(4)));
+
+        // Renamed onto a folder that's kept already, the two are one, with the picture.
+        await _api.RenamePlaylistFolderAsync(new RenamePlaylistFolder("Moods/Calm", "Feelings", "/"));
+        var kept = Assert.Single(await _api.GetPlaylistFoldersAsync());
+        Assert.Equal("Feelings", kept.Path);
+        Assert.NotNull(kept.CoverUrl);
+
+        // Removing it leaves the playlists in it as they are.
+        await _api.CreatePlaylistAsync(new CreatePlaylist("Feelings/Rain"));
+        await _api.DeletePlaylistFolderAsync("Feelings");
+        Assert.Empty(await _api.GetPlaylistFoldersAsync());
+        Assert.Equal("Feelings/Rain", Assert.Single(await _api.ListPlaylistsAsync()).Name);
     }
 
     [TestLibraryFact]

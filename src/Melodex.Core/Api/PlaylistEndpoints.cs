@@ -122,8 +122,18 @@ public static class PlaylistEndpoints
 
         playlists.MapGet("/folders", async (HttpContext http, PlaylistService service, CancellationToken ct) =>
                 Owner(http) is { } user ? Results.Ok(await service.FoldersAsync(user, ct)) : NoOwner())
-            .WithName("ListPlaylistFolders").WithSummary("Your folders of playlists that have pictures of their own. Folders are parts of playlists' names.")
+            .WithName("ListPlaylistFolders")
+            .WithSummary("Your folders of playlists kept for themselves: those made before anything was in them, and those with pictures of their own. "
+                         + "Other folders are only parts of playlists' names.")
             .Produces<IReadOnlyList<PlaylistFolderInfo>>();
+        playlists.MapPost("/folders", async (CreatePlaylistFolder body, HttpContext http, PlaylistService service, CancellationToken ct) =>
+                Owner(http) is { } user ? await Refusable(async () => Results.Ok(await service.CreateFolderAsync(user, body.Path, ct))) : NoOwner())
+            .WithName("CreatePlaylistFolder").WithSummary("Make a folder of playlists, kept even while it's empty. Making one that's there already changes nothing.")
+            .Produces<PlaylistFolderInfo>().ProducesValidationProblem();
+        playlists.MapDelete("/folders", async (string path, HttpContext http, PlaylistService service, CancellationToken ct) =>
+                Owner(http) is { } user ? await service.DeleteFolderAsync(user, path, ct) ? Results.NoContent() : Results.NotFound() : NoOwner())
+            .WithName("DeletePlaylistFolder").WithSummary("Forget a folder kept for itself, and its picture. The playlists in it are left as they are.")
+            .Produces(StatusCodes.Status204NoContent).Produces(StatusCodes.Status404NotFound);
         playlists.MapGet("/folders/{id:guid}/cover", async (Guid id, HttpContext http, PlaylistService service, CancellationToken ct) =>
                 Owner(http) is { } user
                     ? await service.FolderCoverAsync(user, id, ct) is { } cover ? Picture(http, cover) : Results.NotFound()
@@ -138,7 +148,7 @@ public static class PlaylistEndpoints
             .Produces<PlaylistFolderInfo>().ProducesValidationProblem();
         playlists.MapDelete("/folders/cover", async (string path, HttpContext http, PlaylistService service, CancellationToken ct) =>
                 Owner(http) is { } user ? await Refusable(async () => Results.Ok(await service.SetFolderCoverAsync(user, path, null, ct))) : NoOwner())
-            .WithName("RemovePlaylistFolderCover").WithSummary("Take a folder's picture away, so the folder icon stands for it again.")
+            .WithName("RemovePlaylistFolderCover").WithSummary("Take a folder's picture away, so the folder icon stands for it again. The folder stays.")
             .Produces<PlaylistFolderInfo>().ProducesValidationProblem();
 
         MapLogins(api);

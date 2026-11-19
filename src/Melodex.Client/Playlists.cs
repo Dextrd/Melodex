@@ -141,7 +141,11 @@ public sealed record MediaServerAccount(Guid ServerId, string Server, bool InUse
     public bool Linked => Username is not null;
 }
 
-/// <summary>A folder of playlists with a picture of its own.</summary>
+/// <summary>Body of <c>POST /playlists/folders</c>: a folder to make, kept even while it's empty.</summary>
+/// <param name="Path">The folder's whole name, its parents' too, joined by your separator.</param>
+public sealed record CreatePlaylistFolder(string Path);
+
+/// <summary>A folder of playlists kept for itself: made before anything was in it, or with a picture of its own.</summary>
 /// <param name="Path">The folder's path, its parents' names and its own joined by your separator.</param>
 /// <param name="CoverUrl">Its picture; null when the folder icon stands for it.</param>
 public sealed record PlaylistFolderInfo(Guid Id, string Path, string? CoverUrl);

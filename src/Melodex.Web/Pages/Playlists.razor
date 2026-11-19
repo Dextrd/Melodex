@@ -46,7 +46,7 @@ else if (_playlists is null)
 {
     <Loading />
 }
-else if (_playlists.Count == 0)
+else if (_playlists.Count == 0 && _folders.Count == 0)
 {
     <div class="empty card">
         No playlists yet. Make one here, or add songs to one from a song's or album's page or the player.
@@ -65,7 +65,7 @@ else
         </div>
         <h2 class="section">All playlists <span class="muted small">@_playlists.Count</span></h2>
     }
-    @if (shown.Count == 0)
+    @if (shown.Count == 0 && finding)
     {
         <div class="empty card">No playlists called that.</div>
     }
@@ -227,7 +227,7 @@ else
             if (removing.Folder is { } folder)
             {
                 foreach (var path in _folders.Keys.Where(p => IsWithin(p, folder)).ToList())
-                    await Api.SetPlaylistFolderCoverAsync(path, null);
+                    await Api.DeletePlaylistFolderAsync(path);
                 // Out of a folder that's gone, to all of them.
                 if (InFolder is { } inside && IsWithin(inside, folder))
                     Nav.NavigateTo("playlists");
@@ -349,24 +349,32 @@ else
         return _descending ? sorted.Reverse() : sorted.ThenBy(p => p.Name, byName);
     }
 
-    // The playlists in folders, each folder before the playlists beside it, in the order chosen within each.
+    // The playlists in folders, each folder before the playlists beside it, in the order chosen within each. Folders
+    // kept for themselves are there even with nothing in them.
     private Node Tree(IEnumerable<PlaylistSummary> playlists)
     {
         var root = new Node("", "", [], []);
         foreach (var playlist in playlists)
-        {
-            var node = root;
-            foreach (var folder in PlaylistNames.Folders(playlist.Name, Delimiter))
-            {
-                var path = node.Path.Length == 0 ? folder : node.Path + Delimiter + folder;
-                var next = node.Folders.FirstOrDefault(f => f.Path == path);
-                if (next is null)
-                    node.Folders.Add(next = new Node(path, folder, [], []));
-                node = next;
-            }
-            node.Playlists.Add(playlist);
-        }
+            Into(root, PlaylistNames.Folders(playlist.Name, Delimiter)).Playlists.Add(playlist);
+        if (Delimiter.Length > 0)
+            foreach (var path in _folders.Keys)
+                Into(root, path.Split(Delimiter));
         return root;
+    }
+
+    // The folder at the end of these names, made on the way if need be.
+    private Node Into(Node root, IEnumerable<string> folders)
+    {
+        var node = root;
+        foreach (var folder in folders)
+        {
+            var path = node.Path.Length == 0 ? folder : node.Path + Delimiter + folder;
+            var next = node.Folders.FirstOrDefault(f => f.Path == path);
+            if (next is null)
+                node.Folders.Add(next = new Node(path, folder, [], []));
+            node = next;
+        }
+        return node;
     }
 
     private string FolderHref(string path) => $"playlists?folder={Uri.EscapeDataString(path)}";
@@ -384,11 +392,7 @@ else
 
     private async Task SaveFolderPictureAsync(string path, string? upload)
     {
-        var saved = await Api.SetPlaylistFolderCoverAsync(path, upload);
-        if (saved.CoverUrl is null)
-            _folders.Remove(path);
-        else
-            _folders[path] = saved;
+        _folders[path] = await Api.SetPlaylistFolderCoverAsync(path, upload);
     }
 
     // A folder's own picture, or the folder icon.
@@ -402,7 +406,7 @@ else
         <a class="tile" href="@FolderHref(folder.Path)" title="@folder.Name">
             @FolderCover(_folders.GetValueOrDefault(folder.Path)?.CoverUrl)
             <div class="tile-name">@folder.Name</div>
-            <div class="muted small tile-sub">Folder · @Format.Count(folder.Count, "playlist", "playlists")</div>
+            <div class="muted small tile-sub">Folder · @(folder.Count == 0 ? "empty" : Format.Count(folder.Count, "playlist", "playlists"))</div>
         </a>
         @FolderMenu(folder.Path, "tile-menu")
     </div>;
