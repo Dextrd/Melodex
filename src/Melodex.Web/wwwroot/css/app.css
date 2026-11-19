@@ -1605,7 +1605,10 @@ input[type=search]:disabled { opacity: .6; }
 .lyrics-status { display: flex; align-items: baseline; gap: .6rem; flex-wrap: wrap; margin: .6rem 0 0; }
 .lyrics-status + .lyrics-status { margin-top: .3rem; }
 .dialog.lyrics-dialog { width: min(42rem, 100%); }
-.lyrics-view { max-height: min(60vh, 34rem); overflow: auto; margin: 0; padding-right: .5rem; }
+.lyrics-card { padding: .75rem 1rem; }
+.lyrics-card > .lyrics-status:first-child { margin-top: 0; }
+/* About nine lines, then it scrolls. */
+.lyrics-box { max-height: 13.5rem; overflow: auto; margin: .6rem 0 0; padding-right: .5rem; }
 .dialog label.check { display: flex; align-items: center; gap: .45rem; margin: .5rem 0; cursor: pointer; }
 .lyrics-edit-bar { margin: 0 0 .6rem; }
 .lyrics-edit-bar label.check { margin: 0; }
