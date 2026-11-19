@@ -4,6 +4,12 @@ What changed in each release of Melodex. Versions follow [semantic versioning](h
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-11-19
+
+Notifications at the bottom right, Replace and Remove on a song's page, ticking several playlists at once with empty
+folders kept, rolling upgrades, Activity in Running, Queued and Completed sections, catalogue updates as their own task,
+and import from Deezer. Only the core image changes; the database gains a column for replacements, added on start.
+
 ### Added
 
 - **Import from Deezer** on the Tools page, from the spreadsheet of your personal data Deezer gives you (no Deezer
