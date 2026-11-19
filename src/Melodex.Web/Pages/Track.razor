@@ -79,8 +79,6 @@ else
                 @if (owned)
                 {
                     <span class="badge @(Lyrics(track) is LyricsKind.Synced or LyricsKind.Plain ? "owned" : "neutral")" title="@LyricsHint(Lyrics(track))">@LyricsLabel(Lyrics(track))</span>
-                    var qualities = track.Files.Select(f => f.Quality).OfType<FileQuality>().ToList();
-                    <QualityBadge Quality="FileQuality.Lowest(qualities)" Mixed="FileQuality.Mixed(qualities)" />
                 }
                 <ProviderIds Ids="track.Ids" Entity="recording" />
             </div>
@@ -90,9 +88,7 @@ else
                     <IconButton Icon="play" Requires="@UserPermissions.Listen" Primary="true" Large="true" Label="Play" Title="Play it" OnClick="() => Player.PlayAsync([Entry(track)])" />
                     <QueueButton Large="true" Left="true" Title="Add to the queue: play next, or play last" OnQueue="next => Player.AddAsync([Entry(track)], next)" />
                     <IconButton Icon="playlist" Requires="@UserPermissions.Listen" Large="true" Title="Add to a playlist" OnClick="() => _adding = (track.Title, [new PlaylistItem(track.Id)])" />
-                    <IconButton Icon="format" Requires="@UserPermissions.Format" Large="true" Label="Format" Title="Rewrite this song's files: their tags, cover and where they live" OnClick="() => _formatting = true" />
                     <IconButton Icon="image" Requires="@UserPermissions.Format" Large="true" Label="Cover" Title="Choose this song's cover, from any release it's on or a picture of your own" OnClick="() => _choosingCover = true" />
-                    <QualityButton Kind="tracks" Id="track.Id" Name="@track.Title" Large="true" />
                 }
                 else if (!track.Ignored)
                 {
@@ -155,14 +151,23 @@ else
     {
         <TrackLyricsPanel TrackId="track.Id" Title="@track.Title" OnChanged="LoadAsync" />
 
-        @* One file's buttons are on the section's title row, as the lyrics' are; with several, each file has its own. *@
+        @*
+            The files' quality and what's done to all of them are on the section's title row, as the lyrics' are, and so
+            are one file's own buttons; with several, each file has its own.
+        *@
         var single = track.Files.Count == 1;
+        var qualities = track.Files.Select(f => f.Quality).OfType<FileQuality>().ToList();
         <div class="section-head">
             <h2>@(single ? "File" : $"{track.Files.Count} files")</h2>
-            @if (single)
-            {
-                <div class="row lyrics-actions">@FileButtons((track, track.Files[0]))</div>
-            }
+            <QualityBadge Quality="FileQuality.Lowest(qualities)" Mixed="FileQuality.Mixed(qualities)" />
+            <div class="row lyrics-actions">
+                <IconButton Icon="format" Requires="@UserPermissions.Format" Label="Format" Title="Rewrite this song's files: their tags, cover and where they live" OnClick="() => _formatting = true" />
+                <QualityButton Kind="tracks" Id="track.Id" Name="@track.Title" />
+                @if (single)
+                {
+                    @FileButtons((track, track.Files[0]))
+                }
+            </div>
         </div>
         @foreach (var file in track.Files)
         {
