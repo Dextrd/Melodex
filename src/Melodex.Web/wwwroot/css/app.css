@@ -1555,12 +1555,23 @@ input[type=search]:disabled { opacity: .6; }
 @media (prefers-reduced-motion: reduce) { .folder-toggle .chevron { transition: none; } }
 
 /* Adding to a playlist: a new one at the top, then the rest, most recently changed first. */
-.playlist-picker { width: min(30rem, 100%); }
-.picker-list { list-style: none; margin: .25rem 0 0; padding: 0; max-height: 18rem; overflow-y: auto; border: 1px solid var(--border); border-radius: var(--radius); }
+.playlist-picker { width: min(38rem, 100%); }
+.picker-list { list-style: none; margin: .25rem 0 0; padding: 0; max-height: min(26rem, 55vh); overflow-y: auto; border: 1px solid var(--border); border-radius: var(--radius); }
 .picker-list li + li { border-top: 1px solid var(--border); }
 .picker-list button { display: flex; align-items: baseline; gap: .25rem; width: 100%; padding: .55rem .75rem; text-align: left; background: none; border: 0; border-radius: 0; color: inherit; }
 .picker-list button:hover:not(:disabled) { background: var(--bg); }
 .picker-list .spacer-left { margin-left: auto; white-space: nowrap; }
+/* A playlist to tick: its box, its cover, then its name and length. */
+.picker-list .picker-row { align-items: center; gap: .75rem; padding: .5rem .75rem; cursor: pointer; }
+.picker-row .cover { width: 3rem; height: 3rem; flex: none; }
+.picker-name { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.picker-check {
+    display: inline-grid; place-items: center; width: 1.15rem; height: 1.15rem; flex: none;
+    border: 1.5px solid var(--muted); border-radius: 4px; color: var(--accent-text);
+}
+.picker-row[aria-checked="true"] .picker-check, .picker-row[aria-checked="mixed"] .picker-check { background: var(--accent); border-color: var(--accent); }
+.picker-check svg { width: .85rem; height: .85rem; }
+.picker-dash { width: .6rem; height: 2px; border-radius: 1px; background: var(--accent-text); }
 .playlist-picker .row input { flex: 1; min-width: 0; }
 
 /* Rows and results that arrive after the page has shown, as MusicBrainz answers, fade in rather than jump. */

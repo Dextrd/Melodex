@@ -896,6 +896,22 @@ public sealed class MelodexClient(HttpClient http)
         return (await response.Content.ReadFromJsonAsync<PlaylistAdded>(MelodexJson.Options, ct))!;
     }
 
+    /// <summary>How much of these songs each of your playlists holds.</summary>
+    public async Task<IReadOnlyList<PlaylistHolding>> GetPlaylistsHoldingAsync(AddToPlaylist songs, CancellationToken ct = default)
+    {
+        using var response = await http.PostAsJsonAsync($"{Api}/playlists/holding", songs, MelodexJson.Options, ct);
+        await EnsureAsync(response, ct);
+        return (await response.Content.ReadFromJsonAsync<List<PlaylistHolding>>(MelodexJson.Options, ct))!;
+    }
+
+    /// <summary>Takes these songs out of a playlist, wherever they are in it.</summary>
+    public async Task<PlaylistTakenOut> TakeOutOfPlaylistAsync(Guid id, AddToPlaylist songs, CancellationToken ct = default)
+    {
+        using var response = await http.PostAsJsonAsync($"{Api}/playlists/{id}/songs/remove", songs, MelodexJson.Options, ct);
+        await EnsureAsync(response, ct);
+        return (await response.Content.ReadFromJsonAsync<PlaylistTakenOut>(MelodexJson.Options, ct))!;
+    }
+
     public async Task<PlaylistDetail> ArrangePlaylistAsync(Guid id, ArrangePlaylist arrangement, CancellationToken ct = default)
     {
         using var response = await http.PutAsJsonAsync($"{Api}/playlists/{id}/songs", arrangement, MelodexJson.Options, ct);

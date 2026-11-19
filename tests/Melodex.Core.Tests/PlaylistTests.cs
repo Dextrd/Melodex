@@ -219,6 +219,30 @@ public sealed class PlaylistTests : IDisposable
         Assert.Equal([b.Title, a.Title, a.Title], (await _api.GetPlaylistAsync(id))!.Songs.Select(s => s.Title));
     }
 
+    [TestLibraryFact]
+    public async Task Songs_can_be_ticked_into_and_out_of_several_playlists()
+    {
+        await ScanAsync();
+        var (a, b) = await TwoTracksAsync();
+        var both = new AddToPlaylist([new PlaylistItem(a.TrackId), new PlaylistItem(b.TrackId)]);
+        var one = (await _api.CreatePlaylistAsync(new CreatePlaylist("Has one", Songs: [new PlaylistItem(a.TrackId), new PlaylistItem(a.TrackId)]))).Playlist.Id;
+        var all = (await _api.CreatePlaylistAsync(new CreatePlaylist("Has both", Songs: both.Songs))).Playlist.Id;
+        var none = (await _api.CreatePlaylistAsync(new CreatePlaylist("Has neither"))).Playlist.Id;
+
+        // How much of them each holds, a song in twice counting once; a song not in the library doesn't count.
+        var holding = (await _api.GetPlaylistsHoldingAsync(new AddToPlaylist([.. both.Songs, new PlaylistItem(Guid.NewGuid())]))).ToDictionary(h => h.PlaylistId);
+        Assert.Equal(new PlaylistHolding(one, 1, 2), holding[one]);
+        Assert.Equal(new PlaylistHolding(all, 2, 2), holding[all]);
+        Assert.Equal(new PlaylistHolding(none, 0, 2), holding[none]);
+
+        // Taking them out takes every time each is there, and leaves the rest in order.
+        Assert.Equal(new PlaylistTakenOut(2), await _api.TakeOutOfPlaylistAsync(one, new AddToPlaylist([new PlaylistItem(a.TrackId)])));
+        Assert.Empty((await _api.GetPlaylistAsync(one))!.Songs);
+        Assert.Equal(new PlaylistTakenOut(1), await _api.TakeOutOfPlaylistAsync(all, new AddToPlaylist([new PlaylistItem(a.TrackId)])));
+        Assert.Equal([b.Title], (await _api.GetPlaylistAsync(all))!.Songs.Select(s => s.Title));
+        Assert.Equal(new PlaylistTakenOut(0), await _api.TakeOutOfPlaylistAsync(none, both));
+    }
+
     [Fact]
     public void Names_are_compared_by_their_letters_and_artists()
     {

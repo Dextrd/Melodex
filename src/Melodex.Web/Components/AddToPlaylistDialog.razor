@@ -1,56 +1,66 @@
 @inject MelodexClient Api
 @inject AuthState Auth
+@inject Notices Notices
 
-@* Adds songs to one of your playlists, or to a new one. *@
-<Dialog Title="@($"Add {Name} to a playlist")" OnClose="OnClose" Class="playlist-picker">
-    @if (_done is not null)
-    {
-        <p>@_done</p>
-        <div class="toolbar">
-            <span class="spacer"></span>
-            @if (_doneId is { } id) { <a class="button" href="playlists/@id" @onclick="OnClose">Open it</a> }
-            <button class="primary" @onclick="OnClose">Done</button>
+@*
+    Puts songs in your playlists, or takes them out: each playlist with its cover and a box, ticked when it has them all,
+    half-ticked when it has some. Ticking and unticking are saved together. A new playlist is made with them at once.
+*@
+<Dialog Title="@($"Add {Name} to playlists")" OnClose="OnClose" Class="playlist-picker">
+    <div class="field">
+        <label class="field-label" for="playlist-new">New playlist</label>
+        <div class="row">
+            <input id="playlist-new" type="text" placeholder="@($"Name, or Folder{Delimiter}Name")" @bind="_newName" @bind:event="oninput"
+                   @onkeydown="EnterAsync" />
+            <button disabled="@(_busy || _newName.Trim().Length == 0)" @onclick="CreateAsync">Make it</button>
         </div>
+    </div>
+    @if (_playlists is null)
+    {
+        <Loading Inline="true" />
     }
-    else
+    else if (_playlists.Count > 0)
     {
         <div class="field">
-            <label class="field-label" for="playlist-new">New playlist</label>
-            <div class="row">
-                <input id="playlist-new" type="text" placeholder="@($"Name, or Folder{Delimiter}Name")" @bind="_newName" @bind:event="oninput"
-                       @onkeydown="EnterAsync" />
-                <button class="primary" disabled="@(_busy || _newName.Trim().Length == 0)" @onclick="CreateAsync">Make it</button>
-            </div>
-        </div>
-        @if (_playlists is null)
-        {
-            <Loading Inline="true" />
-        }
-        else if (_playlists.Count > 0)
-        {
-            <div class="field">
-                <label class="field-label" for="playlist-filter">Or add to</label>
-                @if (_playlists.Count > 8)
+            <label class="field-label" for="playlist-filter">Your playlists</label>
+            @if (_playlists.Count > 8)
+            {
+                <input id="playlist-filter" type="search" placeholder="Find a playlist" @bind="_filter" @bind:event="oninput" />
+            }
+            <ul class="picker-list" role="group" aria-label="Your playlists">
+                @foreach (var playlist in Shown)
                 {
-                    <input id="playlist-filter" type="search" placeholder="Find a playlist" @bind="_filter" @bind:event="oninput" />
+                    var folders = PlaylistNames.Folders(playlist.Name, Delimiter);
+                    var state = State(playlist.Id);
+                    <li>
+                        <button class="plain picker-row @(Changed(playlist.Id) ? "changed" : "")" role="checkbox" disabled="@_busy"
+                                aria-checked="@(state switch { true => "true", false => "false", null => "mixed" })" @onclick="() => Toggle(playlist.Id)">
+                            <span class="picker-check" aria-hidden="true">
+                                @if (state == true) { <Icon Name="done" /> } else if (state is null) { <span class="picker-dash"></span> }
+                            </span>
+                            <PlaylistCover Covers="playlist.Covers" Class="small" />
+                            <span class="picker-name">
+                                <span class="ellipsis">@PlaylistNames.Leaf(playlist.Name, Delimiter)</span>
+                                <span class="muted small ellipsis">
+                                    @PlaylistNames.Length(playlist.Count, playlist.DurationSeconds)@(folders.Count > 0 ? $" · in {string.Join(" › ", folders)}" : "")
+                                </span>
+                            </span>
+                            @if (state is null)
+                            {
+                                <span class="muted small nowrap">Has @Has(playlist.Id) of @_of</span>
+                            }
+                        </button>
+                    </li>
                 }
-                <ul class="picker-list">
-                    @foreach (var playlist in Shown)
-                    {
-                        var folders = PlaylistNames.Folders(playlist.Name, Delimiter);
-                        <li>
-                            <button class="plain" disabled="@_busy" @onclick="() => AddAsync(playlist)">
-                                <span>@PlaylistNames.Leaf(playlist.Name, Delimiter)</span>
-                                @if (folders.Count > 0) { <span class="muted small"> in @string.Join(" › ", folders)</span> }
-                                <span class="muted small spacer-left">@PlaylistNames.Length(playlist.Count, playlist.DurationSeconds)</span>
-                            </button>
-                        </li>
-                    }
-                </ul>
-            </div>
-        }
-        @if (_error is not null) { <p class="error small">@_error</p> }
+            </ul>
+        </div>
     }
+    @if (_error is not null) { <p class="error small">@_error</p> }
+    <div class="toolbar dialog-buttons">
+        <span class="spacer"></span>
+        <button disabled="@_busy" @onclick="OnClose">Cancel</button>
+        <button class="primary" disabled="@(_busy || _wanted.Count == 0)" @onclick="SaveAsync">@if (_busy) { <span class="spinner"></span> }Save</button>
+    </div>
 </Dialog>
 
 @code {
@@ -59,12 +69,17 @@
     [Parameter, EditorRequired] public IReadOnlyList<PlaylistItem> Songs { get; set; } = [];
     [Parameter] public EventCallback OnClose { get; set; }
 
-    private IReadOnlyList<PlaylistSummary>? _playlists;
+    private List<PlaylistSummary>? _playlists;
+    private Dictionary<Guid, int> _has = [];
+    private int _of;
+
+    // What's been ticked (true) or unticked (false), by playlist; the rest stay as they are.
+    private readonly Dictionary<Guid, bool> _wanted = [];
+
     private string _newName = "";
     private string _filter = "";
     private bool _busy;
-    private string? _error, _done;
-    private Guid? _doneId;
+    private string? _error;
 
     private string Delimiter => PlaylistNames.Delimiter(Auth);
 
@@ -77,30 +92,74 @@
     {
         try
         {
-            _playlists = await Api.ListPlaylistsAsync();
+            var holding = Api.GetPlaylistsHoldingAsync(new AddToPlaylist(Songs));
+            _playlists = (await Api.ListPlaylistsAsync()).ToList();
+            var held = await holding;
+            _has = held.ToDictionary(h => h.PlaylistId, h => h.Has);
+            _of = held.FirstOrDefault()?.Of ?? Songs.Count;
         }
         catch (Exception e) when (e is HttpRequestException or MelodexApiException)
         {
             _error = e.Message;
-            _playlists = [];
+            _playlists ??= [];
         }
     }
 
-    private async Task AddAsync(PlaylistSummary playlist)
+    private int Has(Guid id) => _has.GetValueOrDefault(id);
+
+    // As it is now: all of them in it, none, or some (null).
+    private bool? Held(Guid id) => Has(id) == 0 ? false : Has(id) >= _of ? true : null;
+
+    // As it will be once saved.
+    private bool? State(Guid id) => _wanted.TryGetValue(id, out var wanted) ? wanted : Held(id);
+
+    private bool Changed(Guid id) => _wanted.ContainsKey(id);
+
+    // Some, then all, then none, then back to some; all and none just swap.
+    private void Toggle(Guid id)
+    {
+        var next = State(id) != true;
+        if (next == Held(id) || Held(id) is null && State(id) == false)
+            _wanted.Remove(id);
+        else
+            _wanted[id] = next;
+    }
+
+    private async Task SaveAsync()
     {
         await RunAsync(async () =>
         {
-            var added = await Api.AddToPlaylistAsync(playlist.Id, new AddToPlaylist(Songs));
-            var name = PlaylistNames.Leaf(playlist.Name, Delimiter);
-            _done = added.Added > 0
-                ? $"Added {Count(added.Added)} to {name}{(added.AlreadyThere > 0 ? $"; {Count(added.AlreadyThere)} {(added.AlreadyThere == 1 ? "was" : "were")} in it already" : "")}."
-                : added.AlreadyThere > 0 ? $"{(Songs.Count == 1 ? "It's" : "They're")} in {name} already." : $"{(Songs.Count == 1 ? "It isn't" : "They aren't")} in your library.";
-            _doneId = playlist.Id;
+            var into = new List<string>();
+            var outOf = new List<string>();
+            foreach (var (id, wanted) in _wanted)
+            {
+                var playlist = _playlists!.First(p => p.Id == id);
+                var name = PlaylistNames.Leaf(playlist.Name, Delimiter);
+                if (wanted)
+                {
+                    if ((await Api.AddToPlaylistAsync(id, new AddToPlaylist(Songs))).Added > 0)
+                        into.Add(name);
+                }
+                else if ((await Api.TakeOutOfPlaylistAsync(id, new AddToPlaylist(Songs))).Removed > 0)
+                    outOf.Add(name);
+            }
+            var only = _wanted.Count == 1 ? _wanted.Keys.First() : (Guid?)null;
+            var said = string.Join("; ", new[]
+            {
+                into.Count > 0 ? $"Added to {Names(into)}" : null,
+                outOf.Count > 0 ? $"Taken out of {Names(outOf)}" : null,
+            }.OfType<string>());
+            Notices.Show(new Notice($"playlists:{Guid.NewGuid()}", NoticeKind.Action, Name, said.Length > 0 ? said : "Nothing to change",
+                only is { } one ? $"playlists/{one}" : "playlists", "playlist", _playlists!.FirstOrDefault(p => p.Id == only)?.Covers.FirstOrDefault()), always: true);
+            await OnClose.InvokeAsync();
         });
     }
 
+    private static string Names(List<string> names) => names.Count <= 2 ? string.Join(" and ", names) : $"{names[0]}, {names[1]} and {names.Count - 2} more";
+
     private Task EnterAsync(KeyboardEventArgs e) => e.Key == "Enter" ? CreateAsync() : Task.CompletedTask;
 
+    // Made with the songs in it, and ticked in the list.
     private async Task CreateAsync()
     {
         if (_newName.Trim().Length == 0)
@@ -108,8 +167,11 @@
         await RunAsync(async () =>
         {
             var made = await Api.CreatePlaylistAsync(new CreatePlaylist(_newName.Trim(), Songs: Songs));
-            _done = $"Made {PlaylistNames.Leaf(made.Playlist.Name, Delimiter)}, with {Count(made.Playlist.Count)}.";
-            _doneId = made.Playlist.Id;
+            _playlists!.Add(made.Playlist);
+            _has[made.Playlist.Id] = made.Playlist.Count;
+            _newName = "";
+            Notices.Show(new Notice($"playlist:{made.Playlist.Id}", NoticeKind.Action, $"Made {PlaylistNames.Leaf(made.Playlist.Name, Delimiter)}",
+                $"With {Format.Count(made.Playlist.Count, "song", "songs")}", $"playlists/{made.Playlist.Id}", "playlist", made.Playlist.Covers.FirstOrDefault()));
         });
     }
 
@@ -127,6 +189,4 @@
         }
         _busy = false;
     }
-
-    private static string Count(int songs) => $"{songs} {(songs == 1 ? "song" : "songs")}";
 }

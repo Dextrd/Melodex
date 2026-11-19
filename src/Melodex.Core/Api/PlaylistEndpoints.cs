@@ -73,6 +73,18 @@ public static class PlaylistEndpoints
             .WithSummary("Add songs from your library to the end of a playlist. Songs already in it are left out unless duplicates=true.")
             .Produces<PlaylistAdded>().Produces(StatusCodes.Status404NotFound);
 
+        playlists.MapPost("/holding", async (AddToPlaylist body, HttpContext http, PlaylistService service, CancellationToken ct) =>
+                Owner(http) is { } user ? Results.Ok(await service.HoldingAsync(user, body.Songs, ct)) : NoOwner())
+            .WithName("GetPlaylistsHolding")
+            .WithSummary("How many of these songs each of your playlists holds, for ticking those they're in.")
+            .Produces<IReadOnlyList<PlaylistHolding>>();
+
+        playlists.MapPost("/{id:guid}/songs/remove", async (Guid id, AddToPlaylist body, HttpContext http, PlaylistService service, CancellationToken ct) =>
+                Owner(http) is { } user ? await service.TakeOutAsync(user, id, body.Songs, ct) is { } taken ? Results.Ok(taken) : Results.NotFound() : NoOwner())
+            .WithName("TakeOutOfPlaylist")
+            .WithSummary("Take songs out of a playlist, every time each is in it.")
+            .Produces<PlaylistTakenOut>().Produces(StatusCodes.Status404NotFound);
+
         playlists.MapPut("/{id:guid}/songs", async (Guid id, ArrangePlaylist body, HttpContext http, PlaylistService service, CancellationToken ct) =>
                 Owner(http) is { } user
                     ? await Refusable(async () => await service.ArrangeAsync(user, id, body, ct) is { } playlist ? Results.Ok(playlist) : Results.NotFound())

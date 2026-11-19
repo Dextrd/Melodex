@@ -99,6 +99,15 @@ public sealed record AddToPlaylist(IReadOnlyList<PlaylistItem> Songs, bool Dupli
 /// <param name="NotFound">Songs that aren't in your library.</param>
 public sealed record PlaylistAdded(int Added, int AlreadyThere, int NotFound);
 
+/// <summary>How much of some songs one of your playlists holds, from <c>POST /playlists/holding</c>.</summary>
+/// <param name="Has">How many of them are in it.</param>
+/// <param name="Of">How many songs were asked about: those in your library.</param>
+public sealed record PlaylistHolding(Guid PlaylistId, int Has, int Of);
+
+/// <summary>What taking songs out of a playlist did.</summary>
+/// <param name="Removed">Entries taken out: every one of each song, if it was in more than once.</param>
+public sealed record PlaylistTakenOut(int Removed);
+
 /// <summary>Body of <c>PUT /playlists/{id}/songs</c>: the songs to keep, by entry, in their new order.</summary>
 public sealed record ArrangePlaylist(IReadOnlyList<Guid> EntryIds);
 
