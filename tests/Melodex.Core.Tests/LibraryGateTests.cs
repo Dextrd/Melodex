@@ -58,6 +58,7 @@ public sealed class LibraryGateTests : IDisposable
         }
         Assert.True(task.State == TaskState.Succeeded, task.Error);
         Assert.DoesNotContain("failed", task.Progress);
+        await _api.WaitForCatalogueAsync();
 
         await CheckFilesAsync(key.GetProperty("files"));
 

@@ -7,7 +7,8 @@ namespace Melodex.Web;
 /// Requests, shared by every page so fetch buttons can show what's already on its way: every one still going, however
 /// many, and the newest of the rest, with earlier ones loaded as they're wanted (Activity's Earlier). Reloads when the
 /// server says requests changed, polling only as a fallback, and tells library pages to reload when a request lands in
-/// the library.
+/// the library. What's asked for here gets a notification when it finishes, one for each lot asked for together: in the
+/// library, to review, or failed.
 /// </summary>
 public sealed class RequestTracker : IDisposable
 {
@@ -17,13 +18,26 @@ public sealed class RequestTracker : IDisposable
     // How many finished ones come with each load, and each page of earlier ones.
     private const int Page = 200;
 
+    // Asked for within this long of the last one, it joins its notification.
+    private static readonly TimeSpan Together = TimeSpan.FromSeconds(3);
+
     private readonly MelodexClient api;
     private readonly ServerEvents events;
+    private readonly Notices notices;
 
-    public RequestTracker(MelodexClient api, ServerEvents events)
+    // What was asked for here, a lot at a time, until it's all finished.
+    private sealed record Lot(string Key, List<RequestInfo> Asked)
+    {
+        public DateTime Last { get; set; } = DateTime.UtcNow;
+    }
+
+    private readonly List<Lot> _lots = [];
+
+    public RequestTracker(MelodexClient api, ServerEvents events, Notices notices)
     {
         this.api = api;
         this.events = events;
+        this.notices = notices;
         events.Received += OnEvent;
         events.EnsureStarted();
     }
@@ -97,8 +111,36 @@ public sealed class RequestTracker : IDisposable
     public async Task<RequestInfo> CreateAsync(CreateRequest request)
     {
         var created = await api.CreateRequestAsync(request);
+        Watch(created);
         await RefreshAsync();
         return created;
+    }
+
+    /// <summary>Asked for here some other way: it gets a notification when it finishes.</summary>
+    public void Watch(RequestInfo asked)
+    {
+        var lot = _lots.LastOrDefault();
+        if (lot is null || DateTime.UtcNow - lot.Last > Together || lot.Asked.All(r => !r.Active))
+            _lots.Add(lot = new Lot($"download:{asked.Id}", []));
+        lot.Asked.Add(asked);
+        lot.Last = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// Asks the server to start some requests itself, such as upgrades: those it starts that match get a notification
+    /// when they finish, together. What was there before it's asked, however much, isn't counted.
+    /// </summary>
+    /// <returns>What starting them said, and the requests it started, newest first.</returns>
+    public async Task<(T Started, IReadOnlyList<RequestInfo> Asked)> WatchNewAsync<T>(Func<Task<T>> start, Func<RequestInfo, bool> match)
+    {
+        await EnsureLoadedAsync();
+        var known = _requests.Select(r => r.Id).ToHashSet();
+        var started = await start();
+        await RefreshAsync();
+        var asked = _requests.Where(r => r.ParentId is null && !known.Contains(r.Id) && match(r)).ToList();
+        foreach (var one in asked)
+            Watch(one);
+        return (started, asked);
     }
 
     public async Task RefreshAsync()
@@ -124,11 +166,68 @@ public sealed class RequestTracker : IDisposable
                                      && (r.State == RequestState.InLibrary && old.State != RequestState.InLibrary
                                          || (r.Parts?.InLibrary ?? 0) > (old.Parts?.InLibrary ?? 0)));
         _requests = latest;
+        Finished();
         Schedule(latest.Any(r => r.Active) && !events.Connected ? Busy : Idle);
         Changed?.Invoke();
         if (landed)
             ScanStatus.RaiseLibraryChanged();
     }
+
+    // Each lot all finished gets its say, then is forgotten.
+    private void Finished()
+    {
+        foreach (var lot in _lots.ToList())
+        {
+            var now = lot.Asked.Select(r => _requests.FirstOrDefault(n => n.Id == r.Id) ?? r).ToList();
+            if (now.Any(r => r.Active) || DateTime.UtcNow - lot.Last < TimeSpan.FromSeconds(1))
+                continue;
+            _lots.Remove(lot);
+            var landed = now.Count(r => r.State == RequestState.InLibrary);
+            var failed = now.Count(r => r.State == RequestState.Failed);
+            var review = now.Count(r => r.State == RequestState.NeedsReview);
+            if (landed + failed + review == 0)
+                continue;
+            var key = lot.Key + ":done";
+            var art = now.Select(r => r.Target?.CoverUrl).FirstOrDefault(c => c is not null);
+            if (now.Count == 1)
+            {
+                var one = now[0];
+                var (verb, icon) = one.Upgrade ? ("upgraded", "upgrade") : ("in your library", "get");
+                notices.Show(one.State switch
+                {
+                    RequestState.InLibrary => new Notice(key, Kind(one), one.Title, Capital(verb), Href(lot), icon, art),
+                    RequestState.NeedsReview => new Notice(key, Kind(one), one.Title, "Fetched, and waiting for you to review it", "review", icon, art),
+                    _ => new Notice(key, Kind(one), one.Title, (one.Upgrade ? "No better copy found" : "Couldn't be fetched")
+                        + (one.Detail is { } why ? $": {why}" : ""), Href(lot), "attention", art, Failed: true),
+                });
+                continue;
+            }
+            var upgrades = now.All(r => r.Upgrade);
+            var parts = new[] { (landed, upgrades ? "upgraded" : "in your library"), (review, "to review"), (failed, upgrades ? "with nothing better" : "failed") }
+                .Where(p => p.Item1 > 0).Select(p => $"{p.Item1} {p.Item2}");
+            notices.Show(new Notice(key, Kind(now[0]), Things(now) + " finished", string.Join(", ", parts), review > 0 ? "review" : Href(lot),
+                landed + review == 0 ? "attention" : upgrades ? "upgrade" : "get", art, Failed: landed + review == 0 && !upgrades));
+        }
+    }
+
+    // Looking for better copies is something started; the rest were asked for.
+    private static NoticeKind Kind(RequestInfo request) => request.Upgrade ? NoticeKind.Action : NoticeKind.Download;
+
+    private static string Capital(string text) => char.ToUpperInvariant(text[0]) + text[1..];
+
+    // "12 songs", "2 albums", or "5 things" for a mix.
+    private static string Things(IReadOnlyList<RequestInfo> requests) =>
+        requests.Select(r => r.Kind).Distinct().Count() == 1
+            ? requests[0].Kind switch
+            {
+                RequestKind.Track => Format.Count(requests.Count, "song", "songs"),
+                RequestKind.Album => Format.Count(requests.Count, "album", "albums"),
+                _ => Format.Count(requests.Count, "artist", "artists"),
+            }
+            : Format.Count(requests.Count, "thing", "things");
+
+    // To the first of them in Activity, flashed, so where they are is plain.
+    private static string Href(Lot lot) => $"activity/downloads?open={lot.Asked[0].Id}";
 
     private void Schedule(TimeSpan delay)
     {

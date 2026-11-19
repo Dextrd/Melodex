@@ -80,6 +80,7 @@ public sealed class RequestFixture : IAsyncLifetime
         }
         if (task.State != TaskState.Succeeded)
             throw new InvalidOperationException($"The scan failed: {task.Error}");
+        await Api.WaitForCatalogueAsync();
 
         var albums = new List<AlbumSummary>();
         foreach (var artist in await Api.GetLibraryArtistsAsync())

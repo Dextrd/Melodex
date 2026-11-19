@@ -46,6 +46,11 @@
     <PlayerBar />
 }
 
+@if (Auth.Status is { LetIn: true })
+{
+    <NoticeStack />
+}
+
 @if (Auth.May(UserPermissions.Settings))
 {
     <UpgradeWarning />

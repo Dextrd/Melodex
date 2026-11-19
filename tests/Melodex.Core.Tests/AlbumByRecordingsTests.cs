@@ -79,6 +79,7 @@ public sealed class AlbumByRecordingsTests : IAsyncLifetime
             task = (await _api.GetTaskAsync(task.Id))!;
         }
         Assert.True(task.State == TaskState.Succeeded, task.Error);
+        await _api.WaitForCatalogueAsync();
 
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<MelodexDbContext>();
