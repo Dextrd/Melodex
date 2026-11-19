@@ -66,7 +66,8 @@ public sealed record FetchTarget(
 
         // An upgrade replaces the recording you have, so its copy has to be as long as your file, which is the length to
         // match: the catalogue may not know one (a live bootleg, say), and a studio take of a live song is the same title (#177).
-        var upgrading = request.UpgradesFileId is { } fileId
+        // A replacement goes by the catalogue's length: the file it replaces may be the wrong recording.
+        var upgrading = request is { UpgradesFileId: { } fileId, Replace: false }
             ? await db.LibraryFiles.Where(f => f.Id == fileId).Select(f => f.Duration).FirstOrDefaultAsync(ct)
             : null;
         var tracks = wanted.Select(w => new WantedTrack(w.TrackId, w.Disc, w.Position, w.Title, w.ArtistCredit, w.ArtistId, upgrading ?? w.Duration,

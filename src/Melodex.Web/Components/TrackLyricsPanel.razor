@@ -2,18 +2,23 @@
 @inject AuthState Auth
 
 @*
-    A song's lyrics on its page: a line saying what it has and where they're read from, and buttons to view and edit
-    them, find them again, choose them from a search, delete them, or exclude the song from lyrics matching.
+    A song's lyrics on its page: what it has beside the title, buttons to edit them, find them again, choose them from a
+    search, delete them, or exclude the song from lyrics matching, and a box saying where they're read from with the
+    lyrics line by line, scrolling past nine or so.
 *@
 <div class="section-head">
     <h2>Lyrics</h2>
+    @if (_lyrics is { } had)
+    {
+        <span class="badge @(had.Kind is LyricsKind.Synced or LyricsKind.Plain ? "owned" : "neutral")">@Label(had)</span>
+    }
     @if (_lyrics is { } shown)
     {
         <div class="row lyrics-actions">
             @if (shown.Kind != LyricsKind.None)
             {
-                <IconButton Icon="show" Label="View" Title="@(Auth.May(UserPermissions.Format) ? "See the lyrics line by line, and edit them" : "See the lyrics line by line")"
-                            OnClick="() => _viewing = true" />
+                <IconButton Icon="rename" Requires="@UserPermissions.Format" Label="Edit" Title="Edit the lyrics, line by line or as text" Disabled="_busy"
+                            OnClick="() => _editing = true" />
             }
             <IconButton Icon="search" Requires="@UserPermissions.Format" Label="Search" Disabled="_busy"
                         Title="Search the lyrics sources and choose the lyrics yourself" OnClick="() => _searching = true" />
@@ -22,7 +27,7 @@
                         OnClick="FindAsync" />
             @if (shown.Kind == LyricsKind.None && Auth.May(UserPermissions.Format))
             {
-                <IconButton Icon="rename" Label="Write" Title="Write the lyrics yourself" Disabled="_busy" OnClick="WriteOwn" />
+                <IconButton Icon="rename" Label="Write" Title="Write the lyrics yourself" Disabled="_busy" OnClick="() => _editing = true" />
             }
             @if (shown.Kind != LyricsKind.None)
             {
@@ -45,26 +50,37 @@
 else
 {
     var lyrics = _lyrics;
-    <p class="lyrics-status">
-        <span class="badge @(lyrics.Kind is LyricsKind.Synced or LyricsKind.Plain ? "owned" : "neutral")">@Label(lyrics)</span>
-        <span class="muted">@Status(lyrics)</span>
-    </p>
-    @if (lyrics.Excluded)
-    {
-        <p class="lyrics-status muted small">
-            Excluded from lyrics matching, so scans don't look for its lyrics.
-            @if (Auth.May(UserPermissions.Format))
-            {
-                <button class="link" disabled="@_busy" @onclick="() => ExcludeAsync(false)">Include it again</button>
-            }
-        </p>
-    }
+    <div class="card lyrics-card">
+        <p class="lyrics-status muted small">@Status(lyrics)</p>
+        @if (lyrics.Excluded)
+        {
+            <p class="lyrics-status muted small">
+                Excluded from lyrics matching, so scans don't look for its lyrics.
+                @if (Auth.May(UserPermissions.Format))
+                {
+                    <button class="link" disabled="@_busy" @onclick="() => ExcludeAsync(false)">Include it again</button>
+                }
+            </p>
+        }
+        @if (lyrics.Lines.Count > 0)
+        {
+            <div class="lyrics-lines lyrics-box" tabindex="0" aria-label="The lyrics">
+                @foreach (var line in lyrics.Lines)
+                {
+                    <div class="lyrics-line @(line.Text.Length == 0 ? "gap" : "")">
+                        @if (line.Seconds is { } at) { <span class="muted small lyrics-time">@LyricsText.Time(at)</span> }
+                        <span>@line.Text</span>
+                    </div>
+                }
+            </div>
+        }
+    </div>
 }
 @if (_error is not null) { <p class="error small">@_error</p> }
 
-@if (_viewing && _lyrics is not null)
+@if (_editing && _lyrics is not null)
 {
-    <LyricsDialog TrackId="TrackId" Title="@Title" Lyrics="_lyrics" Editing="_writing" OnClose="() => { _viewing = false; _writing = false; }" OnSaved="SavedAsync" />
+    <LyricsDialog TrackId="TrackId" Title="@Title" Lyrics="_lyrics" OnClose="() => _editing = false" OnSaved="SavedAsync" />
 }
 @if (_searching)
 {
@@ -99,7 +115,7 @@ else
 
     private TrackLyrics? _lyrics;
     private Guid _loaded;
-    private bool _busy, _finding, _viewing, _writing, _searching, _deleting, _excludeToo;
+    private bool _busy, _finding, _editing, _searching, _deleting, _excludeToo;
     private string? _error;
 
     protected override async Task OnParametersSetAsync()
@@ -141,12 +157,6 @@ else
         };
     }
 
-    private void WriteOwn()
-    {
-        _writing = true;
-        _viewing = true;
-    }
-
     private Task FindAsync() => RunAsync(async () =>
     {
         _finding = true;
@@ -171,7 +181,7 @@ else
     {
         _lyrics = lyrics;
         _searching = false;
-        _writing = false;
+        _editing = false;
         await OnChanged.InvokeAsync();
     }
 

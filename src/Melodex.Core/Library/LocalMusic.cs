@@ -9,8 +9,8 @@ using Melodex.Core.Data;
 namespace Melodex.Core.Library;
 
 /// <summary>
-/// Music of your own that no catalogue knows: excluded files with a title and artist, grouped into artists and albums
-/// as their tags say. With no catalogue on, every file not matched before is listed this way too. An artist the library already has from the catalogue, by name, gets these albums too; anyone else
+/// Music of your own that no catalogue knows: excluded files with a title and artist, and deferred ones with an album
+/// too until they're matched, grouped into artists and albums as their tags say. With no catalogue on, every file not matched before is listed this way too. An artist the library already has from the catalogue, by name, gets these albums too; anyone else
 /// becomes a local artist. Their IDs come from their names, so they stay the same from scan to scan.
 /// </summary>
 public sealed class LocalMusic(MelodexDbContext db)
@@ -52,8 +52,11 @@ public sealed class LocalMusic(MelodexDbContext db)
     {
         var plain = !await db.PluginInstances.AnyAsync(p => p.Type == PluginType.Index && p.Enabled, ct);
         var files = await db.LibraryFiles.AsNoTracking()
-            .Where(f => (f.ExcludedAt != null || plain && f.TrackId == null && f.DeferredAt == null) && f.HiddenAt == null).ToListAsync(ct);
-        var songs = files.Select(f => new Song(f, FileTags.Parse(f.TagsJson))).Where(s => SetAsides.Usable(s.Tags)).ToList();
+            .Where(f => (f.ExcludedAt != null || f.TrackId == null && (f.DeferredAt != null || plain)) && f.HiddenAt == null).ToListAsync(ct);
+        // A deferred file waits for a match, so it shows only where its tags say clearly: with an album as well.
+        var songs = files.Select(f => new Song(f, FileTags.Parse(f.TagsJson)))
+            .Where(s => SetAsides.Usable(s.Tags) && (s.File.DeferredAt is null || s.File.ExcludedAt is not null || plain || !string.IsNullOrWhiteSpace(s.Tags.Album)))
+            .ToList();
         if (songs.Count == 0)
             return new Snapshot([], []);
         var catalogue = (await db.Artists.Where(a => a.InLibrary).Select(a => new { a.Id, a.Name }).ToListAsync(ct))

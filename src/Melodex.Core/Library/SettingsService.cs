@@ -90,12 +90,31 @@ public sealed class SettingsService(MelodexDbContext db)
     }
 }
 
-/// <summary>The scheduled look for upgrades in a window.</summary>
-/// <remarks>Window is when it opened, in UTC; Asked, how many upgrades it's asked for; Done, that it needs no more; Closed, that it's over.</remarks>
+/// <summary>
+/// A look through the whole library for upgrades: in a scheduled window, or by hand with Upgrade now. It keeps a few
+/// upgrades going until every upgradable song has been tried, it's stopped, or the window it started in closes.
+/// </summary>
+/// <remarks>
+/// Window is when the scheduled window it started in opened, in UTC, or null for one by hand outside any; Requester, who
+/// its requests are asked for by; StartedAt, when it began (songs looked for since are left alone); Asked, how many it's
+/// asked for; Done, that there was nothing left to try; Closed, that it's over.
+/// </remarks>
 public sealed record UpgradeRun
 {
     public DateTime? Window { get; init; }
+    public bool ByHand { get; init; }
+    public string Requester { get; init; } = Upgrades.ScheduledRequester;
+    public DateTime StartedAt { get; init; }
     public int Asked { get; init; }
     public bool Done { get; init; }
     public bool Closed { get; init; }
+    public bool Stopped { get; init; }
+
+    /// <summary>Still going: asking for more as upgrades finish.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool Going => !Done && !Closed && (Window is not null || ByHand);
+
+    /// <summary>When it began; before it was kept, a scheduled run's window opening.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public DateTime Began => StartedAt != default ? StartedAt : Window ?? DateTime.MinValue;
 }

@@ -396,6 +396,7 @@ public sealed class PlaylistTests : IDisposable
             task = (await _api.GetTaskAsync(task.Id))!;
         }
         Assert.True(task.State == TaskState.Succeeded, task.Error);
+        await _api.WaitForCatalogueAsync();
     }
 
     /// <summary>A media server's playlists, kept in memory. It finds every song, as "s:" and its title.</summary>

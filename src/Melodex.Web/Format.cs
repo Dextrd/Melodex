@@ -55,9 +55,11 @@ public static class Format
         Client.RequestState.Fetching => "Fetching",
         Client.RequestState.Verifying => "Checking",
         Client.RequestState.Importing or Client.RequestState.Notifying when r.Upgrade => "Upgrading",
+        Client.RequestState.Importing or Client.RequestState.Notifying when r.Replace => "Replacing",
         Client.RequestState.Importing or Client.RequestState.Notifying => "Filing",
         // An upgrade that found nothing better leaves the song as it was, in the library.
         Client.RequestState.InLibrary when r.Upgrade => Upgraded(r) ? "Upgraded" : "Unchanged",
+        Client.RequestState.InLibrary when r.Replace => "Replaced",
         Client.RequestState.InLibrary => "In library",
         Client.RequestState.Playable when r.Ended == ListenNowEnd.Expired => "Expired",
         Client.RequestState.Playable when r.Ended == ListenNowEnd.Deleted => "Deleted",

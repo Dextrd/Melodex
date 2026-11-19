@@ -34,7 +34,13 @@ scan.
 - **Match unmatched files again**: files under review and deferred ones, as well as changes.
 - **Match everything again**: every file from scratch, except those you matched, excluded or hid yourself. Over a big
   library this takes a while.
+- **Update catalogue**: look up every artist's discography, and the editions of their albums, so the missing view
+  knows what's out there.
 - **Format the whole library**: see [Formatting](#formatting).
+
+After each scan, Melodex queues a catalogue update of its own, which shows on Activity as a separate task. To update
+the catalogue only when you ask, turn off **Update the catalogue after each scan** under **Settings → General →
+Matching**.
 
 Scans and other long jobs show on **Activity**, where they can be paused, cancelled or moved in the queue, one by one
 or all at once.
@@ -56,7 +62,8 @@ sure the match is, the files' names, their paths or when they last changed; the 
 - **Approve** the suggested match, or **Search** for the right one.
 - **Exclude** it: it's never matched, and the library shows it as its own tags say. Use this for music no catalogue
   knows, such as your own recordings.
-- **Defer** it: it leaves the list, and each scan tries it again, matching it only when it's confident.
+- **Defer** it: it leaves the list, and each scan tries it again, matching it only when it's confident. Meanwhile, if
+  its tags name an artist and an album, it's in the library as they say, as an excluded file is.
 - **Hide** it: it leaves the library altogether.
 
 Songs from an import that couldn't be matched wait under **Matching** too, if you sent them there. Each shows the
@@ -137,9 +144,10 @@ only into that song's files, so the rest of the album keeps the album's cover. C
 After each scan, Melodex looks for lyrics for every song you have that has none, through the lyrics plugins (LRCLIB
 out of the box). Each song's page says whether it has synced lyrics (each line with when it's sung, so the player can
 follow along), plain lyrics, or none, and where they're read from: an `.lrc` file beside the song, or its lyrics tag.
-**View** shows them line by line. With the **Format** permission, the page can also:
+Below that the lyrics are shown line by line, with when each is sung, in a box that scrolls past nine or so. With the
+**Format** permission, the page can also:
 
-- **Edit** them, from View: change any line or its time, add and remove lines, or edit them as text, for example to
+- **Edit** them: change any line or its time, add and remove lines, or edit them as text, for example to
   paste lyrics in. Tick **Timed** for synced lyrics; times are minutes and seconds, such as `1:02.50`. A song without
   lyrics has **Write** instead.
 - **Search** the lyrics plugins, for the song's own title and artist or words you type, and choose the lyrics yourself.
@@ -162,8 +170,17 @@ again after a month. Lyrics move with their song when formatting moves it, and g
 
 ## Removing music
 
-The Library page can remove an artist, album or track. Either the files are deleted (with any folder left holding
-only artwork) and Navidrome is told, or they stay and are hidden, so Melodex stops counting them until they're put
-back on Review.
+The Library page can remove an artist, album or track, and a song's page each of its files (**Remove**, beside the
+file). Either the files are deleted (with any folder left holding only artwork) and Navidrome is told, or they stay and
+are hidden, so Melodex stops counting them until they're put back on Review.
+
+## Replacing a song
+
+A song fetched as the wrong recording, but in a quality good enough that an upgrade won't touch it, can be replaced:
+**Replace**, beside its file on the song's page. Melodex fetches a new file, passing over the one you have (the copy it
+was fetched from, and any byte-for-byte the same), matches it by the catalogue's length rather than the file's, and
+keeps it whatever its quality, as long as the profile allows it. It goes in the old file's place, tagged as it was, so
+the song keeps its place in the library and in every playlist. The old file is held or deleted as upgrades' are, so it
+can be put back from **Review → Upgraded**. It shows on Activity marked **Replace**.
 
 Next: [Users and permissions](users-and-permissions.md).

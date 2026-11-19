@@ -8,7 +8,7 @@
 @if (Auth.May(UserPermissions.Listen))
 {
     <span class="queue-menu @Class">
-        <IconButton Icon="@(_done ? "done" : "queue")" Large="Large" Disabled="Disabled" On="_open" Title="@Title" OnClick="ClickAsync" />
+        <IconButton Icon="@(_done ? "done" : "queue")" Large="Large" Label="@Label" Disabled="Disabled" On="_open" Title="@Title" OnClick="ClickAsync" />
         @if (_open)
         {
             <div class="menu-backdrop" @onclick="() => _open = false"></div>
@@ -25,6 +25,9 @@
     [Parameter, EditorRequired] public Func<bool, Task> OnQueue { get; set; } = _ => Task.CompletedTask;
 
     [Parameter] public string Title { get; set; } = "Add to the queue: play next, or play last";
+
+    /// <summary>Its text beside the icon, where there's room for it.</summary>
+    [Parameter] public string? Label { get; set; }
 
     [Parameter] public string? Class { get; set; }
 

@@ -6,6 +6,7 @@ using Melodex.Web;
 var builder = WebAssemblyHostBuilder.CreateDefault(args);
 builder.RootComponents.Add<App>("#app");
 builder.RootComponents.Add<HeadOutlet>("head::after");
+builder.Logging.AddProvider(new ErrorReporter());
 
 // The web app is just another client of the public API, served from the same origin.
 builder.Services.AddScoped<AuthState>();
@@ -28,4 +29,6 @@ builder.Services.AddScoped<Glimpses>();
 builder.Services.AddScoped<NavSections>();
 builder.Services.AddScoped<ViewTransitions>();
 
-await builder.Build().RunAsync();
+var host = builder.Build();
+ErrorReporter.Js = host.Services.GetRequiredService<Microsoft.JSInterop.IJSRuntime>() as Microsoft.JSInterop.IJSInProcessRuntime;
+await host.RunAsync();

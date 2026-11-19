@@ -116,7 +116,7 @@ public sealed class RequestTracker : IDisposable
         return created;
     }
 
-    /// <summary>Asked for here some other way: it gets a notification when it finishes.</summary>
+    /// <summary>Asked for here some other way, such as a replacement: it gets a notification when it finishes.</summary>
     public void Watch(RequestInfo asked)
     {
         var lot = _lots.LastOrDefault();
@@ -192,12 +192,12 @@ public sealed class RequestTracker : IDisposable
             if (now.Count == 1)
             {
                 var one = now[0];
-                var (verb, icon) = one.Upgrade ? ("upgraded", "upgrade") : ("in your library", "get");
+                var (verb, icon) = one.Upgrade ? ("upgraded", "upgrade") : one.Replace ? ("replaced", "retry") : ("in your library", "get");
                 notices.Show(one.State switch
                 {
                     RequestState.InLibrary => new Notice(key, Kind(one), one.Title, Capital(verb), Href(lot), icon, art),
                     RequestState.NeedsReview => new Notice(key, Kind(one), one.Title, "Fetched, and waiting for you to review it", "review", icon, art),
-                    _ => new Notice(key, Kind(one), one.Title, (one.Upgrade ? "No better copy found" : "Couldn't be fetched")
+                    _ => new Notice(key, Kind(one), one.Title, (one.Upgrade ? "No better copy found" : one.Replace ? "Couldn't be replaced" : "Couldn't be fetched")
                         + (one.Detail is { } why ? $": {why}" : ""), Href(lot), "attention", art, Failed: true),
                 });
                 continue;
