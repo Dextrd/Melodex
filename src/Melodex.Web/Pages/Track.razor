@@ -74,10 +74,6 @@ else
                 <a href="artists/@track.ArtistId">@track.ArtistCredit</a>
                 @if (track.DurationSeconds is not null) { <span>@Format.Duration(track.DurationSeconds)</span> }
                 <StatusBadge Track="@(owned ? TrackStatus.Owned : track.Ignored ? TrackStatus.Ignored : TrackStatus.Missing)" />
-                @if (owned)
-                {
-                    <span class="badge @(Lyrics(track) is LyricsKind.Synced or LyricsKind.Plain ? "owned" : "neutral")" title="@LyricsHint(Lyrics(track))">@LyricsLabel(Lyrics(track))</span>
-                }
                 <ProviderIds Ids="track.Ids" Entity="recording" />
             </div>
             <div class="row album-actions" style="margin-top: .5rem;">
@@ -331,27 +327,6 @@ else
     }
     private bool _choosingCover;
     private (string Name, IReadOnlyList<PlaylistItem> Songs)? _adding;
-    // The best any of its files has.
-    private static LyricsKind Lyrics(TrackDetail track) =>
-        track.Files.Select(f => f.Lyrics).OrderBy(k => k switch { LyricsKind.Synced => 0, LyricsKind.Plain => 1, LyricsKind.Instrumental => 2, _ => 3 })
-            .FirstOrDefault();
-
-    private static string LyricsLabel(LyricsKind kind) => kind switch
-    {
-        LyricsKind.Synced => "Synced lyrics",
-        LyricsKind.Plain => "Lyrics",
-        LyricsKind.Instrumental => "Instrumental",
-        _ => "No lyrics",
-    };
-
-    private static string LyricsHint(LyricsKind kind) => kind switch
-    {
-        LyricsKind.Synced => "Its lyrics are timed, so the player can follow along",
-        LyricsKind.Plain => "It has lyrics, without timings",
-        LyricsKind.Instrumental => "A lyrics source says it has no words.",
-        _ => "No lyrics yet. Scans look for them through the lyrics plugins, when Settings say to.",
-    };
-
     protected override async Task OnParametersSetAsync()
     {
         ScanStatus.LibraryChanged -= Reload;
