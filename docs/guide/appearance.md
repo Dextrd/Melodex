@@ -9,6 +9,9 @@ device you sign in on, and everyone chooses their own.
 - **High contrast**: stronger text and borders, and the owned, partial, covered and missing colours in a palette that
   people with the common kinds of colour blindness can tell apart.
 
+Whoever may change settings also chooses the look for everyone who hasn't chosen their own: the **You** / **Everyone**
+switch at the top right of the panel goes between the two.
+
 The sign-in page uses the last theme chosen in that browser.
 
 ## Notifications

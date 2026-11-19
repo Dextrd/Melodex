@@ -626,6 +626,7 @@ code { font-size: .85em; background: var(--bg); padding: .05rem .3rem; border-ra
 .plugin-sections { display: flex; flex-direction: column; gap: 1.25rem; }
 .panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
 .panel-head { display: flex; align-items: flex-start; gap: 1rem; padding: .9rem 1.1rem; border-bottom: 1px solid var(--border); }
+.panel-head > .panel-switch { margin-left: auto; flex: none; }
 .panel-title { flex: 1; min-width: 0; }
 .panel-title h2 { margin: 0; font-size: 1.05rem; }
 .panel-title p { margin: .25rem 0 0; }
