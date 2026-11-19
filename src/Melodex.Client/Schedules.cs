@@ -131,7 +131,12 @@ public sealed record ScheduleWindowStatus(ScheduleRepeat Repeat, DateTime? Next,
 
 /// <summary>The schedules, when each next runs and how each last went.</summary>
 /// <param name="Running">The run going now, if one is: windows take turns, so one runs at a time.</param>
-public sealed record ScheduleStatus(ScheduleSettings Settings, IReadOnlyList<ScheduleWindowStatus> Windows, ScheduleRunInfo? Running);
+/// <param name="Unavailable">
+/// Tasks that make no sense as things are, with why: the visualiser's bars unless they're made ahead, beside songs. They
+/// can't be ticked, and one ticked already is left out of runs until it makes sense again.
+/// </param>
+public sealed record ScheduleStatus(ScheduleSettings Settings, IReadOnlyList<ScheduleWindowStatus> Windows, ScheduleRunInfo? Running,
+    IReadOnlyDictionary<ScheduledTask, string> Unavailable);
 
 /// <summary>What <c>POST /requests/retry-failed</c> and <c>POST /wishlist/get</c> asked for.</summary>
 /// <param name="Asked">How many requests were queued, again or new.</param>

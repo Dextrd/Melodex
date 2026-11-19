@@ -58,6 +58,33 @@ public sealed class ScheduleTests : IDisposable
         Assert.Equal(22, upgrades.NextRun!.Value.Hour);
     }
 
+    [Fact]
+    public async Task The_visualisers_bars_are_only_made_on_a_schedule_while_they_sit_beside_songs()
+    {
+        // Made as songs play, to start with: ticked on the daily schedule, but left out of its runs, and saying why.
+        var status = await _api.GetSchedulesAsync();
+        Assert.Contains(ScheduledTask.Bars, status.Settings.Daily.Tasks);
+        Assert.StartsWith("The bars are made as each song plays", status.Unavailable[ScheduledTask.Bars]);
+        var refused = await Assert.ThrowsAsync<MelodexApiException>(() => _api.MakeBarsAsync());
+        Assert.Equal(HttpStatusCode.Conflict, refused.Status);
+
+        var now = DateTime.UtcNow;
+        var open = new DailySchedule { From = TimeOnly.FromDateTime(now.AddHours(-1)), Until = TimeOnly.FromDateTime(now.AddHours(1)), Tasks = [ScheduledTask.Bars] };
+        await _api.SaveSchedulesAsync(status.Settings with { TimeZone = "UTC", Daily = open, Weekly = status.Settings.Weekly with { Tasks = [] } });
+        Assert.Null((await _api.GetSchedulesAsync()).Windows.Single(w => w.Repeat == ScheduleRepeat.Daily).Next);
+        using var scope = _factory.Services.CreateScope();
+        var tasks = scope.ServiceProvider.GetRequiredService<ScheduledTasks>();
+        await tasks.TickAsync(now, default);
+        Assert.Null((await _api.GetSchedulesAsync()).Running);
+
+        // Beside songs, it runs.
+        await _api.SavePlaybackSettingsAsync(new SavePlayback(VisualiserBars.WhenMatching));
+        status = await _api.GetSchedulesAsync();
+        Assert.Empty(status.Unavailable);
+        await tasks.TickAsync(now, default);
+        Assert.Equal(ScheduledTask.Bars, (await _api.GetSchedulesAsync()).Running!.Steps.Single().Task);
+    }
+
     [Theory]
     [InlineData("zone")]
     [InlineData("month")]

@@ -91,13 +91,24 @@ else
                     var here = window.Tasks.Contains(task);
                     var elsewhere = _settings.WhenRuns(task) is { } other && other != repeat ? other : (ScheduleRepeat?)null;
                     var (where, href) = Schedules.RunNow(task);
-                    <li>
+                    var why = _status.Unavailable.GetValueOrDefault(task);
+                    <li class="@(why is null ? null : "unavailable")">
                         <label class="dialog-choice">
-                            <input type="checkbox" checked="@here" @onchange="e => Tick(repeat, task, (bool)e.Value!)" />
+                            @* One that makes no sense can't be ticked; one ticked already stays so, left out of runs until it does. *@
+                            <input type="checkbox" checked="@here" disabled="@(why is not null && !here)" @onchange="e => Tick(repeat, task, (bool)e.Value!)" />
                             <span>
                                 <strong>@Schedules.Name(task)</strong>
                                 @if (elsewhere is { } on) { <span class="muted small"> · on the @Schedules.Name(on).ToLowerInvariant() schedule</span> }
-                                <span class="muted small">@Schedules.Hint(task) Run it now from <a href="@href">@where</a>.</span>
+                                @if (why is not null)
+                                {
+                                    <span class="muted small">
+                                        @why @(here ? "It's left out of runs until" : "It can be ticked once") the bars sit beside songs, under <a href="@href">@where</a>.
+                                    </span>
+                                }
+                                else
+                                {
+                                    <span class="muted small">@Schedules.Hint(task) Run it now from <a href="@href">@where</a>.</span>
+                                }
                             </span>
                         </label>
                     </li>
@@ -105,9 +116,9 @@ else
             </ul>
 
             <div class="muted small schedule-when">
-                @if (window.Tasks.Count == 0)
+                @if (!window.Tasks.Any(t => !_status.Unavailable.ContainsKey(t)))
                 {
-                    <span>Nothing's ticked, so it doesn't run.</span>
+                    <span>Nothing's ticked that can run, so it doesn't.</span>
                 }
                 else if (status?.Next is { } next)
                 {

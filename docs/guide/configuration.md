@@ -40,8 +40,9 @@ ticking it on one takes it off another; one on none only runs when you start it.
 - **Update the catalogue**: look up every library artist's discography.
 - **Check lossless files**: look for lossy music passed off as lossless in files not checked yet.
 - **Look for missing lyrics**: look again for songs without lyrics.
-- **Make the visualiser's bars**: for songs without them, while **Settings → Playback** makes them when matching;
-  otherwise it's skipped, saying why.
+- **Make the visualiser's bars**: for songs without them. Only while **Settings → Playback** keeps bars beside songs:
+  made as songs play, or with the visualiser off, it's greyed out, saying why, and one ticked already is left out of
+  runs until they're kept beside songs again.
 - **Retry failed downloads**: ask again for downloads that failed. Any not started when the window closes go back to
   failed, for the next window.
 - **Get what's on wishlists**: ask for what's on everyone's wishlist, each in the name of whoever wished for it, when a

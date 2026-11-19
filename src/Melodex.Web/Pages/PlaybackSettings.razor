@@ -63,15 +63,16 @@ else
                 }
             </div>
         }
-        <div class="setting-line">
-            <ScheduleNote Task="ScheduledTask.Bars" />
-            @if (_status.Settings.Visualiser == VisualiserBars.WhenMatching)
-            {
+        @* Only while bars sit beside songs: made as songs play, or with no visualiser, there are none to make. *@
+        @if (_status.Settings.Visualiser == VisualiserBars.WhenMatching)
+        {
+            <div class="setting-line">
+                <ScheduleNote Task="ScheduledTask.Bars" />
                 <span class="spacer"></span>
                 <button disabled="@_makingBars" @onclick="MakeBarsAsync">@if (_makingBars) { <span class="spinner"></span> }Make missing bars now</button>
-            }
-        </div>
-        @if (_barsError is not null) { <div class="error small">@_barsError</div> }
+            </div>
+            @if (_barsError is not null) { <div class="error small">@_barsError</div> }
+        }
     </div>
 
     <h2>Listen now</h2>

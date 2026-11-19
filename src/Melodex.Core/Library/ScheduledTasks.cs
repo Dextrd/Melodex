@@ -58,9 +58,10 @@ public sealed class ScheduledTasks(
         {
             downloads = new ScheduleDownloads();
             var schedule = await settings.GetScheduleAsync(ct);
+            var unavailable = await UnavailableAsync(ct);
             foreach (var repeat in Enum.GetValues<ScheduleRepeat>())
             {
-                var tasks = schedule.Of(repeat).Tasks.Distinct().Order().ToList();
+                var tasks = schedule.Of(repeat).Tasks.Distinct().Where(t => !unavailable.ContainsKey(t)).Order().ToList();
                 if (tasks.Count == 0 || ScheduleWindows.Current(schedule, repeat, utcNow) is not { } open
                     || runs.Last.GetValueOrDefault(repeat)?.Opens == open.Start)
                     continue;
@@ -83,6 +84,18 @@ public sealed class ScheduledTasks(
         {
             Current = finished ? null : run, Last = last, Downloads = finished ? new ScheduleDownloads() : downloads,
         }, ct);
+    }
+
+    /// <summary>Tasks that make no sense as things are, with why.</summary>
+    public async Task<Dictionary<ScheduledTask, string>> UnavailableAsync(CancellationToken ct)
+    {
+        var unavailable = new Dictionary<ScheduledTask, string>();
+        var bars = (await settings.GetPlaybackAsync(ct)).Visualiser;
+        if (bars != VisualiserBars.WhenMatching)
+            unavailable[ScheduledTask.Bars] = bars == VisualiserBars.Off
+                ? "The visualiser is off, so there are no bars to make."
+                : "The bars are made as each song plays, so none are kept beside songs to make ahead.";
+        return unavailable;
     }
 
     // Each step as far as it can go now.
@@ -339,10 +352,11 @@ public sealed class ScheduledTasks(
     {
         var schedule = await settings.GetScheduleAsync(ct);
         var runs = await settings.GetScheduleRunsAsync(ct);
+        var unavailable = await UnavailableAsync(ct);
         var now = DateTime.UtcNow;
         var windows = Enum.GetValues<ScheduleRepeat>().Select(r => new ScheduleWindowStatus(r,
-            schedule.Of(r).Tasks.Count > 0 ? ScheduleWindows.Next(schedule, r, now) : null, runs.Last.GetValueOrDefault(r))).ToList();
-        return new ScheduleStatus(schedule, windows, runs.Current);
+            schedule.Of(r).Tasks.Any(t => !unavailable.ContainsKey(t)) ? ScheduleWindows.Next(schedule, r, now) : null, runs.Last.GetValueOrDefault(r))).ToList();
+        return new ScheduleStatus(schedule, windows, runs.Current, unavailable);
     }
 }
 
