@@ -4,6 +4,7 @@
 @inject AuthState Auth
 @using Microsoft.JSInterop
 @inject IJSRuntime Js
+@inject NavigationManager Nav
 
 <SectionTitle>API · Melodex</SectionTitle>
 
@@ -28,7 +29,8 @@ else
                 <p class="muted small">
                     Apps use a key to call Melodex, sent in the <code>X-Api-Key</code> header. A key is yours: it can do only what you may, and goes if
                     you're removed. Give each app its own, with only what it needs, so you can revoke one without the others. See the
-                    <a href="api/docs" target="_blank" rel="noopener">API reference</a>.
+                    <a href="api/docs" target="_blank" rel="noopener">API reference</a>. A key can also sign
+                    <a href="settings/help/subsonic-players">Subsonic players</a> in, one for each phone or computer.
                 </p>
             </div>
             <button class="primary small" @onclick="StartNewKey">New key</button>
@@ -52,6 +54,10 @@ else
                             @foreach (var scope in key.Scopes)
                             {
                                 <span class="badge neutral" title="@Hint(scope)">@Name(scope)</span>
+                            }
+                            @if (key.Subsonic)
+                            {
+                                <span class="badge" title="Subsonic players can sign in with it, as the password">Subsonic</span>
                             }
                         </div>
                         <div class="muted small">
@@ -91,6 +97,20 @@ else
                     </label>
                 }
             }
+            @if (Auth.May(UserPermissions.Listen))
+            {
+                <div class="field-label">Subsonic players</div>
+                <label class="dialog-choice">
+                    <input type="checkbox" checked="@_subsonic" @onchange="e => ToggleSubsonic((bool)e.Value!)" />
+                    <span>
+                        <strong>Let a Subsonic player sign in with it</strong>
+                        <span class="muted small">
+                            Such as Symfonium, Amperfy or Feishin: your username, and this key as the password. It needs Listen. Melodex keeps it encrypted
+                            rather than only a fingerprint of it, as many players need it whole.
+                        </span>
+                    </span>
+                </label>
+            }
             @if (_keyError is not null) { <p class="error small">@_keyError</p> }
             <div class="toolbar dialog-buttons">
                 <button @onclick="() => _making = false">Cancel</button>
@@ -102,11 +122,27 @@ else
     @if (_made is { } made)
     {
         <Dialog Title="@($"Key for {made.Info.Name}")" OnClose="() => _made = null">
-            <p>Copy it into the app now. Melodex keeps only a fingerprint of it, so it can't show it again.</p>
-            <div class="secret-box">
-                <code>@made.Key</code>
-                <IconButton Icon="copy" Title="Copy" Confirm="true" OnClick="() => CopyAsync(made.Key)" />
-            </div>
+            @if (made.Info.Subsonic)
+            {
+                <p>Type these into the player now. Melodex won't show the key again.</p>
+                <dl class="subsonic-login">
+                    <dt>Server</dt>
+                    <dd class="secret-box"><code>@Server</code><IconButton Icon="copy" Title="Copy" Confirm="true" OnClick="() => CopyAsync(Server)" /></dd>
+                    <dt>Username</dt>
+                    <dd class="secret-box"><code>@made.Info.Owner</code><IconButton Icon="copy" Title="Copy" Confirm="true" OnClick="() => CopyAsync(made.Info.Owner!)" /></dd>
+                    <dt>Password</dt>
+                    <dd class="secret-box"><code>@made.Key</code><IconButton Icon="copy" Title="Copy" Confirm="true" OnClick="() => CopyAsync(made.Key)" /></dd>
+                </dl>
+                <p class="muted small">A player that signs in with an API key takes the key alone. A player away from home needs a server address it can reach from there.</p>
+            }
+            else
+            {
+                <p>Copy it into the app now. Melodex keeps only a fingerprint of it, so it can't show it again.</p>
+                <div class="secret-box">
+                    <code>@made.Key</code>
+                    <IconButton Icon="copy" Title="Copy" Confirm="true" OnClick="() => CopyAsync(made.Key)" />
+                </div>
+            }
             <div class="toolbar dialog-buttons"><button class="primary" @onclick="() => _made = null">Done</button></div>
         </Dialog>
     }
@@ -130,6 +166,7 @@ else
     private bool _making;
     private string _keyName = "";
     private HashSet<string> _keyScopes = [];
+    private bool _subsonic;
     private string? _keyError;
     private CreatedApiKey? _made;
     private ApiKeyInfo? _revoking;
@@ -150,6 +187,7 @@ else
     {
         _keyName = "";
         _keyScopes = [UserPermissions.Read];
+        _subsonic = false;
         _keyError = null;
         _making = true;
     }
@@ -160,7 +198,21 @@ else
             _keyScopes.Add(scope);
         else
             _keyScopes.Remove(scope);
+        // A player can't do without listening.
+        if (!_keyScopes.Contains(UserPermissions.Listen) && !_keyScopes.Contains(UserPermissions.Admin))
+            _subsonic = false;
     }
+
+    /// <summary>For a player: it listens, and browses what it plays.</summary>
+    private void ToggleSubsonic(bool on)
+    {
+        _subsonic = on;
+        if (on && !_keyScopes.Contains(UserPermissions.Admin))
+            _keyScopes.Add(UserPermissions.Listen);
+    }
+
+    /// <summary>The address players connect to: this one, without the web app's page.</summary>
+    private string Server => Nav.BaseUri.TrimEnd('/');
 
     private async Task MakeKeyAsync()
     {
@@ -169,7 +221,7 @@ else
         try
         {
             List<string> scopes = _keyScopes.Contains(UserPermissions.Admin) ? [UserPermissions.Admin] : UserPermissions.All.Select(p => p.Id).Where(_keyScopes.Contains).ToList();
-            _made = await Api.CreateApiKeyAsync(new CreateApiKey(_keyName, scopes));
+            _made = await Api.CreateApiKeyAsync(new CreateApiKey(_keyName, scopes, _subsonic));
             _making = false;
             _keys = await Api.ListApiKeysAsync();
         }

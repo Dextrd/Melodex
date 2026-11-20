@@ -6,19 +6,26 @@ in the browser. You don't need Navidrome for this, though Melodex still works wi
 
 ## Signing in
 
-Under **Your account**, in the account menu, **Subsonic players** has what to type into a player:
+Players sign in with an API key, not your password. Under **Settings → API**, make a **New key**, named for the phone
+or computer it's for, and tick **Let a Subsonic player sign in with it** (which gives it the **Listen** permission).
+Melodex then shows what to type into the player:
 
 - **Server**: the address you open Melodex at, such as `https://music.example.com`. A player on your phone away from
   home needs an address it can reach from there.
 - **Username**: yours in Melodex.
-- **App password**: **Make an app password** gives you one, kept apart from your own password. Players sign in with
-  it, so your real password never sits in an app on a phone. You can see it again there whenever you need it, and
-  **Replace** it if a phone is lost: players still using the old one have to sign in again. **Remove** takes it away.
+- **Password**: the key.
 
-Players that know OpenSubsonic's API-key sign-in can use an API key instead, with the **Listen** permission: make one
-under **Settings → API**. Revoking the key signs out just that player.
+A player that signs in with an API key alone, as OpenSubsonic's newer players can, takes the key without a username,
+and any key with **Listen** works for that, ticked or not.
 
-You need the **Listen** permission to use a player at all: the admin gives it under **Settings → Users**.
+Make one key for each player: if a phone is lost, revoke its key under **Settings → API** and the rest carry on.
+Nothing stops one key being used on several, but they'd all be signed out together. Your own password never works in
+a player, so it never sits in an app on a phone.
+
+A ticked key is kept encrypted rather than only as a fingerprint, as most players send a scrambled form of their
+password that can only be checked against the key itself. Melodex still shows it only once, when it's made.
+
+To make a key you need the **Listen** and **API keys and webhooks** permissions: the admin gives them under **Settings → Users**.
 
 ## What players see
 

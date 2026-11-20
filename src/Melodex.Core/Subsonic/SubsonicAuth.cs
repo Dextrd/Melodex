@@ -49,15 +49,16 @@ public static class SubsonicErrors
 }
 
 /// <summary>
-/// Who a Subsonic player is (#7). OpenSubsonic's <c>apiKey</c> takes a Melodex API key with the listen scope; players
-/// without it sign in with a username and the person's app password, kept apart from their real one, sent as it is
-/// (<c>p</c>, perhaps hex-encoded) or as a token, an MD5 of it and a salt (<c>t</c> and <c>s</c>).
+/// Who a Subsonic player is (#7): always an API key with the listen scope. OpenSubsonic's <c>apiKey</c> takes any;
+/// players without it sign in with a username and, as the password, one of that person's keys made for Subsonic
+/// players, sent as it is (<c>p</c>, perhaps hex-encoded) or as a token, an MD5 of it and a salt (<c>t</c> and
+/// <c>s</c>). Their real password never works here.
 /// </summary>
 public sealed class SubsonicAuth(AccessService access, MelodexDbContext db, IDataProtectionProvider protection)
 {
-    private IDataProtector Protector => protection.CreateProtector("Melodex.SubsonicPassword");
+    private IDataProtector Protector => protection.CreateProtector("Melodex.SubsonicKey");
 
-    public string Protect(string password) => Protector.Protect(password);
+    public string Protect(string key) => Protector.Protect(key);
 
     public string? Unprotect(string? stored)
     {
@@ -74,51 +75,43 @@ public sealed class SubsonicAuth(AccessService access, MelodexDbContext db, IDat
         }
     }
 
-    /// <summary>A new app password: long enough to be safe, in letters and digits a phone keyboard types easily.</summary>
-    public static string NewPassword()
-    {
-        const string letters = "abcdefghjkmnpqrstuvwxyz23456789";
-        var chars = new char[20];
-        for (var i = 0; i < chars.Length; i++)
-            chars[i] = letters[RandomNumberGenerator.GetInt32(letters.Length)];
-        // In fours, to read out and type.
-        return string.Join('-', chars.Chunk(5).Select(c => new string(c)));
-    }
-
     /// <summary>The caller, or the error to answer with.</summary>
     public async Task<(Caller? Caller, SubsonicResponse? Error)> IdentifyAsync(SubsonicParams p, string address, CancellationToken ct)
     {
-        var key = p["apiKey"];
+        var apiKey = p["apiKey"];
         var username = p["u"];
-        if (key is not null)
+        if (apiKey is not null)
         {
             if (username is not null || p["p"] is not null || p["t"] is not null)
                 return (null, SubsonicResponse.Error(SubsonicErrors.ConflictingMechanisms, "Send an API key or a username and password, not both."));
-            var caller = await access.FromKeyAsync(key, ct);
-            if (caller is null)
+            var app = await access.FromKeyAsync(apiKey, ct);
+            if (app is null)
                 return (null, SubsonicResponse.Error(SubsonicErrors.BadApiKey, "That isn't a Melodex API key."));
-            return caller.May(Scopes.Listen) && caller.UserId is not null
-                ? (caller, null)
+            return app.May(Scopes.Listen) && app.UserId is not null
+                ? (app, null)
                 : (null, SubsonicResponse.Error(SubsonicErrors.NotAllowed, "That API key can't listen: give it the listen scope."));
         }
         if (username is null)
-            return (null, SubsonicResponse.Error(SubsonicErrors.Missing, "Sign in with an API key (apiKey) or a username (u) and app password."));
+            return (null, SubsonicResponse.Error(SubsonicErrors.Missing, "Sign in with an API key (apiKey), or a username (u) and a key made for Subsonic players as the password."));
         if (access.TooManyFailures(address))
             return (null, SubsonicResponse.Error(SubsonicErrors.WrongLogin, "Too many wrong passwords: wait a few minutes and try again."));
 
-        var user = await db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.NormalizedUsername == AccessService.Normalize(username), ct);
-        var expected = Unprotect(user?.SubsonicPassword);
-        if (user is null || expected is null || !Matches(p, expected))
+        var normalized = AccessService.Normalize(username);
+        var secrets = await db.ApiKeys.AsNoTracking()
+            .Where(k => k.SubsonicSecret != null && k.User != null && k.User.NormalizedUsername == normalized)
+            .Select(k => k.SubsonicSecret).ToListAsync(ct);
+        var key = secrets.Select(Unprotect).FirstOrDefault(k => k is not null && Matches(p, k));
+        var caller = key is null ? null : await access.FromKeyAsync(key, ct);
+        if (caller is null)
         {
             access.Failed(address);
             return (null, SubsonicResponse.Error(SubsonicErrors.WrongLogin,
-                "Wrong username or password. Players sign in with your app password, from Your account in Melodex, not your own password."));
+                "Wrong username or password. Players sign in with an API key made for Subsonic players, under Settings → API in Melodex, not your own password."));
         }
         access.Succeeded(address);
-        var scopes = AccessService.PermissionsOf(user);
-        if (!user.IsAdmin && !scopes.Contains(Scopes.Listen))
-            return (null, SubsonicResponse.Error(SubsonicErrors.NotAllowed, "You can't listen in Melodex. The admin can let you, under Settings → Users."));
-        return (new Caller(CallerKind.User, user.Username, scopes, user.Id, IsAdmin: user.IsAdmin), null);
+        return caller.May(Scopes.Listen)
+            ? (caller, null)
+            : (null, SubsonicResponse.Error(SubsonicErrors.NotAllowed, "That key can't listen: you or it may no longer have the Listen permission."));
     }
 
     private static bool Matches(SubsonicParams p, string expected)

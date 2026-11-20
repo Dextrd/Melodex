@@ -3,7 +3,7 @@
 
 <PageTitle>Your account · Melodex</PageTitle>
 
-@* Your own login, what you may do, and your login on each media server: the page version of editing a user; then how Subsonic players sign in. *@
+@* Your own login, what you may do, and your login on each media server: the page version of editing a user. *@
 <h1>Your account</h1>
 @if (Auth.Status is { } status)
 {
@@ -15,5 +15,4 @@
             <UserEditor Self="true" />
         </div>
     </section>
-    <SubsonicPanel />
 }

@@ -97,6 +97,9 @@ namespace Melodex.Core.Data.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("SubsonicSecret")
+                        .HasColumnType("TEXT");
+
                     b.Property<Guid?>("UserId")
                         .HasColumnType("TEXT");
 
@@ -1181,12 +1184,6 @@ namespace Melodex.Core.Data.Migrations
 
                     b.Property<string>("Stamp")
                         .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("SubsonicPassword")
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateTime?>("SubsonicPasswordAt")
                         .HasColumnType("TEXT");
 
                     b.Property<string>("Username")

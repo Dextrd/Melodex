@@ -28,13 +28,6 @@ public class User
     /// <summary>How the web app looks to them, as JSON: see <c>Appearance</c>. Empty for the default.</summary>
     public string? Appearance { get; set; }
 
-    /// <summary>
-    /// Their app password for Subsonic players (#7), encrypted with the data protection keys: players sign in with it,
-    /// or a token made from it, in place of their real password, so it has to be kept, not hashed. Null for none.
-    /// </summary>
-    public string? SubsonicPassword { get; set; }
-    public DateTime? SubsonicPasswordAt { get; set; }
-
     /// <summary>Their own logins on the media servers, for syncing their playlists: one for each server, kept when another takes over.</summary>
     public List<MediaServerLogin> MediaServerLogins { get; set; } = [];
 
@@ -88,6 +81,13 @@ public class ApiKey
 
     /// <summary>Roughly when it was last used; updated at most once a minute.</summary>
     public DateTime? LastUsedAt { get; set; }
+
+    /// <summary>
+    /// For a key Subsonic players may sign in with as a password (#7), the key itself, encrypted with the data protection
+    /// keys: players that send a token, a hash of the password and a salt, can only be checked against the key itself.
+    /// Null for any other key, of which only the hash is kept.
+    /// </summary>
+    public string? SubsonicSecret { get; set; }
 }
 
 /// <summary>An address Melodex tells, with a signed POST, when something it cares about happens.</summary>

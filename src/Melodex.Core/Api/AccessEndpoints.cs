@@ -135,45 +135,6 @@ public static class AccessEndpoints
             .WithSummary("Change your own username or password. A new password signs out your other sessions.")
             .Produces(StatusCodes.Status204NoContent).ProducesValidationProblem();
 
-        // Subsonic players sign in with an app password, apart from the real one (#7).
-        auth.MapGet("/subsonic", async (HttpContext http, MelodexDbContext db, Subsonic.SubsonicAuth subsonic, CancellationToken ct) =>
-                await db.Users.FindAsync([Caller.Of(http).UserId], ct) is { } user
-                    ? Results.Ok(new SubsonicLogin(user.Username, subsonic.Unprotect(user.SubsonicPassword), user.SubsonicPasswordAt))
-                    : Results.NotFound())
-            .RequireScope(Scopes.SignedIn)
-            .WithName("GetSubsonicLogin")
-            .WithSummary("Your login for Subsonic players: your username and app password, if you've made one. Only someone signed in sees it.")
-            .Produces<SubsonicLogin>();
-
-        auth.MapPost("/subsonic", async (HttpContext http, MelodexDbContext db, Subsonic.SubsonicAuth subsonic, CancellationToken ct) =>
-            {
-                if (await db.Users.FindAsync([Caller.Of(http).UserId], ct) is not { } user)
-                    return Results.NotFound();
-                var password = Subsonic.SubsonicAuth.NewPassword();
-                user.SubsonicPassword = subsonic.Protect(password);
-                user.SubsonicPasswordAt = DateTime.UtcNow;
-                await db.SaveChangesAsync(ct);
-                return Results.Ok(new SubsonicLogin(user.Username, password, user.SubsonicPasswordAt));
-            })
-            .RequireScope(Scopes.SignedIn)
-            .WithName("NewSubsonicPassword")
-            .WithSummary("Make you a new app password for Subsonic players, in place of any you had: players still using the old one have to sign in again.")
-            .Produces<SubsonicLogin>();
-
-        auth.MapDelete("/subsonic", async (HttpContext http, MelodexDbContext db, CancellationToken ct) =>
-            {
-                if (await db.Users.FindAsync([Caller.Of(http).UserId], ct) is not { } user)
-                    return Results.NotFound();
-                user.SubsonicPassword = null;
-                user.SubsonicPasswordAt = null;
-                await db.SaveChangesAsync(ct);
-                return Results.NoContent();
-            })
-            .RequireScope(Scopes.SignedIn)
-            .WithName("RemoveSubsonicPassword")
-            .WithSummary("Remove your app password: players signed in with it can't play any more. Players using an API key aren't affected.")
-            .Produces(StatusCodes.Status204NoContent);
-
         auth.MapPut("/appearance", async (Appearance body, HttpContext http, AccessService access, MelodexDbContext db, CancellationToken ct) =>
             {
                 if (await db.Users.FindAsync([Caller.Of(http).UserId], ct) is not { } user)
@@ -329,7 +290,8 @@ public static class AccessEndpoints
             })
             .WithName("ListApiKeys").WithSummary("Your API keys, without the keys themselves. The admin sees everyone's.");
 
-        keys.MapPost("", async (CreateApiKey body, HttpContext http, MelodexDbContext db, AccessService access, CancellationToken ct) =>
+        keys.MapPost("", async (CreateApiKey body, HttpContext http, MelodexDbContext db, AccessService access, Subsonic.SubsonicAuth subsonic,
+                CancellationToken ct) =>
             {
                 var caller = Caller.Of(http);
                 var errors = new Dictionary<string, string[]>();
@@ -337,6 +299,8 @@ public static class AccessEndpoints
                     errors["name"] = ["Give the key a name, such as the app it's for."];
                 if (body.Scopes.Count == 0 || body.Scopes.Any(s => !Scopes.IsKnown(s)))
                     errors["scopes"] = [$"Choose one or more of {string.Join(", ", Scopes.All)}."];
+                else if (body.Subsonic && !body.Scopes.Contains(Scopes.Listen) && !body.Scopes.Contains(Scopes.Admin))
+                    errors["subsonic"] = ["A key for Subsonic players needs the Listen permission."];
                 if (errors.Count > 0)
                     return Results.ValidationProblem(errors);
                 if (caller.UserId is not { } owner)
@@ -345,6 +309,8 @@ public static class AccessEndpoints
                 if (Beyond(caller, body.Scopes.Where(s => s != Scopes.Admin)) is { } beyond)
                     return beyond;
                 var (key, record) = AccessService.NewKey(body.Name, body.Scopes, owner);
+                if (body.Subsonic)
+                    record.SubsonicSecret = subsonic.Protect(key);
                 db.ApiKeys.Add(record);
                 await db.SaveChangesAsync(ct);
                 access.KeysChanged();
@@ -353,7 +319,8 @@ public static class AccessEndpoints
             })
             .WithName("CreateApiKey")
             .WithSummary("Make a key for an app. It's yours: it can do only what you may, and goes if you're removed. The key is in this answer "
-                         + "only: Melodex keeps just a hash of it.")
+                         + "only: Melodex keeps just a hash of it, or with subsonic, which lets Subsonic players sign in with it as your password, "
+                         + "the key encrypted, as players that send a token need it.")
             .Produces<CreatedApiKey>(StatusCodes.Status201Created).ProducesValidationProblem();
 
         keys.MapDelete("/{id:guid}", async (Guid id, HttpContext http, MelodexDbContext db, AccessService access, CancellationToken ct) =>
@@ -368,7 +335,7 @@ public static class AccessEndpoints
     }
 
     private static ApiKeyInfo Info(ApiKey key) =>
-        new(key.Id, key.Name, key.Prefix, Scopes.Parse(key.Scopes).ToList(), key.CreatedAt, key.LastUsedAt, key.UserId, key.User?.Username);
+        new(key.Id, key.Name, key.Prefix, Scopes.Parse(key.Scopes).ToList(), key.CreatedAt, key.LastUsedAt, key.UserId, key.User?.Username, key.SubsonicSecret is not null);
 
     private static UserInfo Info(User user, int keys, (string Username, string Server)? linked) =>
         new(user.Id, user.Username, user.IsAdmin, Scopes.All.Where(AccessService.PermissionsOf(user).Contains).ToList(), user.CreatedAt, user.LastSignInAt, keys,

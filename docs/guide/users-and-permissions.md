@@ -34,7 +34,7 @@ them out everywhere else.
 | **API keys and webhooks** | Making API keys for apps, and managing webhooks |
 | **Manage users** | Adding, changing and removing other users |
 
-Someone who just listens needs Browse and Listen. Buttons for what someone may not do don't show.
+Someone who just listens needs Browse and Listen. To use a Subsonic player as well, they also need **API keys and webhooks**, because the player signs in with a key they make themselves. Buttons for what someone may not do don't show.
 
 ## API keys
 

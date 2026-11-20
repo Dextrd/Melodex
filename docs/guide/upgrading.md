@@ -32,8 +32,8 @@ under the new **Settings → Scheduled tasks**: see [Scheduled tasks](configurat
 schedule moves there as it was: its times and time zone, on the daily schedule if it ran every day, or else the weekly
 one on the first of its days. Nothing else is put on a schedule, so everything runs as it did until you tick it.
 
-Melodex can be played from [Subsonic players](subsonic-players.md) now. Nothing changes until you make an app password
-under **Your account**. The next scan reads every song's genres from its tags, once, so it takes a little longer than
+Melodex can be played from [Subsonic players](subsonic-players.md) now. Nothing changes until you make an API key for
+one under **Settings → API**. The next scan reads every song's genres from its tags, once, so it takes a little longer than
 usual.
 
 ## To 1.1.0: upgrades replace files

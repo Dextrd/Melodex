@@ -26,7 +26,7 @@ public sealed record SubsonicCall(HttpContext Http, SubsonicParams P, Caller Cal
 
 /// <summary>
 /// The Subsonic API, with OpenSubsonic's extensions (#7), under <c>/rest</c>: so any Subsonic player can browse your
-/// library, play it and keep its playlists, signing in with an API key or your app password. Every call needs the
+/// library, play it and keep its playlists, signing in with an API key, alone or as your password. Every call needs the
 /// listen permission, and answers in XML, or JSON with <c>f=json</c>; errors are a 200 with a code, as players expect.
 /// </summary>
 public static partial class SubsonicEndpoints

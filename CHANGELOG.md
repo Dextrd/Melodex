@@ -9,8 +9,9 @@ What changed in each release of Melodex. Versions follow [semantic versioning](h
 - **Subsonic players**: Melodex speaks the Subsonic API with OpenSubsonic's extensions, at `/rest`, so Symfonium,
   Amperfy, Substreamer, Tempo, Feishin and other Subsonic apps can browse your library, search it, play it (turned
   into MP3, Opus or AAC at a lower bitrate when a player asks), show covers and lyrics, and keep your playlists, the
-  same ones as in Melodex. Players sign in with an app password from **Your account**, kept apart from your own, or
-  an API key with the Listen permission. See the new guide page, Subsonic players (#7).
+  same ones as in Melodex. Players sign in with an API key: tick **Let a Subsonic player sign in with it** when you
+  make one under **Settings → API**, and it's the password with your username. See the new guide page, Subsonic
+  players (#7).
 - Songs' genres are read from their tags. Files scanned before have theirs read on the next scan (#7).
 - **Settings → Scheduled tasks**: daily, weekly and monthly windows, each with its own times (running past midnight
   if it ends earlier than it starts), the weekly one on a day you pick and the monthly one on a day of the month (in a

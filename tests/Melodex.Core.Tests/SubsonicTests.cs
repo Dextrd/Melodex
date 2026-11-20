@@ -125,37 +125,44 @@ public sealed class SubsonicTests : IDisposable
     private static string Md5(string text) => Convert.ToHexStringLower(MD5.HashData(Encoding.UTF8.GetBytes(text)));
 
     [Fact]
-    public async Task Players_sign_in_with_an_app_password_or_an_API_key_with_the_listen_scope()
+    public async Task Players_sign_in_with_an_API_key_alone_or_as_the_password_with_the_username()
     {
-        // No app password yet: the real one doesn't work.
-        Assert.Equal(40, ErrorOf(await CallAsync("ping", $"u={SignedIn.Username}&p={Uri.EscapeDataString(SignedIn.Password)}")));
+        // The real password never works.
+        var u = $"u={SignedIn.Username}";
+        Assert.Equal(40, ErrorOf(await CallAsync("ping", $"{u}&p={Uri.EscapeDataString(SignedIn.Password)}")));
         Assert.Equal(10, ErrorOf(await CallAsync("ping", "")));
 
-        var login = await _api.NewSubsonicPasswordAsync();
-        var password = login.Password!;
-        Assert.Equal((SignedIn.Username, password), (login.Username, (await _api.GetSubsonicLoginAsync()).Password));
-        var u = $"u={login.Username}";
-        await OkAsync("ping", $"{u}&p={password}");
-        await OkAsync("ping", $"{u}&p=enc:{Convert.ToHexStringLower(Encoding.UTF8.GetBytes(password))}");
-        await OkAsync("ping", $"{u}&t={Md5(password + "s4lt")}&s=s4lt");
-        Assert.Equal(40, ErrorOf(await CallAsync("ping", $"{u}&t={Md5(password + "s4lt")}&s=other")));
-        Assert.Equal(40, ErrorOf(await CallAsync("ping", $"{u}&p=wrong")));
+        // A key made for Subsonic players is the password, plain, hex-encoded or as a token.
+        var made = await _api.CreateApiKeyAsync(new CreateApiKey("Phone", [UserPermissions.Listen], Subsonic: true));
+        Assert.True(made.Info.Subsonic);
+        Assert.True((await _api.ListApiKeysAsync()).Single(k => k.Id == made.Info.Id).Subsonic);
+        var key = made.Key;
+        await OkAsync("ping", $"{u}&p={key}");
+        await OkAsync("ping", $"u={SignedIn.Username.ToUpperInvariant()}&p=enc:{Convert.ToHexStringLower(Encoding.UTF8.GetBytes(key))}");
+        await OkAsync("ping", $"{u}&t={Md5(key + "s4lt")}&s=s4lt");
+        Assert.Equal(40, ErrorOf(await CallAsync("ping", $"{u}&t={Md5(key + "s4lt")}&s=other")));
+        Assert.Equal(40, ErrorOf(await CallAsync("ping", $"u=someone&p={key}")));
+        // Signing in says who's playing: the key's owner.
+        Assert.Equal(SignedIn.Username, (string)(await OkAsync("getUser", $"{u}&p={key}"))["user"]!["username"]!);
 
-        // A new one replaces it; removed, there's none.
-        var replaced = (await _api.NewSubsonicPasswordAsync()).Password!;
-        Assert.NotEqual(password, replaced);
-        Assert.Equal(40, ErrorOf(await CallAsync("ping", $"{u}&p={password}")));
-        await _api.RemoveSubsonicPasswordAsync();
-        Assert.Equal(40, ErrorOf(await CallAsync("ping", $"{u}&p={replaced}")));
-        Assert.Null((await _api.GetSubsonicLoginAsync()).Password);
-
-        // OpenSubsonic's API key: one that can listen, alone.
+        // Another key isn't a password, though it works alone with OpenSubsonic's apiKey if it can listen.
         var listen = (await _api.CreateApiKeyAsync(new CreateApiKey("Player", [UserPermissions.Listen]))).Key;
         var read = (await _api.CreateApiKeyAsync(new CreateApiKey("Reader", [UserPermissions.Read]))).Key;
+        Assert.False((await _api.ListApiKeysAsync()).Single(k => k.Name == "Player").Subsonic);
+        Assert.Equal(40, ErrorOf(await CallAsync("ping", $"{u}&p={listen}")));
         await OkAsync("ping", $"apiKey={listen}");
+        await OkAsync("ping", $"apiKey={key}");
         Assert.Equal(43, ErrorOf(await CallAsync("ping", $"apiKey={listen}&{u}")));
         Assert.Equal(44, ErrorOf(await CallAsync("ping", "apiKey=mdx_nothing")));
         Assert.Equal(50, ErrorOf(await CallAsync("ping", $"apiKey={read}")));
+
+        // A key for players has to listen.
+        var refused = await Assert.ThrowsAsync<MelodexApiException>(() => _api.CreateApiKeyAsync(new CreateApiKey("Phone", [UserPermissions.Read], Subsonic: true)));
+        Assert.Contains("Listen", refused.Message);
+
+        // Revoked, it signs the player out.
+        await _api.RevokeApiKeyAsync(made.Info.Id);
+        Assert.Equal(40, ErrorOf(await CallAsync("ping", $"{u}&p={key}")));
 
         var extensions = (await OkAsync("getOpenSubsonicExtensions", $"apiKey={listen}"))["openSubsonicExtensions"]!.AsArray();
         Assert.Contains("apiKeyAuthentication", extensions.Select(e => (string)e!["name"]!));

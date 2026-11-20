@@ -319,9 +319,10 @@ Besides its own API, Melodex speaks the [Subsonic API](http://www.subsonic.org/p
 works with Melodex as it is. The user guide's [Subsonic players](guide/subsonic-players.md) page covers it from a
 listener's side.
 
-- **Signing in**: OpenSubsonic's `apiKey` with a Melodex key that has the `listen` scope, or `u` with the person's
-  app password from **Your account**, as `p` (plain, or `enc:` and hex) or as a token, `t` and `s`. The person's own
-  password doesn't work here. Every call needs the listen permission.
+- **Signing in** is always with an API key that has the `listen` scope: OpenSubsonic's `apiKey` takes any such key;
+  otherwise `u` is the key's owner and the password is a key made with `"subsonic": true` (**Let a Subsonic player
+  sign in with it** in the web app), as `p` (plain, or `enc:` and hex) or as a token, `t` and `s`. Such a key is kept
+  encrypted, as a token can only be checked against the key itself. The person's own password doesn't work here.
 - **Answers** are XML, or JSON with `f=json`; errors are a 200 with Subsonic's error codes. Calls can be form posts
   (`formPost`), and `stream` takes `timeOffset` when it transcodes (`transcodeOffset`).
 - **IDs** are Melodex's own: an artist's and album's are the same as in `/api/v1`, and a song's is its file's ID

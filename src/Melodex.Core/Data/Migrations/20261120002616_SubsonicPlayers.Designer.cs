@@ -11,7 +11,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Melodex.Core.Data.Migrations
 {
     [DbContext(typeof(MelodexDbContext))]
-    [Migration("20261119233139_SubsonicPlayers")]
+    [Migration("20261120002616_SubsonicPlayers")]
     partial class SubsonicPlayers
     {
         /// <inheritdoc />
@@ -98,6 +98,9 @@ namespace Melodex.Core.Data.Migrations
 
                     b.Property<string>("Scopes")
                         .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("SubsonicSecret")
                         .HasColumnType("TEXT");
 
                     b.Property<Guid?>("UserId")
@@ -1184,12 +1187,6 @@ namespace Melodex.Core.Data.Migrations
 
                     b.Property<string>("Stamp")
                         .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("SubsonicPassword")
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateTime?>("SubsonicPasswordAt")
                         .HasColumnType("TEXT");
 
                     b.Property<string>("Username")
