@@ -56,10 +56,11 @@ public sealed class RadioTests : IDisposable
     public async Task A_radio_from_a_song_plays_it_then_songs_like_it_with_your_share_of_ones_you_dont_have()
     {
         var s = await SeedAsync();
-        Assert.Equal(new RadioSettings(25, true), await _api.GetRadioSettingsAsync());
+        Assert.Equal(25, (await _api.GetFetchSettingsAsync()).RadioMissingPercent);
+        Assert.Equal(new RadioSettings(true), await _api.GetRadioSettingsAsync());
 
         // Only songs you have: Glory Box first, as it was started from, then Massive Attack's, found like it or by an artist like Portishead.
-        await _api.SaveRadioSettingsAsync(new RadioSettings(0, true));
+        await ShareAsync(0);
         var batch = (await _api.NextRadioAsync(new RadioNext(s.GloryBox)))!;
         Assert.Equal(("Glory Box", RadioSeedKind.Song), (batch.Name, batch.Kind));
         Assert.Equal(s.GloryBox, batch.Songs[0].TrackId);
@@ -67,7 +68,7 @@ public sealed class RadioTests : IDisposable
         Assert.All(batch.Songs.Skip(1), x => Assert.True(x.Owned));
 
         // All songs you don't have: Overcome, then, with nothing else like it, songs you have.
-        await _api.SaveRadioSettingsAsync(new RadioSettings(100, false));
+        await ShareAsync(100);
         batch = (await _api.NextRadioAsync(new RadioNext(s.GloryBox, [s.GloryBox])))!;
         Assert.Equal(s.Overcome, batch.Songs[0].TrackId);
         Assert.False(batch.Songs[0].Owned);
@@ -81,15 +82,30 @@ public sealed class RadioTests : IDisposable
         Assert.Equal([s.Angel], batch.Songs.Select(x => x.TrackId));
 
         Assert.Null(await _api.NextRadioAsync(new RadioNext(Guid.NewGuid())));
-        var invalid = await _http.PutAsJsonAsync("api/v1/radio/settings", new RadioSettings(150, true), MelodexJson.Options);
+        var invalid = await _http.PutAsJsonAsync("api/v1/settings/fetch", await _api.GetFetchSettingsAsync() with { RadioMissingPercent = 150 },
+            MelodexJson.Options);
         Assert.Equal(HttpStatusCode.BadRequest, invalid.StatusCode);
+
+        await _api.SaveRadioSettingsAsync(new RadioSettings(false));
+        Assert.Equal(new RadioSettings(false), await _api.GetRadioSettingsAsync());
+    }
+
+    [Fact]
+    public async Task The_share_is_a_target_over_the_whole_radio()
+    {
+        var s = await SeedAsync();
+        await ShareAsync(50);
+
+        // Two songs played, both ones you have: the next one is one you don't, to make up for them.
+        var batch = (await _api.NextRadioAsync(new RadioNext(s.GloryBox, [s.GloryBox, s.Teardrop, s.Angel], Take: 1)))!;
+        Assert.Equal([s.Overcome], batch.Songs.Select(x => x.TrackId));
     }
 
     [Fact]
     public async Task A_song_skipped_quickly_isnt_played_again_and_its_artist_comes_up_less()
     {
         var s = await SeedAsync();
-        await _api.SaveRadioSettingsAsync(new RadioSettings(0, true));
+        await ShareAsync(0);
         await _api.SkipRadioSongAsync(s.Teardrop);
 
         var batch = (await _api.NextRadioAsync(new RadioNext(s.GloryBox, [s.GloryBox])))!;
@@ -103,7 +119,7 @@ public sealed class RadioTests : IDisposable
     public async Task Radios_start_from_albums_artists_and_your_playlists_and_subsonic_players_mix_from_them()
     {
         var s = await SeedAsync();
-        await _api.SaveRadioSettingsAsync(new RadioSettings(0, true));
+        await ShareAsync(0);
 
         var album = (await _api.NextRadioAsync(new RadioNext(s.Mezzanine)))!;
         Assert.Equal(("Mezzanine", RadioSeedKind.Album), (album.Name, album.Kind));
@@ -136,6 +152,9 @@ public sealed class RadioTests : IDisposable
         var total = Enumerable.Range(0, 2000).Sum(_ => RadioService.Share(5, 0.25));
         Assert.InRange(total / 2000.0, 1.15, 1.35);
     }
+
+    private async Task ShareAsync(int percent) =>
+        await _api.SaveFetchSettingsAsync(await _api.GetFetchSettingsAsync() with { RadioMissingPercent = percent });
 
     private sealed record Seeded(Guid Portishead, Guid Massive, Guid GloryBox, Guid Teardrop, Guid Angel, Guid Overcome, Guid Mezzanine);
 

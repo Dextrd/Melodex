@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Melodex.Client;
 using Melodex.Core.Catalogue;
 using Melodex.Core.Data;
+using Melodex.Core.Library;
 
 namespace Melodex.Core.Listening;
 
@@ -9,12 +10,12 @@ namespace Melodex.Core.Listening;
 /// Radio (#4): play that never runs out, started from a song, album, artist or playlist. Each batch asks the discovery
 /// plugins for songs like a few of what it was started from, and like what it played lately that you starred or didn't
 /// skip, so it drifts as it goes; when they know too little, it falls back on the library's songs by the same and similar
-/// artists. Songs you don't have make up your share of it, to fetch to listen to. Nothing it's queued comes again, nor
+/// artists. Songs you don't have make up the server's share of it, to fetch to listen to. Nothing it's queued comes again, nor
 /// anything you played in the last two days while there's enough else, nor a song you skipped within half a minute in
 /// the last 90 days; skips also count against the artist, and the same artist doesn't come within three songs
 /// while there's another, nor twice running unless there's nothing else.
 /// </summary>
-public sealed partial class RadioService(MelodexDbContext db, DiscoveryService discovery)
+public sealed partial class RadioService(MelodexDbContext db, DiscoveryService discovery, SettingsService settings)
 {
     /// <summary>How long a quick skip steers radios.</summary>
     public static readonly TimeSpan SkipsKept = TimeSpan.FromDays(90);
@@ -47,8 +48,7 @@ public sealed partial class RadioService(MelodexDbContext db, DiscoveryService d
         var take = Math.Clamp(body.Take, 1, MaxTake);
         var recent = body.Recent ?? [];
         var queued = recent.ToHashSet();
-        var user = await db.Users.AsNoTracking().FirstAsync(u => u.Id == userId, ct);
-        var missingShare = body.OwnedOnly ? 0 : Math.Clamp(user.RadioMissingPercent, 0, 100) / 100.0;
+        var missingShare = body.OwnedOnly ? 0 : Math.Clamp((await settings.GetFetchAsync(ct)).RadioMissingPercent, 0, 100) / 100.0;
 
         var since = DateTime.UtcNow - SkipsKept;
         var skips = await db.RadioSkips.AsNoTracking().Where(s => s.UserId == userId && s.SkippedAt >= since).ToListAsync(ct);
@@ -86,7 +86,9 @@ public sealed partial class RadioService(MelodexDbContext db, DiscoveryService d
             foreach (var song in await OwnedAmongAsync(seed.Tracks, 30, ct))
                 Add(song, 0.5);
         // Too little found, as for an artist the plugins hardly know: songs you have by the same artists and those like them.
-        if (candidates.Values.Count(c => c.Song.Owned) < take * 3)
+        // Counting only those it could still play.
+        int Playable() => candidates.Values.Count(c => c.Song.Owned && !queued.Contains(c.Song.TrackId) && !playedLately.Contains(c.Song.TrackId));
+        if (Playable() < take * 3)
         {
             foreach (var song in await OwnedByAsync(seed.Artists, 30, ct))
                 Add(song, 0.3);
@@ -96,7 +98,7 @@ public sealed partial class RadioService(MelodexDbContext db, DiscoveryService d
                         Add(song, 0.4 * like.Score);
         }
         // And so it never runs out, nor runs short of songs you have for your share of them, anything you have.
-        if (candidates.Values.Count(c => c.Song.Owned) < take * 2)
+        if (Playable() < take * 2)
             foreach (var song in await OwnedByAsync([], take * 4, ct))
                 Add(song, 0.05);
 
@@ -134,7 +136,10 @@ public sealed partial class RadioService(MelodexDbContext db, DiscoveryService d
             picked.Add(first);
             recentArtists.Add(TextMatch.NormaliseArtist(first.ArtistCredit));
         }
-        var missingWanted = Share(take - picked.Count, missingShare);
+        // The share is a target over the whole radio: a batch that came short of songs you don't have, or long, is made up for in this one.
+        var played = recent.TakeLast(100).Where(id => id != seed.Tracks[0] || seed.Kind != RadioSeedKind.Song).ToList();
+        var playedMissing = played.Count - heard.Count(t => played.Contains(t.Id) && t.Owned);
+        var missingWanted = Math.Clamp(Share(played.Count + take - picked.Count, missingShare) - playedMissing, 0, take - picked.Count);
         var slots = Enumerable.Range(0, take - picked.Count).Select(i => i < missingWanted).OrderBy(_ => Random.Shared.Next()).ToList();
         foreach (var missing in slots)
         {
@@ -186,16 +191,10 @@ public sealed partial class RadioService(MelodexDbContext db, DiscoveryService d
     }
 
     public async Task<RadioSettings> SettingsAsync(Guid userId, CancellationToken ct) =>
-        await db.Users.Where(u => u.Id == userId).Select(u => new RadioSettings(u.RadioMissingPercent, u.Autoplay)).FirstAsync(ct);
+        await db.Users.Where(u => u.Id == userId).Select(u => new RadioSettings(u.Autoplay)).FirstAsync(ct);
 
-    public async Task SaveSettingsAsync(Guid userId, RadioSettings settings, CancellationToken ct)
-    {
-        if (settings.MissingPercent is < 0 or > 100)
-            throw new ArgumentException("The share of songs you don't have is 0 to 100 percent.");
-        await db.Users.Where(u => u.Id == userId).ExecuteUpdateAsync(u => u
-            .SetProperty(x => x.RadioMissingPercent, settings.MissingPercent)
-            .SetProperty(x => x.Autoplay, settings.Autoplay), ct);
-    }
+    public async Task SaveSettingsAsync(Guid userId, RadioSettings value, CancellationToken ct) =>
+        await db.Users.Where(u => u.Id == userId).ExecuteUpdateAsync(u => u.SetProperty(x => x.Autoplay, value.Autoplay), ct);
 
     /// <summary>What a radio was started from: a song, album, artist, or one of their own playlists.</summary>
     private async Task<Seed?> SeedAsync(Guid userId, Guid id, CancellationToken ct)
@@ -264,10 +263,11 @@ public sealed partial class RadioService(MelodexDbContext db, DiscoveryService d
             ? new DiscoveredSong(trackId, t.Title, t.ArtistCredit, t.ArtistId, null, null, null, t.Duration?.TotalSeconds, false, 1, [])
             : null;
 
-    private sealed record Heard(Guid Id, string Title, string ArtistCredit);
+    private sealed record Heard(Guid Id, string Title, string ArtistCredit, bool Owned);
 
     private async Task<List<Heard>> TracksOfAsync(List<Guid> tracks, CancellationToken ct) =>
-        await db.Tracks.AsNoTracking().Where(t => tracks.Contains(t.Id)).Select(t => new Heard(t.Id, t.Title, t.ArtistCredit)).ToListAsync(ct);
+        await db.Tracks.AsNoTracking().Where(t => tracks.Contains(t.Id))
+            .Select(t => new Heard(t.Id, t.Title, t.ArtistCredit, db.LibraryFiles.Any(f => f.TrackId == t.Id))).ToListAsync(ct);
 
     /// <summary>A song whatever version it is: its title without anything in brackets after it, and its artist.</summary>
     private static string SongKey(string title, string artist) =>

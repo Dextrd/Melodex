@@ -1417,9 +1417,6 @@ namespace Melodex.Core.Data.Migrations
                     b.Property<DateTime?>("PlaylistsSyncedAt")
                         .HasColumnType("TEXT");
 
-                    b.Property<int>("RadioMissingPercent")
-                        .HasColumnType("INTEGER");
-
                     b.Property<string>("Stamp")
                         .IsRequired()
                         .HasColumnType("TEXT");

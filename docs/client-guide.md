@@ -475,12 +475,13 @@ Songs like a song, album, artist or playlist, without end, with the `listen` sco
   your playlists), the `recent` songs it's queued so far as track IDs, oldest first, and how many to `take` (5 by
   default, at most 50). Nothing is kept on the server, so send them each time. The answer has its `name` and `kind`,
   and `songs` in the order to play them, shaped as similar songs are: those not `owned` are to fetch to listen to.
-  Started from a song, the first batch starts with it. `ownedOnly` leaves out songs you don't have, whatever the
-  user's settings say. A seed that isn't there is a 404.
+  Started from a song, the first batch starts with it. Songs you don't have make up the server's share,
+  `radioMissingPercent` in `GET /settings/fetch` (0 to 100, 25 by default), counted over the `recent` songs as well,
+  so a batch makes up for those before it. `ownedOnly` leaves them out, whatever the share. A seed that isn't there is a 404.
 - `POST /radio/skips` with a `trackId` says a radio's song was skipped in its first half minute: radios leave it out,
   and play its artist less, for 90 days.
-- `GET /radio/settings` and `PUT /radio/settings` are the user's: `missingPercent`, the share of songs they don't have
-  (0 to 100, 25 by default), and `autoplay`, whether a player carries on with a radio when its queue runs out.
+- `GET /radio/settings` and `PUT /radio/settings` are the user's: `autoplay`, whether a player carries on with a radio
+  when its queue runs out.
 
 ## The API reference
 

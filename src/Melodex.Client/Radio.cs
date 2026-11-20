@@ -17,15 +17,14 @@ public sealed record RadioNext(Guid SeedId, IReadOnlyList<Guid>? Recent = null, 
 /// <param name="Name">What it was started from: the song's, album's, artist's or playlist's name.</param>
 /// <param name="Kind">What that is.</param>
 /// <param name="Songs">
-/// The songs, in the order to play them: those you have, and, as your radio settings say, those you don't, to fetch to
+/// The songs, in the order to play them: those you have, and, as the server's share of them says, those you don't, to fetch to
 /// listen to. Started from a song, the first batch starts with it.
 /// </param>
 public sealed record RadioBatch(string Name, RadioSeedKind Kind, IReadOnlyList<DiscoveredSong> Songs);
 
 /// <summary>Someone's radio settings (#4).</summary>
-/// <param name="MissingPercent">How much of a radio is songs you don't have, fetched to listen to: 0 to 100 percent.</param>
 /// <param name="Autoplay">When the queue runs out, carry on with a radio from the last song.</param>
-public sealed record RadioSettings(int MissingPercent = 25, bool Autoplay = true);
+public sealed record RadioSettings(bool Autoplay = true);
 
 /// <summary>Body of <c>POST /radio/skips</c>: a song a radio played that was skipped within its first half minute.</summary>
 public sealed record RadioSkipped(Guid TrackId);

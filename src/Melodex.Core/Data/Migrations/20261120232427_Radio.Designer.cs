@@ -11,7 +11,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Melodex.Core.Data.Migrations
 {
     [DbContext(typeof(MelodexDbContext))]
-    [Migration("20261120163610_Radio")]
+    [Migration("20261120232427_Radio")]
     partial class Radio
     {
         /// <inheritdoc />
@@ -1419,9 +1419,6 @@ namespace Melodex.Core.Data.Migrations
 
                     b.Property<DateTime?>("PlaylistsSyncedAt")
                         .HasColumnType("TEXT");
-
-                    b.Property<int>("RadioMissingPercent")
-                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Stamp")
                         .IsRequired()

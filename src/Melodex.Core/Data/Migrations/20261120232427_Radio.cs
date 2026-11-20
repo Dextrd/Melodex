@@ -16,15 +16,7 @@ namespace Melodex.Core.Data.Migrations
                 table: "Users",
                 type: "INTEGER",
                 nullable: false,
-                // Existing users get the defaults new ones have: autoplay on, a quarter songs they don't have.
                 defaultValue: true);
-
-            migrationBuilder.AddColumn<int>(
-                name: "RadioMissingPercent",
-                table: "Users",
-                type: "INTEGER",
-                nullable: false,
-                defaultValue: 25);
 
             migrationBuilder.CreateTable(
                 name: "RadioSkips",
@@ -61,10 +53,6 @@ namespace Melodex.Core.Data.Migrations
 
             migrationBuilder.DropColumn(
                 name: "Autoplay",
-                table: "Users");
-
-            migrationBuilder.DropColumn(
-                name: "RadioMissingPercent",
                 table: "Users");
         }
     }

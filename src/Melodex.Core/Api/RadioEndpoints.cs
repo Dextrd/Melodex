@@ -38,27 +38,20 @@ public static class RadioEndpoints
                 Owner(http) is { } user ? Results.Ok(await service.SettingsAsync(user, ct)) : NoOwner())
             .RequireScope(Scopes.Listen)
             .WithName("GetRadioSettings")
-            .WithSummary("Your radio settings: how much of a radio is songs you don't have, and whether the player carries on with a radio when the queue runs out.")
+            .WithSummary("Your radio settings: whether the player carries on with a radio when the queue runs out. How much of a radio is songs you don't have is the server's, in GET /settings/fetch.")
             .Produces<RadioSettings>();
 
         radio.MapPut("/settings", async (RadioSettings body, HttpContext http, RadioService service, CancellationToken ct) =>
             {
                 if (Owner(http) is not { } user)
                     return NoOwner();
-                try
-                {
-                    await service.SaveSettingsAsync(user, body, ct);
-                    return Results.NoContent();
-                }
-                catch (ArgumentException e)
-                {
-                    return Results.ValidationProblem(new Dictionary<string, string[]> { ["missingPercent"] = [e.Message] });
-                }
+                await service.SaveSettingsAsync(user, body, ct);
+                return Results.NoContent();
             })
             .RequireScope(Scopes.Listen)
             .WithName("SaveRadioSettings")
             .WithSummary("Changes your radio settings.")
-            .Produces(StatusCodes.Status204NoContent).ProducesValidationProblem();
+            .Produces(StatusCodes.Status204NoContent);
 
         return api;
     }

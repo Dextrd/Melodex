@@ -36,9 +36,6 @@ public class User
 
     public DateTime? PlaylistsSyncedAt { get; set; }
 
-    /// <summary>How much of a radio is songs they don't have, fetched to listen to (#4): 0 to 100 percent.</summary>
-    public int RadioMissingPercent { get; set; } = 25;
-
     /// <summary>When the queue runs out, the player carries on with a radio from the last song (#4).</summary>
     public bool Autoplay { get; set; } = true;
 }
