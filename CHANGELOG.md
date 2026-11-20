@@ -38,6 +38,11 @@ What changed in each release of Melodex. Versions follow [semantic versioning](h
   existing install until you tick it. The upgrade settings' `scheduled`, `days`, `from`, `until` and `timeZone` are read
   only in the API now, saying what the schedules say (#112).
 
+### Fixed
+
+- Copy buttons work when Melodex is opened over plain http, such as at the server's own address at home, rather than
+  showing an error: browsers only offer the clipboard to https pages, so the text is copied the older way (#7).
+
 ## [1.6.0] - 2026-11-19
 
 Notifications at the bottom right, Replace and Remove on a song's page, ticking several playlists at once with empty

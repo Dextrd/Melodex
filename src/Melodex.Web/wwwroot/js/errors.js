@@ -30,8 +30,12 @@ window.melodexError = (() => {
             e.target.closest(".error-toggle").setAttribute("aria-expanded", String(open));
         } else if (e.target.closest(".error-copy")) {
             const button = e.target.closest(".error-copy");
-            navigator.clipboard?.writeText(banner.querySelector(".error-message").textContent + "\n\n" + details)
-                .then(() => { button.textContent = "Copied"; setTimeout(() => button.textContent = "Copy", 1500); }, () => { });
+            melodexCopy(banner.querySelector(".error-message").textContent + "\n\n" + details).then(copied => {
+                if (!copied)
+                    return;
+                button.textContent = "Copied";
+                setTimeout(() => button.textContent = "Copy", 1500);
+            });
         }
     });
 
