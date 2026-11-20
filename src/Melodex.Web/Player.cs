@@ -724,7 +724,7 @@ public sealed class Player : IAsyncDisposable
                 ? (await _api.GetListeningAsync(id))?.StreamUrl
                 : (await (entry.FileId is { } file ? _api.GetFilePlayInfoAsync(file) : _api.GetPlayInfoAsync(entry.TrackId, entry.EditionId)))?.StreamUrl;
             if (url is not null)
-                await _api.WarmBarsAsync(url);
+                await _api.WarmSpectrumAsync(url);
         }
         catch (Exception e) when (e is HttpRequestException or MelodexApiException or TaskCanceledException)
         {

@@ -60,20 +60,23 @@ public static class ListenEndpoints
                 + "With as=webm, Opus in an Ogg file comes in WebM instead, for Safari, which gets its time wrong.")
             .Produces(StatusCodes.Status200OK).Produces(StatusCodes.Status206PartialContent).Produces(StatusCodes.Status403Forbidden).Produces(StatusCodes.Status404NotFound);
 
-        listen.MapGet("/{id:guid}/bars", async (Guid id, long? exp, string? sig, bool? warm, HttpContext http, MelodexDbContext db, ListenNowService service,
-                StreamSigner signer, BarsMaker maker, SettingsService settings, CancellationToken ct) =>
-            {
-                if (!signer.Verify(ListenNowService.StreamPath(id), exp ?? 0, sig))
-                    return Results.StatusCode(StatusCodes.Status403Forbidden);
-                if (await db.ListenNowItems.FindAsync([id], ct) is not { } item || service.FullPath(item) is not { } file || !File.Exists(file))
-                    return Results.NotFound();
-                return await BarsAsync(file, null, warm == true, http, maker, settings, ct);
-            })
-            .AllowAnyone()
-            .WithName("GetListeningBars")
-            .WithSummary(BarsSummary + " Needs the signature from its stream URL.")
-            .Produces(StatusCodes.Status200OK, contentType: "application/octet-stream").Produces(StatusCodes.Status202Accepted)
-            .Produces(StatusCodes.Status403Forbidden).Produces(StatusCodes.Status404NotFound).ProducesProblem(StatusCodes.Status503ServiceUnavailable);
+        foreach (var version in new[] { 2, 1 })
+            listen.MapGet(version == 2 ? "/{id:guid}/spectrum" : "/{id:guid}/bars", async (Guid id, long? exp, string? sig, bool? warm, int? bands,
+                    HttpContext http, MelodexDbContext db, ListenNowService service, StreamSigner signer, SpectrumMaker maker, SettingsService settings,
+                    CancellationToken ct) =>
+                {
+                    if (!signer.Verify(ListenNowService.StreamPath(id), exp ?? 0, sig))
+                        return Results.StatusCode(StatusCodes.Status403Forbidden);
+                    if (await db.ListenNowItems.FindAsync([id], ct) is not { } item || service.FullPath(item) is not { } file || !File.Exists(file))
+                        return Results.NotFound();
+                    return await SpectrumAsync(file, null, version, bands, warm == true, http, maker, settings, ct);
+                })
+                .AllowAnyone()
+                .WithName(version == 2 ? "GetListeningSpectrum" : "GetListeningBars")
+                .WithSummary((version == 2 ? SpectrumSummary : BarsSummary) + " Needs the signature from its stream URL.")
+                .Produces(StatusCodes.Status200OK, contentType: "application/octet-stream").Produces(StatusCodes.Status202Accepted)
+                .Produces(StatusCodes.Status403Forbidden).Produces(StatusCodes.Status404NotFound).ProducesProblem(StatusCodes.Status503ServiceUnavailable)
+                .ProducesProblem(StatusCodes.Status400BadRequest);
 
         listen.MapGet("/{id:guid}/lyrics", async (Guid id, MelodexDbContext db, ListenNowService service, ListenNowLyrics lyrics, CancellationToken ct) =>
             {
@@ -172,25 +175,28 @@ public static class ListenEndpoints
                          + "Its track ID is the file's own when it isn't matched.")
             .Produces<PlayInfo>().Produces(StatusCodes.Status404NotFound);
 
-        api.MapGet("/library/files/{id:guid}/bars", async (Guid id, long? exp, string? sig, bool? warm, HttpContext http, MelodexDbContext db,
-                StreamSigner signer, BarsMaker maker, SettingsService settings, Microsoft.Extensions.Options.IOptions<MelodexOptions> options, CancellationToken ct) =>
-            {
-                if (!signer.Verify(LibraryStreamPath(id), exp ?? 0, sig))
-                    return Results.StatusCode(StatusCodes.Status403Forbidden);
-                if (await db.LibraryFiles.FindAsync([id], ct) is not { } row)
-                    return Results.NotFound();
-                var root = Path.GetFullPath(options.Value.LibraryPath);
-                var file = Path.GetFullPath(Path.Combine(root, row.Path));
-                if (!file.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.Ordinal) || !File.Exists(file))
-                    return Results.NotFound();
-                return await BarsAsync(file, BarsFile.SidecarOf(file), warm == true, http, maker, settings, ct);
-            })
-            .WithTags("Library")
-            .AllowAnyone()
-            .WithName("GetLibraryFileBars")
-            .WithSummary(BarsSummary + " A .bars file beside it is used when there is one. Needs the signature from its stream URL.")
-            .Produces(StatusCodes.Status200OK, contentType: "application/octet-stream").Produces(StatusCodes.Status202Accepted)
-            .Produces(StatusCodes.Status403Forbidden).Produces(StatusCodes.Status404NotFound).ProducesProblem(StatusCodes.Status503ServiceUnavailable);
+        foreach (var version in new[] { 2, 1 })
+            api.MapGet(version == 2 ? "/library/files/{id:guid}/spectrum" : "/library/files/{id:guid}/bars", async (Guid id, long? exp, string? sig,
+                    bool? warm, int? bands, HttpContext http, MelodexDbContext db, StreamSigner signer, SpectrumMaker maker, SettingsService settings,
+                    Microsoft.Extensions.Options.IOptions<MelodexOptions> options, CancellationToken ct) =>
+                {
+                    if (!signer.Verify(LibraryStreamPath(id), exp ?? 0, sig))
+                        return Results.StatusCode(StatusCodes.Status403Forbidden);
+                    if (await db.LibraryFiles.FindAsync([id], ct) is not { } row)
+                        return Results.NotFound();
+                    var root = Path.GetFullPath(options.Value.LibraryPath);
+                    var file = Path.GetFullPath(Path.Combine(root, row.Path));
+                    if (!file.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.Ordinal) || !File.Exists(file))
+                        return Results.NotFound();
+                    return await SpectrumAsync(file, SpectrumFormat.SidecarOf(file), version, bands, warm == true, http, maker, settings, ct);
+                })
+                .WithTags("Library")
+                .AllowAnyone()
+                .WithName(version == 2 ? "GetLibraryFileSpectrum" : "GetLibraryFileBars")
+                .WithSummary((version == 2 ? SpectrumSummary : BarsSummary) + " A .bars file beside it is used when there is one. Needs the signature from its stream URL.")
+                .Produces(StatusCodes.Status200OK, contentType: "application/octet-stream").Produces(StatusCodes.Status202Accepted)
+                .Produces(StatusCodes.Status403Forbidden).Produces(StatusCodes.Status404NotFound).ProducesProblem(StatusCodes.Status503ServiceUnavailable)
+                .ProducesProblem(StatusCodes.Status400BadRequest);
 
         api.MapGet("/playback", (SettingsService s, CancellationToken ct) => s.GetPlaybackAsync(ct))
             .WithTags("Listen now").RequireScope(Scopes.Listen).WithName("GetPlayback")
@@ -261,14 +267,22 @@ public static class ListenEndpoints
         return api;
     }
 
-    private const string BarsSummary = "The visualiser's bars for the song, made now if they need to be: a gzipped .bars file (see the user guide). "
-                                       + "With warm=true they're made without being sent, ahead of being played (202). 404 while the visualiser is off; "
-                                       + "503 if they can't be made.";
+    private const string SpectrumSummary = "The song's spectrum, made now if it needs to be: how loud each band of pitch is, 30 times a second, with "
+                                           + "the loudness, peak, waveform and beats, in a gzipped file whose format the client guide describes. bands=8, 16 or 32 "
+                                           + "gives fewer bands than 64. With warm=true it's made without being sent, ahead of being played (202). 404 while the "
+                                           + "visualiser is off; 503 if it can't be made.";
 
-    /// <summary>The song's bars, or with <paramref name="warm"/>, their making started for later.</summary>
-    private static async Task<IResult> BarsAsync(string file, string? sidecar, bool warm, HttpContext http, BarsMaker maker, SettingsService settings,
-        CancellationToken ct)
+    private const string BarsSummary = "The song's spectrum as version 1 of its format had it, for apps written for it: 64 smoothed levels a frame "
+                                       + "and nothing else. New apps use the spectrum. With warm=true it's made without being sent (202). 404 while the "
+                                       + "visualiser is off; 503 if it can't be made.";
+
+    /// <summary>The song's spectrum, in the version and with the bands asked for, or with <paramref name="warm"/>, its making started for later.</summary>
+    private static async Task<IResult> SpectrumAsync(string file, string? sidecar, int version, int? bands, bool warm, HttpContext http,
+        SpectrumMaker maker, SettingsService settings, CancellationToken ct)
     {
+        if (bands is { } asked && (version == 1 || !SpectrumFormat.BandChoices.Contains(asked)))
+            return Results.Problem($"bands can be {string.Join(", ", SpectrumFormat.BandChoices)}.", statusCode: StatusCodes.Status400BadRequest,
+                title: "There's no spectrum with that many bands");
         if ((await settings.GetPlaybackAsync(ct)).Visualiser == VisualiserBars.Off)
             return Results.NotFound();
         if (warm)
@@ -276,18 +290,19 @@ public static class ListenEndpoints
             _ = maker.GetAsync(file, sidecar, CancellationToken.None).ContinueWith(t => _ = t.Exception, TaskContinuationOptions.OnlyOnFaulted);
             return Results.Accepted();
         }
-        byte[] bars;
+        byte[] spectrum;
         try
         {
-            bars = await maker.GetAsync(file, sidecar, ct);
+            spectrum = await maker.GetAsync(file, sidecar, ct);
         }
-        catch (BarsException e)
+        catch (SpectrumException e)
         {
-            return Results.Problem(e.Message, statusCode: StatusCodes.Status503ServiceUnavailable, title: "The visualiser's bars couldn't be made");
+            return Results.Problem(e.Message, statusCode: StatusCodes.Status503ServiceUnavailable, title: "The spectrum couldn't be made");
         }
+        spectrum = version == 1 ? SpectrumFormat.AsVersion1(spectrum) : SpectrumFormat.WithBands(spectrum, bands ?? SpectrumFormat.Bands);
         http.Response.Headers.ContentEncoding = "gzip";
         http.Response.Headers.CacheControl = "private, max-age=43200";
-        return Results.Bytes(bars, "application/octet-stream");
+        return Results.Bytes(spectrum, "application/octet-stream");
     }
 
     /// <summary>How often an idle event stream sends a comment, so proxies keep it open.</summary>

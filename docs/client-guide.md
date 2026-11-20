@@ -15,6 +15,7 @@ guide covers what the reference can't: how the pieces fit together.
 - [Finding music](#finding-music)
 - [Requests](#requests)
 - [Listen now](#listen-now)
+- [Spectrums](#spectrums)
 - [Events](#events)
 - [Webhooks](#webhooks)
 - [Errors](#errors)
@@ -169,6 +170,61 @@ support range requests, and stop working after 12 hours; get a fresh one from `G
 handing to an audio element, not for keeping.
 
 The `listen.ready` event says when an item becomes playable, with its stream URL.
+
+## Spectrums
+
+Each song has a spectrum, which Melodex's own visualiser draws its bars from and any app can use for its own: how loud
+each band of pitch is, 30 times a second, with how loud the whole moment is, its peak, the outline of its waveform and
+where the beats fall. Melodex works it out once from the song, so an app needn't decode the music a second time.
+
+A song's spectrum is at its stream URL with `spectrum` in place of `stream`, signed the same way:
+
+```http
+GET /api/v1/library/files/{id}/spectrum?exp=...&sig=...
+GET /api/v1/listen/{id}/spectrum?exp=...&sig=...
+```
+
+- `bands=8`, `16` or `32` gives fewer bands than 64, each the loudest of those it covers.
+- `warm=true` has it made without sending it, ahead of the song being played (`202`).
+- `404` while the visualiser is off in Melodex's settings, `503` if it can't be made, such as when the song won't
+  decode.
+
+It's made on demand, in a second or so, unless Melodex keeps one beside each song (see the user guide), and sent
+gzipped, which a browser or HTTP client unpacks for you.
+
+### The format
+
+A header, then one frame after another from the start of the song. Numbers of more than a byte are little-endian.
+
+| Bytes | Header |
+| --- | --- |
+| 0–3 | `MDXB` |
+| 4 | The version: 2 |
+| 5 | Frames a second: 30 |
+| 6 | Bands a frame: 64, or as asked |
+| 7 | The header's length: 16 |
+| 8–9 | The lowest pitch, in hertz: 40 |
+| 10–11 | The highest pitch, in hertz: 16000 |
+| 12 | The quietest level, in decibels of full scale, as a signed byte: -96 |
+| 13 | The loudest: 0 |
+| 14–15 | A frame's length: the bands and 5 |
+
+| Bytes | Each frame |
+| --- | --- |
+| One for each band | How loud it is, 0 to 255 between the quietest and loudest decibels, bass first. Bands are spaced by pitch, as we hear it, each the loudest frequency in it |
+| Next | Loudness: the root mean square of the samples since the last frame, on the same scale |
+| Next | Peak: the loudest sample since the last frame, on the same scale |
+| Next two | The waveform's lowest and highest sample since the last frame, as signed bytes, -127 to 127 being full scale |
+| Last | A beat: 0 for none, otherwise how strong, 1 to 255 |
+
+A frame's moment is its number over the frames a second; its bands are of the 4096 samples (at 44.1 kHz) leading up
+to it, so the first few rise as the song begins. The levels aren't smoothed: a bar that moves gently, as Melodex's own
+does, keeps part of its last height each frame. A level in decibels is the quietest plus the level times the range
+over 255. Read the header's lengths rather than assuming them: a later version may add bytes to the header or to
+each frame, which an app that skips them can still read.
+
+`/bars`, in place of `/spectrum`, still gives version 1 of the format, for apps written for it: an 8-byte header
+(`MDXB`, 1, 30, 64 and a spare byte), then 64 bars a frame from 40 Hz to 10 kHz, smoothed, without the rest.
 
 ## Events
 
