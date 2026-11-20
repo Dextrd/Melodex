@@ -47,8 +47,9 @@ Each person sees their own playlists, stars, ratings and queue. Everyone sees th
 
 - **Stars and ratings** are the same in players and in Melodex: star a song in a player and it's starred on its page
   in Melodex, and the other way round. A song keeps its star and rating when its file is replaced by a better copy.
-- **The play queue** is shared with Melodex's own player. Players that save their queue (Symfonium, Amperfy, Feishin
-  and others do, some only when asked) pick up where you left off in the browser, and the browser picks up from them.
+- **The play queue** is shared with Melodex's own player, for players that keep their queue on the server: Feishin
+  does, for one, but not every player can, and Amperfy doesn't. Such a player picks up where you left off in the
+  browser when it starts or when you ask it to (it doesn't start playing by itself), and the browser picks up from it.
   Neither interrupts the other: the browser takes up a queue saved elsewhere only while it isn't playing. Songs in the
   queue that aren't in your library, fetched to listen to, are left out of what players see.
 

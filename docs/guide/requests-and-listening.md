@@ -154,8 +154,8 @@ Play, queue and skip from any album, artist or track. While something's playing,
 next**, straight after the song playing, or at the end. Songs you don't have are fetched as the queue reaches them.
 
 The queue is kept for each person on the server: after a reload, the next time, or in another browser, it's there
-paused where you left it, and Play carries on. [Subsonic players](subsonic-players.md) share it too, so you can carry
-on in a phone's player from where the browser left off and back again. A browser that isn't playing picks up a queue
+paused where you left it, and Play carries on. [Subsonic players](subsonic-players.md) that keep their queue on the
+server share it too, so you can carry on in one from where the browser left off and back again. A browser that isn't playing picks up a queue
 changed elsewhere straight away; one that's playing carries on with its own. Drag songs by the six dots on their left to reorder them. The button at the top of the queue opens it as
 a page of its own, to play from, move songs about, take them out, or save the queue as a playlist.
 

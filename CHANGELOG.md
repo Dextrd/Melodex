@@ -18,8 +18,8 @@ What changed in each release of Melodex. Versions follow [semantic versioning](h
   Each person has their own, the same in Subsonic players (`star`, `setRating`, `getStarred2`, and the starred and
   highest-rated album lists) and in the API (`GET /marks`, `PUT /marks/{kind}/{id}`) (#7).
 - **The play queue is kept on the server**, so it follows you to another browser, and Subsonic players share it
-  (`getPlayQueue` and `savePlayQueue`, and by index): carry on in a phone's player from where the browser left off,
-  and back. A browser that isn't playing picks up a queue changed elsewhere at once. The API has `GET` and
+  (`getPlayQueue` and `savePlayQueue`, and by index): carry on in a player that keeps its queue on the server, such as
+  Feishin, from where the browser left off, and back. A browser that isn't playing picks up a queue changed elsewhere at once. The API has `GET` and
   `PUT /player/queue` (#7).
 - Melodex's own Subsonic extension, `melodex`: each song's ID in the API, and whether you have all of an album (#7).
 - **Settings → Scheduled tasks**: daily, weekly and monthly windows, each with its own times (running past midnight
