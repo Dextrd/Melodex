@@ -33,15 +33,24 @@ Anyone can make keys, each able to do only what they may themselves, so you need
   covers, years, genres and lengths. A player that browses by folders sees one folder, Music, with your artists in it,
   their albums in each, and the songs in each album.
 - **Search** across artists, albums and songs, every word you type matched, accents or not.
-- **Album lists**: newest, random, by name, by artist, by year and by genre. Most played, recently played, highest
-  rated and starred are empty for now.
+- **Album lists**: newest, random, by name, by artist, by year, by genre, starred, and highest rated. Most played and
+  recently played are empty for now.
 - **Genres**, read from your songs' tags. Files scanned before this version have theirs read on the next scan.
 - **Lyrics**, from the song's `.lrc` file or tags, synced line by line for players that show them so.
 - **Your playlists**, the same as in Melodex: a playlist made or changed in a player is changed in Melodex, and the
   other way round. Folders show as part of the name. Songs in a playlist that aren't in your library yet keep their
   places, but players don't list them.
 
-Each person sees their own playlists. Everyone sees the whole library.
+Each person sees their own playlists, stars, ratings and queue. Everyone sees the whole library.
+
+## Stars, ratings and the queue
+
+- **Stars and ratings** are the same in players and in Melodex: star a song in a player and it's starred on its page
+  in Melodex, and the other way round. A song keeps its star and rating when its file is replaced by a better copy.
+- **The play queue** is shared with Melodex's own player. Players that save their queue (Symfonium, Amperfy, Feishin
+  and others do, some only when asked) pick up where you left off in the browser, and the browser picks up from them.
+  Neither interrupts the other: the browser takes up a queue saved elsewhere only while it isn't playing. Songs in the
+  queue that aren't in your library, fetched to listen to, are left out of what players see.
 
 ## Playing
 
@@ -50,4 +59,4 @@ at most at some bitrate, Melodex turns the song into that as it plays, which sui
 A song already small enough in that format is sent as it is. Downloading for offline listening always gives the file
 as it is in your library.
 
-Stars, ratings, the play queue shared between players, and plays counted (scrobbling) aren't there yet.
+Plays aren't counted (scrobbling) yet, so most played and recently played stay empty.

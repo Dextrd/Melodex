@@ -26,6 +26,9 @@ else
                 <span>@Format.Count(_artist.Albums.Count, "album", "albums")</span>
                 <span class="badge neutral" title="No catalogue knows them: they're shown as their files' tags say">Your own files</span>
             </div>
+            <div class="row album-actions" style="margin-top: .5rem;">
+                <StarButton Kind="MarkKind.Artist" Id="_artist.Id" Labelled="true" />
+            </div>
         </div>
     </div>
     <AlbumTable Albums="_artist.Albums" />

@@ -13,6 +13,15 @@ What changed in each release of Melodex. Versions follow [semantic versioning](h
   make one under **Settings → API**, and it's the password with your username. See the new guide page, Subsonic
   players (#7).
 - Songs' genres are read from their tags. Files scanned before have theirs read on the next scan (#7).
+- **Stars and ratings**: star songs, albums and artists you have, and rate songs and albums 1 to 5, from their pages
+  or their **⋯** menus. The Library page's star shows only what's starred, and albums and tracks sort by your rating.
+  Each person has their own, the same in Subsonic players (`star`, `setRating`, `getStarred2`, and the starred and
+  highest-rated album lists) and in the API (`GET /marks`, `PUT /marks/{kind}/{id}`) (#7).
+- **The play queue is kept on the server**, so it follows you to another browser, and Subsonic players share it
+  (`getPlayQueue` and `savePlayQueue`, and by index): carry on in a phone's player from where the browser left off,
+  and back. A browser that isn't playing picks up a queue changed elsewhere at once. The API has `GET` and
+  `PUT /player/queue` (#7).
+- Melodex's own Subsonic extension, `melodex`: each song's ID in the API, and whether you have all of an album (#7).
 - **Settings → Scheduled tasks**: daily, weekly and monthly windows, each with its own times (running past midnight
   if it ends earlier than it starts), the weekly one on a day you pick and the monthly one on a day of the month (in a
   shorter month, its last day), all in one time zone. Tick what each runs: a scan, a catalogue update, the lossless

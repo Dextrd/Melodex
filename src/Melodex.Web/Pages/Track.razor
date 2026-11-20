@@ -82,6 +82,8 @@ else
                     <IconButton Icon="play" Requires="@UserPermissions.Listen" Primary="true" Large="true" Label="Play" Title="Play it" OnClick="() => Player.PlayAsync([Entry(track)])" />
                     <QueueButton Large="true" Left="true" Label="Add to queue" Title="Add to the queue: play next, or play last" OnQueue="next => Player.AddAsync([Entry(track)], next)" />
                     <IconButton Icon="playlist" Requires="@UserPermissions.Listen" Large="true" Label="Add to playlist" Title="Add to a playlist" OnClick="() => _adding = (track.Title, [new PlaylistItem(track.Id)])" />
+                    <StarButton Kind="MarkKind.Song" Id="track.Id" Large="true" />
+                    <RatingStars Kind="MarkKind.Song" Id="track.Id" />
                 }
                 else if (!track.Ignored)
                 {

@@ -20,6 +20,7 @@ builder.Services.AddScoped<Notices>();
 builder.Services.AddScoped<TaskNotices>();
 builder.Services.AddScoped<RequestTracker>();
 builder.Services.AddScoped<WishlistStore>();
+builder.Services.AddScoped<MarkStore>();
 builder.Services.AddScoped<Schedules>();
 builder.Services.AddScoped<Player>();
 builder.Services.AddScoped<LibraryStore>();

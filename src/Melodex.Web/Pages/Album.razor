@@ -84,6 +84,8 @@ else
                     @if (album.Status is not AlbumStatus.Missing)
                     {
                         <QualityButton Kind="albums" Id="album.Id" Name="@album.Title" Large="true" />
+                        <StarButton Kind="MarkKind.Album" Id="album.Id" Large="true" />
+                        <RatingStars Kind="MarkKind.Album" Id="album.Id" />
                     }
                 </fieldset>
             }

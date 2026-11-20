@@ -55,6 +55,7 @@ else
             @if (_artist.InLibrary)
             {
                 <QualityButton Kind="artists" Id="_artist.Id" Name="@_artist.Name" />
+                <StarButton Kind="MarkKind.Artist" Id="_artist.Id" />
             }
         </fieldset>
         <OwnershipFilter OnChange="StateHasChanged" OwnedHint="Only albums you have" MissingHint="Only missing albums, and albums with tracks missing" />

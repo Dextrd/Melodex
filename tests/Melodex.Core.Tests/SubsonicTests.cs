@@ -104,6 +104,36 @@ public sealed class SubsonicTests : IDisposable
         Assert.InRange(made, before, DateTime.UtcNow.AddSeconds(1));
     }
 
+    [Fact]
+    public async Task Stars_ratings_and_queues_are_each_persons_own()
+    {
+        var album = Guid.NewGuid();
+        var mark = await _api.SetMarkAsync(MarkKind.Album, album, new SetMark(Starred: true, Rating: 3));
+        Assert.Equal((3, true), (mark!.Rating, mark.StarredAt is not null));
+        // What's left out stays as it was.
+        Assert.Equal(3, (await _api.SetMarkAsync(MarkKind.Album, album, new SetMark(Starred: false)))!.Rating);
+        Assert.Null(await _api.SetMarkAsync(MarkKind.Album, album, new SetMark(Rating: 0)));
+        await _api.SetMarkAsync(MarkKind.Artist, album, new SetMark(Starred: true));
+        Assert.Equal(HttpStatusCode.BadRequest,
+            (await Assert.ThrowsAsync<MelodexApiException>(() => _api.SetMarkAsync(MarkKind.Song, album, new SetMark(Rating: 6)))).Status);
+        Assert.Equal(HttpStatusCode.BadRequest,
+            (await _factory.CreateSignedInClient().PutAsJsonAsync($"api/v1/marks/playlist/{album}", new SetMark(Starred: true), MelodexJson.Options)).StatusCode);
+        var song = new PlayQueueItem(Guid.NewGuid(), "A song", "Someone");
+        await _api.SavePlayQueueAsync(new SavePlayQueue([song], 0, 61.5));
+        Assert.Equal(HttpStatusCode.BadRequest,
+            (await Assert.ThrowsAsync<MelodexApiException>(() => _api.SavePlayQueueAsync(new SavePlayQueue([song], 1, 0)))).Status);
+
+        await _api.CreateUserAsync(new CreateUser("bob", "bob's password", [UserPermissions.Read, UserPermissions.Listen]));
+        var http = _factory.CreateClient();
+        (await http.PostAsJsonAsync("api/v1/auth/login", new SignIn("bob", "bob's password"))).EnsureSuccessStatusCode();
+        var bob = new MelodexClient(http);
+        Assert.Empty(await bob.ListMarksAsync());
+        Assert.Null(await bob.GetPlayQueueAsync());
+        await bob.SetMarkAsync(MarkKind.Album, album, new SetMark(Starred: true));
+        Assert.Equal([MarkKind.Artist], (await _api.ListMarksAsync()).Select(m => m.Kind));
+        Assert.Equal((61.5, "web"), ((await _api.GetPlayQueueAsync())!.Position, (await _api.GetPlayQueueAsync())!.ChangedBy));
+    }
+
     // ---- With the test library ----
 
     private async Task<JsonNode> CallAsync(string method, string auth, string query = "")

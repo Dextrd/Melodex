@@ -11,6 +11,13 @@ An album, artist or song opened from a list shows what that list already knew wh
 in order, with the ones you have filled in and the others shimmering, or an artist's albums that you have. Buttons that
 need the whole page stay greyed until it's there, and while MusicBrainz is still being asked about it.
 
+## Stars and ratings
+
+Star a song, album or artist you have from its page, or from **⋯** wherever it's listed, and rate songs and albums 1 to
+5 on their pages; choose the rating they have to take it away. The star beside the Library page's filter shows only
+what you've starred, in each view, and **Your rating** sorts albums and tracks by your ratings. Everyone has their
+own, and they're the same in [Subsonic players](subsonic-players.md).
+
 ## Quality
 
 Melodex knows each file's quality, written as it usually is: **FLAC 16/44.1** (lossless, 16 bits at 44.1 kHz, as a CD

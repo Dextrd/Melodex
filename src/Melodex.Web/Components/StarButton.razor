@@ -1,0 +1,29 @@
+@implements IDisposable
+@inject MarkStore Marks
+
+@* A star for a song, album or artist you have (#7): yours, and the same in Subsonic players. *@
+@{ var starred = Marks.IsStarred(Kind, Id); }
+<IconButton Icon="@(starred ? "starred" : "star")" On="starred" Large="Large" Label="@(Labelled ? starred ? "Starred" : "Star" : null)"
+            Title="@(starred ? $"Take the star off this {What}" : $"Star this {What}: it's in Starred on the Library page, and in Subsonic players")"
+            OnClick="() => Marks.StarAsync(Kind, Id, !starred)" />
+
+@code {
+    [Parameter, EditorRequired] public MarkKind Kind { get; set; }
+
+    /// <summary>The song's track ID, or the album or artist.</summary>
+    [Parameter, EditorRequired] public Guid Id { get; set; }
+
+    [Parameter] public bool Large { get; set; }
+
+    [Parameter] public bool Labelled { get; set; }
+
+    private string What => Kind.ToString().ToLowerInvariant();
+
+    protected override async Task OnInitializedAsync()
+    {
+        Marks.Changed += StateHasChanged;
+        await Marks.EnsureLoadedAsync();
+    }
+
+    public void Dispose() => Marks.Changed -= StateHasChanged;
+}

@@ -129,7 +129,7 @@ public static partial class SubsonicEndpoints
         for (var i = 0; i < queue.Items.Count; i++)
         {
             var item = queue.Items[i];
-            if (item.Missing)
+            if (item.Missing || item.ListenId is not null)
                 continue;
             var song = item.FileId is { } file && library.SongsById.TryGetValue(file, out var byFile) ? byFile
                 : songsByTrack.GetValueOrDefault(item.TrackId);

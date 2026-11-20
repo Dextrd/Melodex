@@ -24,6 +24,7 @@ public sealed record SetMark(bool? Starred = null, int? Rating = null);
 /// <param name="FileId">A file of your own that no catalogue knows.</param>
 /// <param name="EditionId">The edition it was queued from.</param>
 /// <param name="Missing">Not in the library: it's fetched to listen to as the queue comes near it. Subsonic players don't see these.</param>
+/// <param name="ListenId">Fetched to listen to: its listen-now track. Subsonic players don't see these either.</param>
 public sealed record PlayQueueItem(
     Guid TrackId,
     string Title,
@@ -35,7 +36,8 @@ public sealed record PlayQueueItem(
     string? AlbumTitle = null,
     string? CoverUrl = null,
     double? DurationSeconds = null,
-    bool Missing = false);
+    bool Missing = false,
+    Guid? ListenId = null);
 
 /// <summary>
 /// Your play queue, kept on the server (#7): the web player and Subsonic players share it, so one picks up where the
