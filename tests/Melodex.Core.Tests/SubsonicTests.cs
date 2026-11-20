@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Headers;
+using System.Net.Http.Json;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -144,6 +145,15 @@ public sealed class SubsonicTests : IDisposable
         Assert.Equal(40, ErrorOf(await CallAsync("ping", $"u=someone&p={key}")));
         // Signing in says who's playing: the key's owner.
         Assert.Equal(SignedIn.Username, (string)(await OkAsync("getUser", $"{u}&p={key}"))["user"]!["username"]!);
+
+        // Someone who may only listen makes their own key, which signs in only with their own name: never as the admin.
+        await _api.CreateUserAsync(new CreateUser("bob", "bob's password", [UserPermissions.Listen]));
+        var bobHttp = _factory.CreateClient();
+        (await bobHttp.PostAsJsonAsync("api/v1/auth/login", new SignIn("bob", "bob's password"))).EnsureSuccessStatusCode();
+        var bobs = (await new MelodexClient(bobHttp).CreateApiKeyAsync(new CreateApiKey("Bob's phone", [UserPermissions.Listen], Subsonic: true))).Key;
+        Assert.Equal(40, ErrorOf(await CallAsync("ping", $"{u}&p={bobs}")));
+        Assert.Equal(40, ErrorOf(await CallAsync("ping", $"{u}&t={Md5(bobs + "s4lt")}&s=s4lt")));
+        Assert.Equal("bob", (string)(await OkAsync("getUser", $"u=bob&p={bobs}"))["user"]!["username"]!);
 
         // Another key isn't a password, though it works alone with OpenSubsonic's apiKey if it can listen.
         var listen = (await _api.CreateApiKeyAsync(new CreateApiKey("Player", [UserPermissions.Listen]))).Key;

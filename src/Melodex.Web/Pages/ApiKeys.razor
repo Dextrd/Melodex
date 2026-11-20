@@ -12,11 +12,7 @@
     API keys. Each belongs to whoever made it and can do no more than they may; the admin sees everyone's. Webhooks
     have a tab of their own.
 *@
-@if (!Auth.May(UserPermissions.Keys))
-{
-    <div class="empty card">You can't make API keys. The admin can give you that under Settings → Users.</div>
-}
-else if (_keys is null)
+@if (_keys is null)
 {
     <Loading />
 }
@@ -179,8 +175,7 @@ else
 
     protected override async Task OnInitializedAsync()
     {
-        if (Auth.May(UserPermissions.Keys))
-            _keys = await Api.ListApiKeysAsync();
+        _keys = await Api.ListApiKeysAsync();
     }
 
     private void StartNewKey()

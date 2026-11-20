@@ -25,7 +25,7 @@ a player, so it never sits in an app on a phone.
 A ticked key is kept encrypted rather than only as a fingerprint, as most players send a scrambled form of their
 password that can only be checked against the key itself. Melodex still shows it only once, when it's made.
 
-To make a key you need the **Listen** and **API keys and webhooks** permissions: the admin gives them under **Settings → Users**.
+Anyone can make keys, each able to do only what they may themselves, so you need the **Listen** permission: the admin gives it under **Settings → Users**.
 
 ## What players see
 

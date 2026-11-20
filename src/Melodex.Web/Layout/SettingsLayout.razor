@@ -20,9 +20,9 @@
         {
             <NavLink href="settings/users">Users</NavLink>
         }
+        <NavLink href="settings/api">API</NavLink>
         @if (Auth.May(UserPermissions.Keys))
         {
-            <NavLink href="settings/api">API</NavLink>
             <NavLink href="settings/webhooks">Webhooks</NavLink>
         }
         <NavLink href="settings/appearance">Appearance</NavLink>
@@ -42,12 +42,12 @@
 </div>
 
 @code {
-    // What the open tab needs: users and keys have tabs of their own, appearance is for everyone, and the rest are settings.
+    // What the open tab needs: users and webhooks have tabs of their own, everyone has their own keys and appearance, and the rest are settings.
     private string? Needed => Nav.ToBaseRelativePath(Nav.Uri).Split('?', '#')[0].TrimEnd('/') switch
     {
         "settings/users" or "settings/security" => UserPermissions.Users,
-        "settings/api" or "settings/webhooks" => UserPermissions.Keys,
-        "settings/appearance" or "settings/about" => null,
+        "settings/webhooks" => UserPermissions.Keys,
+        "settings/api" or "settings/appearance" or "settings/about" => null,
         var help when help == "settings/help" || help.StartsWith("settings/help/") => null,
         _ => UserPermissions.Settings,
     };

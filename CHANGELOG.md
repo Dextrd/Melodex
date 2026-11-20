@@ -30,6 +30,9 @@ What changed in each release of Melodex. Versions follow [semantic versioning](h
 
 ### Changed
 
+- Everyone can make API keys under **Settings → API**, as many as they like, each able to do only what they may. The
+  permission that was **API keys and webhooks** is now **Webhooks**; on a key it still lets an app make and revoke its
+  owner's keys (#7).
 - The upgrade schedule has moved from **Settings → Quality** to **Settings → Scheduled tasks**, as it was set: on the
   daily schedule if it ran every day, or else the weekly one on the first of its days. Nothing else is scheduled on an
   existing install until you tick it. The upgrade settings' `scheduled`, `days`, `from`, `until` and `timeZone` are read

@@ -31,14 +31,15 @@ them out everywhere else.
 | **Remove music** | Deleting music from the library, or hiding it |
 | **Scan** | Scanning the library, and pausing, cancelling and reordering tasks |
 | **Settings and plugins** | Changing settings and plugins, and reading the log |
-| **API keys and webhooks** | Making API keys for apps, and managing webhooks |
+| **Webhooks** | Managing webhooks. On an API key, it also lets the app make and revoke your keys |
 | **Manage users** | Adding, changing and removing other users |
 
-Someone who just listens needs Browse and Listen. To use a Subsonic player as well, they also need **API keys and webhooks**, because the player signs in with a key they make themselves. Buttons for what someone may not do don't show.
+Someone who just listens needs Browse and Listen. Buttons for what someone may not do don't show.
 
 ## API keys
 
-Apps use a key from **Settings → API**. A key belongs to whoever made it and can never do more than they may: if their
+Apps use a key from **Settings → API**. Anyone signed in can make keys there, as many as they like, but each can do only
+what its maker may. A key belongs to whoever made it and can never do more than they may: if their
 permissions shrink, or they're removed, so does the key. **Everything you may do** gives a key all its owner's
 permissions, now and later. See the [client guide](../client-guide.md) for the API itself.
 
