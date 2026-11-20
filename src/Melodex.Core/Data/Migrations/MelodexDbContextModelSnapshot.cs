@@ -1126,6 +1126,31 @@ namespace Melodex.Core.Data.Migrations
                     b.ToTable("Crosswalk", (string)null);
                 });
 
+            modelBuilder.Entity("Melodex.Core.Data.RadioSkip", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("ArtistId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("SkippedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("TrackId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "SkippedAt");
+
+                    b.ToTable("RadioSkips");
+                });
+
             modelBuilder.Entity("Melodex.Core.Data.Request", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1362,6 +1387,9 @@ namespace Melodex.Core.Data.Migrations
                     b.Property<string>("Appearance")
                         .HasColumnType("TEXT");
 
+                    b.Property<bool>("Autoplay")
+                        .HasColumnType("INTEGER");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("TEXT");
 
@@ -1388,6 +1416,9 @@ namespace Melodex.Core.Data.Migrations
 
                     b.Property<DateTime?>("PlaylistsSyncedAt")
                         .HasColumnType("TEXT");
+
+                    b.Property<int>("RadioMissingPercent")
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Stamp")
                         .IsRequired()
@@ -1699,6 +1730,15 @@ namespace Melodex.Core.Data.Migrations
                 });
 
             modelBuilder.Entity("Melodex.Core.Data.PlaylistFolder", b =>
+                {
+                    b.HasOne("Melodex.Core.Data.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Melodex.Core.Data.RadioSkip", b =>
                 {
                     b.HasOne("Melodex.Core.Data.User", null)
                         .WithMany()

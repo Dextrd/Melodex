@@ -1,0 +1,76 @@
+@inject MelodexClient Api
+@inject Player Player
+
+@*
+    Your radio settings (#4), on your account page: how much of a radio is songs you don't have, fetched to listen to,
+    and whether the player carries on with a radio when the queue runs out. Saved as they're changed.
+*@
+@if (_settings is not { } settings)
+{
+    <Loading Inline="true" />
+}
+else
+{
+    <p class="muted small">Songs you don't have are fetched to listen to as they come near, without adding them to your library.</p>
+    @foreach (var (value, name, hint) in Choices)
+    {
+        <label class="dialog-choice">
+            <input type="radio" name="radio-missing" checked="@(settings.MissingPercent == value)" @onchange="() => SaveAsync(settings with { MissingPercent = value })" />
+            <span>
+                <strong>@name</strong>
+                <span class="muted small">@hint</span>
+            </span>
+        </label>
+    }
+    <label class="check" style="margin-top: .75rem;">
+        <input type="checkbox" checked="@settings.Autoplay" @onchange="e => SaveAsync(settings with { Autoplay = e.Value is true })" />
+        Autoplay: when the queue runs out, carry on with a radio from the last song
+    </label>
+    @if (_error is not null) { <p class="error small">@_error</p> }
+}
+
+@code {
+    private RadioSettings? _settings;
+    private string? _error;
+
+    private static readonly (int Value, string Name, string Hint)[] Choices =
+    [
+        (0, "Only songs you have", "Nothing is fetched."),
+        (10, "A few you don't have", "About one song in ten."),
+        (25, "Some you don't have", "About one song in four. The default."),
+        (50, "Half and half", "As much new to you as your own."),
+        (75, "Mostly ones you don't have", "About three songs in four."),
+        (100, "Only songs you don't have", "All of it new to your library."),
+    ];
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _settings = await Api.GetRadioSettingsAsync();
+            // A share chosen through the API that isn't one of these shows as the nearest.
+            if (!Choices.Any(c => c.Value == _settings.MissingPercent))
+                _settings = _settings with { MissingPercent = Choices.MinBy(c => Math.Abs(c.Value - _settings.MissingPercent)).Value };
+        }
+        catch (Exception e) when (e is HttpRequestException or MelodexApiException)
+        {
+            _error = e.Message;
+            _settings = new RadioSettings();
+        }
+    }
+
+    private async Task SaveAsync(RadioSettings settings)
+    {
+        _settings = settings;
+        _error = null;
+        try
+        {
+            await Api.SaveRadioSettingsAsync(settings);
+            Player.RadioSettingsChanged(settings);
+        }
+        catch (Exception e) when (e is HttpRequestException or MelodexApiException)
+        {
+            _error = $"Couldn't save it: {e.Message}";
+        }
+    }
+}
