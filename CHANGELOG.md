@@ -31,7 +31,9 @@ What changed in each release of Melodex. Versions follow [semantic versioning](h
   the admin enters under **Settings → Playback** (#2).
 - **Discovery plugins**, a sixth kind: similar artists, similar songs and recommendations, in the order you choose
   under **Settings → Plugins → Discovery**, with what they agree on first. An artist's page shows **Similar artists**
-  and a song's page **Similar songs**, matched to the catalogue where they can be. **ListenBrainz** is set up from the
+  and a song's page **Similar songs** at its foot: songs the catalogue has, listed as search lists them, to play,
+  listen to or get. Every section of a song's page opens and closes; similar songs and replaced files start shut, and
+  it remembers what you open. **ListenBrainz** is set up from the
   start and needs no account; it also recommends songs for you once your ListenBrainz account is linked. **Last.fm**
   needs an API key of your own. The API has `GET /artists/{id}/similar`, `GET /tracks/{id}/similar`,
   `GET /discovery/recommendations` and `GET /discovery`, and plugins at an address can be discovery plugins (#3).

@@ -4,15 +4,15 @@
 @*
     A song's lyrics on its page: what it has beside the title, buttons to edit them, find them again, choose them from a
     search, delete them, or exclude the song from lyrics matching, and a box saying where they're read from with the
-    lyrics line by line, scrolling past nine or so.
+    lyrics line by line, scrolling past nine or so. The title opens and closes it; shut, only what it has shows.
 *@
 <div class="section-head">
-    <h2>Lyrics</h2>
+    <h2><SectionToggle Open="Open" OnToggle="OnToggle">Lyrics</SectionToggle></h2>
     @if (_lyrics is { } had)
     {
         <span class="badge @(had.Kind is LyricsKind.Synced or LyricsKind.Plain ? "owned" : "neutral")">@Label(had)</span>
     }
-    @if (_lyrics is { } shown)
+    @if (Open && _lyrics is { } shown)
     {
         <div class="row lyrics-actions">
             @if (shown.Kind != LyricsKind.None)
@@ -43,7 +43,8 @@
     }
 </div>
 
-@if (_lyrics is null)
+@if (!Open) { }
+else if (_lyrics is null)
 {
     <Loading Inline="true" />
 }
@@ -112,6 +113,11 @@ else
 
     /// <summary>Its files' lyrics changed, so the page can show them as they are now.</summary>
     [Parameter] public EventCallback OnChanged { get; set; }
+
+    /// <summary>Whether the section is open, showing the lyrics and what can be done with them.</summary>
+    [Parameter] public bool Open { get; set; } = true;
+
+    [Parameter] public EventCallback OnToggle { get; set; }
 
     private TrackLyrics? _lyrics;
     private Guid _loaded;

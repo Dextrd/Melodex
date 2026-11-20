@@ -2,8 +2,8 @@
 
 @*
     Songs the discovery plugins found (#3): like a song, or recommended. Listed as search lists tracks, with what can be
-    done with each: play one you have, or listen to, get or wish for one you don't. One the catalogue doesn't know is
-    searched for instead.
+    done with each: play one you have, or listen to, get or wish for one you don't. Only songs the catalogue has are
+    listed.
 *@
 <div class="card">
     <table class="table track-list narrow-status discovered-songs">
@@ -12,17 +12,17 @@
             @foreach (var song in Songs)
             {
                 var track = AsTrack(song);
-                <tr class="arrives" @key="(song.TrackId, song.Title, song.ArtistCredit)">
+                <tr class="arrives" @key="song.TrackId">
                     <td class="cover-col">
                         @if (song.AlbumId is { } albumId) { <a href="albums/@albumId" tabindex="-1"><Cover Url="@song.CoverUrl" /></a> }
                         else { <Cover Url="@song.CoverUrl" /> }
                     </td>
                     <td class="track-main">
                         <div class="ellipsis">
-                            <a href="@Href(song)" class="plain" title="@Title(song)">@song.Title</a>@if (track is not null && !song.Owned) { <FetchNote Id="track.Id" /> }
+                            <a href="tracks/@track.Id" class="plain" title="@Title(song)">@song.Title</a>@if (!song.Owned) { <FetchNote Id="track.Id" /> }
                         </div>
                         <div class="muted small ellipsis">
-                            @if (track is not null) { <span class="show-narrow"><StatusBadge Track="song.Owned ? TrackStatus.Owned : TrackStatus.Missing" /></span> }
+                            <span class="show-narrow"><StatusBadge Track="song.Owned ? TrackStatus.Owned : TrackStatus.Missing" /></span>
                             @if (song.ArtistId is { } artistId) { <a href="artists/@artistId">@song.ArtistCredit</a> } else { @song.ArtistCredit }
                             @if (song.AlbumTitle is { } album)
                             {
@@ -32,13 +32,9 @@
                         </div>
                     </td>
                     <td class="num muted hide-narrow">@Format.Duration(song.DurationSeconds)</td>
-                    <td class="num hide-narrow">@if (track is not null) { <StatusBadge Track="song.Owned ? TrackStatus.Owned : TrackStatus.Missing" /> }</td>
+                    <td class="num hide-narrow"><StatusBadge Track="song.Owned ? TrackStatus.Owned : TrackStatus.Missing" /></td>
                     <td class="num actions">
-                        @if (track is null)
-                        {
-                            <a class="icon-button" href="@Href(song)" title="Not in the catalogue yet: search for it" aria-label="Search for it"><Icon Name="search" /></a>
-                        }
-                        else if (song.Owned)
+                        @if (song.Owned)
                         {
                             <IconButton Icon="play" Requires="@UserPermissions.Listen" Title="Play" OnClick="() => Player.PlayAsync([PlayerEntry.Owned(track)])" />@* no space: buttons line up from row to row *@<ItemMenu Entry="PlayerEntry.Owned(track)" Keep="[new PlaylistItem(track.Id)]" Name="@track.Title" UpgradeTrackId="track.Id"
                                       AlbumHref="@(track.AlbumId is { } a ? $"albums/{a}" : null)" ArtistHref="@(track.ArtistId is { } r ? $"artists/{r}" : null)" />
@@ -62,13 +58,9 @@
 @code {
     [Parameter, EditorRequired] public IReadOnlyList<DiscoveredSong> Songs { get; set; } = [];
 
-    /// <summary>The song as search would list it, when the catalogue knows it.</summary>
-    private static SearchTrack? AsTrack(DiscoveredSong song) => song.TrackId is { } id
-        ? new SearchTrack(id, song.Title, song.ArtistCredit, song.DurationSeconds, song.Owned, [], song.ArtistId, song.AlbumId, song.AlbumTitle, song.CoverUrl)
-        : null;
-
-    private static string Href(DiscoveredSong song) =>
-        song.TrackId is { } id ? $"tracks/{id}" : $"search?q={Uri.EscapeDataString($"{song.Title} {song.ArtistCredit}")}";
+    /// <summary>The song as search would list it.</summary>
+    private static SearchTrack AsTrack(DiscoveredSong song) =>
+        new(song.TrackId, song.Title, song.ArtistCredit, song.DurationSeconds, song.Owned, [], song.ArtistId, song.AlbumId, song.AlbumTitle, song.CoverUrl);
 
     private static string Title(DiscoveredSong song) => $"{Math.Round(song.Score * 100)}% alike, from {string.Join(" and ", song.From)}";
 }

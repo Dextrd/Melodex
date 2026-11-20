@@ -17,7 +17,8 @@ recommend to a listener, each with a score. They sit under Discovery in Settings
 4. What they find is matched to the catalogue: by an ID it already has; for an artist with a MusicBrainz ID while a
    catalogue uses them, by adding them to the catalogue as a search would; else by name, only when one artist the
    catalogue holds has it (or one in the library does). A song is matched by its IDs, else by its title among its
-   artist's. What isn't matched is still listed, by name, and searched for when opened.
+   artist's. Artists that aren't matched are still listed, by name, and searched for when opened; songs that aren't
+   are left out, so plugins are asked for more than are listed.
 5. A plugin that throws is left out of that answer, logged, and asked again next time.
 
 ## `IDiscoveryPlugin`

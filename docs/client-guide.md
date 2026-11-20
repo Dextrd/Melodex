@@ -458,8 +458,8 @@ From the discovery plugins, combined, with the `read` scope:
 - `GET /artists/{id}/similar` lists artists like a catalogue artist, closest first, with `take` (20 by default, at most
   100). Each has a `score` from 0 to 1 and the plugins it's `from`; those matched to the catalogue have its `id` and
   whether they're `inLibrary`, and the rest only their `name`.
-- `GET /tracks/{id}/similar` lists songs like a song, the same way: those matched have a `trackId`, whether they're
-  `owned`, and an album with its cover.
+- `GET /tracks/{id}/similar` lists songs like a song, the same way, but only those the catalogue has: each has its
+  `trackId`, whether it's `owned`, and an album with its cover.
 - `GET /discovery/recommendations` lists songs recommended for the key's user, best first (50 by default): from what
   the plugins know of them through their linked ListenBrainz and Last.fm accounts, and what they've played lately.
 

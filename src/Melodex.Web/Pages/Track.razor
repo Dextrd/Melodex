@@ -5,6 +5,7 @@
 @inject RequestTracker Tracker
 @inject Player Player
 @inject Glimpses Glimpses
+@inject Preferences Prefs
 
 <PageTitle>@(_track?.Title ?? _glimpse?.Title ?? "Track") · Melodex</PageTitle>
 
@@ -98,8 +99,11 @@ else
         </div>
     </div>
 
-    <h2 class="section">On @Format.Count(track.Appearances.Select(a => a.AlbumId).Distinct().Count(), "album", "albums")</h2>
-    @if (track.Appearances.Count == 0)
+    <h2 class="section">
+        <SectionToggle Open="IsOpen(Albums)" OnToggle="() => ToggleAsync(Albums)">On @Format.Count(track.Appearances.Select(a => a.AlbumId).Distinct().Count(), "album", "albums")</SectionToggle>
+    </h2>
+    @if (!IsOpen(Albums)) { }
+    else if (track.Appearances.Count == 0)
     {
         <div class="empty card">No albums in the catalogue list this song yet.</div>
     }
@@ -144,7 +148,7 @@ else
 
     @if (owned)
     {
-        <TrackLyricsPanel TrackId="track.Id" Title="@track.Title" OnChanged="LoadAsync" />
+        <TrackLyricsPanel TrackId="track.Id" Title="@track.Title" OnChanged="LoadAsync" Open="IsOpen(Lyrics)" OnToggle="() => ToggleAsync(Lyrics)" />
 
         @*
             The files' quality and what's done to all of them are on the section's title row, as the lyrics' are, and so
@@ -153,19 +157,22 @@ else
         var single = track.Files.Count == 1;
         var qualities = track.Files.Select(f => f.Quality).OfType<FileQuality>().ToList();
         <div class="section-head">
-            <h2>@(single ? "File" : $"{track.Files.Count} files")</h2>
+            <h2><SectionToggle Open="IsOpen(Files)" OnToggle="() => ToggleAsync(Files)">@(single ? "File" : $"{track.Files.Count} files")</SectionToggle></h2>
             <QualityBadge Quality="FileQuality.Lowest(qualities)" Mixed="FileQuality.Mixed(qualities)" />
-            <div class="row lyrics-actions">
-                <IconButton Icon="format" Requires="@UserPermissions.Format" Label="Format" Title="Rewrite this song's files: their tags, cover and where they live" OnClick="() => _formatting = true" />
-                <IconButton Icon="image" Requires="@UserPermissions.Format" Label="Cover" Title="Choose this song's cover, from any release it's on or a picture of your own" OnClick="() => _choosingCover = true" />
-                <QualityButton Kind="tracks" Id="track.Id" Name="@track.Title" />
-                @if (single)
-                {
-                    @FileButtons((track, track.Files[0]))
-                }
-            </div>
+            @if (IsOpen(Files))
+            {
+                <div class="row lyrics-actions">
+                    <IconButton Icon="format" Requires="@UserPermissions.Format" Label="Format" Title="Rewrite this song's files: their tags, cover and where they live" OnClick="() => _formatting = true" />
+                    <IconButton Icon="image" Requires="@UserPermissions.Format" Label="Cover" Title="Choose this song's cover, from any release it's on or a picture of your own" OnClick="() => _choosingCover = true" />
+                    <QualityButton Kind="tracks" Id="track.Id" Name="@track.Title" />
+                    @if (single)
+                    {
+                        @FileButtons((track, track.Files[0]))
+                    }
+                </div>
+            }
         </div>
-        @foreach (var file in track.Files)
+        @foreach (var file in IsOpen(Files) ? track.Files : [])
         {
             <div class="card track-file">
                 @if (single)
@@ -217,15 +224,18 @@ else
         }
         @if (_held.Count > 0)
         {
-            <h2 class="section">Replaced by an upgrade</h2>
-            <p class="muted small">
-                Held outside the music folder until it's deleted. Rolling back deletes the copy that replaced it and puts this one back; a later upgrade may replace it again, unless it's never to be upgraded.
-            </p>
-            <div class="card"><HeldFiles Files="_held" ShowTitle="false" Changed="LoadAsync" /></div>
+            <h2 class="section"><SectionToggle Open="IsOpen(Upgrades)" OnToggle="() => ToggleAsync(Upgrades)">Replaced by an upgrade</SectionToggle></h2>
+            @if (IsOpen(Upgrades))
+            {
+                <p class="muted small">
+                    Held outside the music folder until it's deleted. Rolling back deletes the copy that replaced it and puts this one back; a later upgrade may replace it again, unless it's never to be upgraded.
+                </p>
+                <div class="card"><HeldFiles Files="_held" ShowTitle="false" Changed="LoadAsync" /></div>
+            }
         }
     }
 
-    <SimilarSongs TrackId="track.Id" />
+    <SimilarSongs TrackId="track.Id" Open="IsOpen(Similar)" OnToggle="() => ToggleAsync(Similar)" />
 }
 
 @if (_choosingCover && _track is not null)
@@ -331,8 +341,28 @@ else
     }
     private bool _choosingCover;
     private (string Name, IReadOnlyList<PlaylistItem> Songs)? _adding;
+
+    // Which of the page's sections are open, kept between visits: the albums it's on, its lyrics and its files are open
+    // until shut; what upgrades replaced and similar songs are shut until opened.
+    private const string SectionsKey = "trackSections", Albums = "albums", Lyrics = "lyrics", Files = "files", Upgrades = "upgrades", Similar = "similar";
+    private Dictionary<string, bool> _sections = [];
+    private bool _sectionsLoaded;
+
+    private bool IsOpen(string section) => _sections.TryGetValue(section, out var open) ? open : section is Albums or Lyrics or Files;
+
+    private Task ToggleAsync(string section)
+    {
+        _sections[section] = !IsOpen(section);
+        return Prefs.SetAsync(SectionsKey, _sections);
+    }
+
     protected override async Task OnParametersSetAsync()
     {
+        if (!_sectionsLoaded)
+        {
+            _sections = await Prefs.GetAsync<Dictionary<string, bool>>(SectionsKey, []);
+            _sectionsLoaded = true;
+        }
         ScanStatus.LibraryChanged -= Reload;
         ScanStatus.LibraryChanged += Reload;
         Tracker.Changed -= Redraw;

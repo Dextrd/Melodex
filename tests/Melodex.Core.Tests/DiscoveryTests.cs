@@ -171,8 +171,8 @@ public sealed class DiscoveryTests : IDisposable
         Assert.Equal(("Teardrop", teardrop, massive, true), (song.Title, song.TrackId, song.ArtistId, song.Owned));
         Assert.Equal(["ListenBrainz", "Last.fm"], song.From);
         Assert.DoesNotContain(songs, s => s.TrackId == gloryBox);
-        // A song the catalogue doesn't have is shown by its name.
-        Assert.Contains(songs, s => s is { Title: "Overcome", TrackId: null });
+        // A song the catalogue doesn't have isn't listed.
+        Assert.DoesNotContain(songs, s => s.Title == "Overcome");
 
         Assert.Equal(System.Net.HttpStatusCode.NotFound,
             (await Assert.ThrowsAsync<HttpRequestException>(() => _api.ListSimilarArtistsAsync(Guid.NewGuid()))).StatusCode);
@@ -198,7 +198,7 @@ public sealed class DiscoveryTests : IDisposable
         }
 
         var songs = await _api.ListSimilarSongsAsync(roads);
-        Assert.Equal(["Teardrop", "Overcome"], songs.Select(s => s.Title));
+        Assert.Equal(["Teardrop"], songs.Select(s => s.Title));
         Assert.Contains(_services.Asked, u => u.Contains("acr-lookup") && u.Contains("recording_name=Roads"));
         Assert.Contains(_services.Asked, u => u.Contains("similar-recordings") && u.Contains(RoadsMain));
     }
@@ -218,7 +218,7 @@ public sealed class DiscoveryTests : IDisposable
         }
         DiscoveryCache.Clear();
         var recommended = await _api.ListRecommendationsAsync();
-        Assert.Equal([("Teardrop", (Guid?)teardrop), ("Overcome", null)], recommended.Select(r => (r.Title, r.TrackId)));
+        Assert.Equal([("Teardrop", teardrop)], recommended.Select(r => (r.Title, r.TrackId)));
         Assert.Equal(1, recommended[0].Score);
         Assert.Contains(_services.Asked, u => u.Contains("cf/recommendation/user/someone/recording"));
     }

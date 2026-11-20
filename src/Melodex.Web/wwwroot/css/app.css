@@ -476,7 +476,7 @@ p.error { max-width: none; white-space: normal; }
 .page-head + .card, .page-head + .notice + .card, .page-head + .error + .card { margin-top: 1rem; }
 .crumbs { margin-bottom: .35rem; }
 
-/* Collapsible sections on the artist page. */
+/* Collapsible sections on the artist and song pages. */
 h2.section { margin: 1.5rem 0 .5rem; }
 .section-toggle {
     font: inherit; font-weight: 700; border: none; background: none; padding: 0; color: var(--text);
