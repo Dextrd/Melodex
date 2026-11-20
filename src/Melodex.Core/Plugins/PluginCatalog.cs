@@ -5,6 +5,8 @@ using Melodex.Contracts.Plugins;
 using Melodex.Plugins.Deezer;
 using Melodex.Plugins.FanartTv;
 using Melodex.Plugins.Jellyfin;
+using Melodex.Plugins.LastFm;
+using Melodex.Plugins.ListenBrainz;
 using Melodex.Plugins.Lrclib;
 using Melodex.Plugins.Wikimedia;
 using Melodex.Plugins.MusicBrainz;
@@ -21,7 +23,7 @@ namespace Melodex.Core.Plugins;
 public sealed record DiscoveredPlugin(PluginManifest Manifest, IPluginFactory? Factory, string Source, string? Rejection);
 
 /// <summary>
-/// Finds in-process plugins (index, artwork and media-server plugins) at startup: the ones built into the core, plus every
+/// Finds in-process plugins (index, artwork, lyrics, discovery and media-server plugins) at startup: the ones built into the core, plus every
 /// assembly in a subfolder of the plugins folder. Plugins built for a contract the core doesn't support are listed
 /// with the reason, but never instantiated.
 /// </summary>
@@ -30,7 +32,8 @@ public sealed class PluginCatalog
     private static readonly Assembly[] BuiltIn =
         [typeof(MusicBrainzIndexFactory).Assembly, typeof(NavidromeConnectorFactory).Assembly, typeof(FanartTvFactory).Assembly,
          typeof(WikimediaCommonsFactory).Assembly, typeof(DeezerFactory).Assembly, typeof(LrclibFactory).Assembly,
-         typeof(PlexConnectorFactory).Assembly, typeof(JellyfinConnectorFactory).Assembly];
+         typeof(PlexConnectorFactory).Assembly, typeof(JellyfinConnectorFactory).Assembly, typeof(ListenBrainzFactory).Assembly,
+         typeof(LastFmFactory).Assembly];
 
     private readonly Dictionary<string, DiscoveredPlugin> _plugins = new(StringComparer.Ordinal);
 

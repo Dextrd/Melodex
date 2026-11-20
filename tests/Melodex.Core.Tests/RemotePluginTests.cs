@@ -10,6 +10,7 @@ using Melodex.Contracts.Catalogue;
 using Melodex.Contracts.Plugins;
 using Melodex.Contracts.Plugins.Artwork;
 using Melodex.Contracts.Plugins.Connectors;
+using Melodex.Contracts.Plugins.Discovery;
 using Melodex.Contracts.Plugins.Index;
 using Melodex.Contracts.Plugins.Lyrics;
 using Melodex.Contracts.Plugins.Remote;
@@ -143,6 +144,26 @@ public sealed class RemotePluginTests : IDisposable
         Assert.Equal([1, 2, 3], image?.Data);
         // It only pictures what it says it can.
         Assert.DoesNotContain(await RunningAsync(s => s.GetRequiredService<ArtworkPlugins>().ForAsync(ArtworkSubject.Artist, default)), p => p.Instance.Endpoint is not null);
+    }
+
+    [Fact]
+    public async Task Discovery_comes_from_a_plugin_at_an_address()
+    {
+        _plugins.Add("my-discovery", Manifest("example.discovery", PluginType.Discovery, DiscoveryCapabilities.SimilarArtists));
+        _plugins.Answer("my-discovery", "/v1/similar-artists", call =>
+        {
+            var input = call.GetProperty("input");
+            Assert.Equal(("Portishead", 5), (input.GetProperty("artist").GetProperty("name").GetString(), input.GetProperty("count").GetInt32()));
+            return new[] { new DiscoveredArtist("Massive Attack", [new ProviderId(Providers.MusicBrainz, "10adbe5e-a2c0-4bf3-8249-2b4cbf6e6ca8")], 0.9) };
+        });
+        await _api.AddPluginAsync(new AddPlugin(Endpoint: "http://my-discovery:8080", Type: PluginType.Discovery));
+
+        var discovery = await RunningAsync(async s => (await s.GetRequiredService<DiscoveryPlugins>().GetAsync(default)).Single(p => p.Instance.Endpoint is not null).Plugin);
+        var similar = Assert.Single(await discovery.SimilarArtistsAsync(new DiscoveryArtist("Portishead", []), 5, default));
+        Assert.Equal(("Massive Attack", 0.9), (similar.Name, similar.Score));
+        // Only what it declares is asked.
+        Assert.Empty(await discovery.RecommendAsync(new DiscoveryListener(new Dictionary<string, string>(), [], []), 5, default));
+        Assert.DoesNotContain(_plugins.Calls, c => c.Path == "/v1/recommendations");
     }
 
     [Fact]

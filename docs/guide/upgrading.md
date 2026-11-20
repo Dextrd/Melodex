@@ -37,6 +37,12 @@ as it is. Two things change:
   `COMPOSE_PROFILES` does nothing. Paste back the plugins you use from their READMEs, where the lines are the same as
   before. Your plugins' settings are kept in Melodex, so nothing needs adding again under **Settings → Plugins**.
 
+## To 2.0.0: discovery
+
+Melodex sets up the new ListenBrainz discovery plugin once, as it did LRCLIB for lyrics, so artists' and songs' pages
+show similar music. It sends ListenBrainz the MusicBrainz IDs of the artists and songs whose pages you open. To turn it
+off, remove it under **Settings → Plugins → Discovery**; it isn't set up again.
+
 ## To 1.7.0: scheduled tasks
 
 Scans, catalogue updates, lossless checks, lyrics, the visualiser's bars, failed downloads, wishlists and upgrades can

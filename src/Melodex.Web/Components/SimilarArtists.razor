@@ -1,0 +1,65 @@
+@inject MelodexClient Api
+
+@*
+    Artists like this one (#3), from the discovery plugins, on an artist's page. Those the catalogue knows open their page;
+    the rest search for their name. Nothing shows when no discovery plugin finds artists, or none found any.
+*@
+@if (_similar is null)
+{
+    <h2 class="section">Similar artists</h2>
+    <Loading Inline="true" Text="Asking the discovery plugins…" />
+}
+else if (_similar.Count > 0)
+{
+    <h2 class="section">Similar artists</h2>
+    <div class="tiles similar-artists">
+        @foreach (var artist in _similar)
+        {
+            <a class="tile arrives" href="@Href(artist)" title="@Title(artist)">
+                <Cover Url="@artist.ImageUrl" Artist="true" />
+                <div class="tile-name">@artist.Name</div>
+                @if (artist.Disambiguation is not null) { <div class="muted small tile-sub">@artist.Disambiguation</div> }
+                @if (artist.InLibrary) { <div><span class="badge owned">In library</span></div> }
+            </a>
+        }
+    </div>
+}
+@if (_error is not null) { <div class="muted small" role="status">Couldn't find similar artists: @_error</div> }
+
+@code {
+    [Parameter, EditorRequired] public Guid ArtistId { get; set; }
+
+    /// <summary>How many to show.</summary>
+    [Parameter] public int Take { get; set; } = 12;
+
+    private IReadOnlyList<SimilarArtist>? _similar;
+    private Guid _loaded;
+    private string? _error;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (ArtistId == _loaded)
+            return;
+        (_loaded, _similar, _error) = (ArtistId, null, null);
+        try
+        {
+            if (!(await Api.GetDiscoveryAsync()).SimilarArtists)
+            {
+                _similar = [];
+                return;
+            }
+            var similar = await Api.ListSimilarArtistsAsync(ArtistId, Take);
+            if (ArtistId == _loaded)
+                _similar = similar;
+        }
+        catch (Exception e) when (e is HttpRequestException or MelodexApiException)
+        {
+            (_similar, _error) = ([], e.Message);
+        }
+    }
+
+    private static string Href(SimilarArtist artist) => artist.Id is { } id ? $"artists/{id}" : $"search?q={Uri.EscapeDataString(artist.Name)}";
+
+    private static string Title(SimilarArtist artist) =>
+        $"{artist.Name}{(artist.Disambiguation is null ? "" : $" ({artist.Disambiguation})")} · {Math.Round(artist.Score * 100)}% alike, from {string.Join(" and ", artist.From)}";
+}

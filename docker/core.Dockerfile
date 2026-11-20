@@ -13,6 +13,8 @@ COPY src/Melodex.Plugins.FanartTv/Melodex.Plugins.FanartTv.csproj src/Melodex.Pl
 COPY src/Melodex.Plugins.Wikimedia/Melodex.Plugins.Wikimedia.csproj src/Melodex.Plugins.Wikimedia/
 COPY src/Melodex.Plugins.Deezer/Melodex.Plugins.Deezer.csproj src/Melodex.Plugins.Deezer/
 COPY src/Melodex.Plugins.Lrclib/Melodex.Plugins.Lrclib.csproj src/Melodex.Plugins.Lrclib/
+COPY src/Melodex.Plugins.ListenBrainz/Melodex.Plugins.ListenBrainz.csproj src/Melodex.Plugins.ListenBrainz/
+COPY src/Melodex.Plugins.LastFm/Melodex.Plugins.LastFm.csproj src/Melodex.Plugins.LastFm/
 COPY src/Melodex.Core/Melodex.Core.csproj src/Melodex.Core/
 RUN dotnet restore src/Melodex.Core/Melodex.Core.csproj
 COPY src/ src/

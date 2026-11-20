@@ -1,0 +1,51 @@
+@inject MelodexClient Api
+
+@*
+    Songs like this one (#3), from the discovery plugins, on a song's page. Those the catalogue knows open their page, and
+    say whether you have them; the rest search for their title and artist. Nothing shows when no discovery plugin finds
+    songs, or none found any.
+*@
+@if (_similar is null)
+{
+    <h2 class="section">Similar songs</h2>
+    <Loading Inline="true" Text="Asking the discovery plugins…" />
+}
+else if (_similar.Count > 0)
+{
+    <h2 class="section">Similar songs</h2>
+    <SongList Songs="_similar" />
+}
+@if (_error is not null) { <div class="muted small" role="status">Couldn't find similar songs: @_error</div> }
+
+@code {
+    [Parameter, EditorRequired] public Guid TrackId { get; set; }
+
+    /// <summary>How many to show.</summary>
+    [Parameter] public int Take { get; set; } = 15;
+
+    private IReadOnlyList<DiscoveredSong>? _similar;
+    private Guid _loaded;
+    private string? _error;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (TrackId == _loaded)
+            return;
+        (_loaded, _similar, _error) = (TrackId, null, null);
+        try
+        {
+            if (!(await Api.GetDiscoveryAsync()).SimilarSongs)
+            {
+                _similar = [];
+                return;
+            }
+            var similar = await Api.ListSimilarSongsAsync(TrackId, Take);
+            if (TrackId == _loaded)
+                _similar = similar;
+        }
+        catch (Exception e) when (e is HttpRequestException or MelodexApiException)
+        {
+            (_similar, _error) = ([], e.Message);
+        }
+    }
+}

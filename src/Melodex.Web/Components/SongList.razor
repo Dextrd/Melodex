@@ -1,0 +1,39 @@
+@*
+    Songs the discovery plugins found (#3): like a song, or recommended. Each opens its page when the catalogue knows it,
+    else searches for it.
+*@
+<div class="card">
+    <table class="table track-list discovered-songs">
+        <colgroup><col class="cover-col" /><col /><col class="status-col hide-narrow" /></colgroup>
+        <tbody>
+            @foreach (var song in Songs)
+            {
+                <tr class="arrives" @key="(song.TrackId, song.Title, song.ArtistCredit)">
+                    <td class="cover-col"><Cover Url="@song.CoverUrl" /></td>
+                    <td class="track-main">
+                        <div class="ellipsis"><a href="@Href(song)" title="@Title(song)">@song.Title</a></div>
+                        <div class="muted small ellipsis">
+                            @if (song.ArtistId is { } artist) { <a href="artists/@artist">@song.ArtistCredit</a> } else { @song.ArtistCredit }
+                            @if (song.AlbumTitle is { } album)
+                            {
+                                <span> · </span>
+                                @if (song.AlbumId is { } albumId) { <a href="albums/@albumId">@album</a> } else { @album }
+                            }
+                            @if (song.Owned) { <span class="show-narrow"> · <span class="badge owned">Owned</span></span> }
+                        </div>
+                    </td>
+                    <td class="num hide-narrow">@if (song.Owned) { <span class="badge owned">Owned</span> }</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<DiscoveredSong> Songs { get; set; } = [];
+
+    private static string Href(DiscoveredSong song) =>
+        song.TrackId is { } id ? $"tracks/{id}" : $"search?q={Uri.EscapeDataString($"{song.Title} {song.ArtistCredit}")}";
+
+    private static string Title(DiscoveredSong song) => $"{Math.Round(song.Score * 100)}% from {string.Join(" and ", song.From)}";
+}

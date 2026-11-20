@@ -1,6 +1,6 @@
 # Plugins at an address
 
-Catalogue, artwork, lyrics and media-server plugins are usually .NET assemblies loaded into Melodex. Each can also run
+Catalogue, artwork, lyrics, discovery and media-server plugins are usually .NET assemblies loaded into Melodex. Each can also run
 on its own, in any language, and be reached at an address, as [retrieval plugins](retrieval-plugins.md) always are.
 They're added under **Settings → Plugins → Add → Add your own plugin…** in the section for their kind. Melodex then
 uses one exactly as it would one loaded in process: the same contract version, capabilities and rules as on the page
@@ -11,6 +11,7 @@ for its kind.
 | Catalogue | [`IIndexPlugin`](index-plugins.md) | Index v1.0 |
 | Artwork | [`IArtworkPlugin`](artwork-plugins.md) | Artwork v1.0 |
 | Lyrics | [`ILyricsPlugin`](lyrics-plugins.md) | Lyrics v1.1 |
+| Discovery | [`IDiscoveryPlugin`](discovery-plugins.md) | Discovery v1.0 |
 | Media server | [`IMediaServerConnector`](media-server-connectors.md) | Connector v1.3 |
 
 The models are the ones in `Melodex.Contracts`, serialized as the retrieval contract's are: camelCase names, enums as
@@ -68,6 +69,14 @@ Declare `artists`, `albums` and `editions` for what the plugin can picture; it's
 | --- | --- | --- |
 | `POST /v1/find` | `LyricsQuery` | `FoundLyrics`, or 404 |
 | `POST /v1/search` | `LyricsSearch` | `LyricsResult[]`. Only with `search`. |
+
+## Discovery
+
+| Call | Input | Answers |
+| --- | --- | --- |
+| `POST /v1/similar-artists` | `{ "artist": DiscoveryArtist, "count" }` | `DiscoveredArtist[]`, closest first. Only with `similar-artists`. |
+| `POST /v1/similar-recordings` | `{ "recording": DiscoveryRecording, "count" }` | `DiscoveredRecording[]`, closest first. Only with `similar-recordings`. |
+| `POST /v1/recommendations` | `{ "listener": DiscoveryListener, "count" }` | `DiscoveredRecording[]`, best first. Only with `recommendations`. |
 
 ## Media server
 

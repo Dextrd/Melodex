@@ -9,7 +9,7 @@
 
 @if (!InSetup)
 {
-    <p class="muted">What Melodex works through: where music comes from, the media server it files music for, and the catalogue it checks your library against, with its pictures.</p>
+    <p class="muted">What Melodex works through: where music comes from, the media server it files music for, and the catalogue it checks your library against, with its pictures, lyrics, and music like what you play.</p>
 }
 
 @if (_plugins is null)
@@ -36,6 +36,9 @@ else
         @Section(PluginType.Lyrics, "Lyrics",
             "The words of songs, found for each song in your library after a scan and written beside or into its files. Melodex asks these in order and keeps the first lyrics found.",
             "No lyrics sources, so songs won't get lyrics.")
+        @Section(PluginType.Discovery, "Discovery",
+            "Music like what you play: similar artists on an artist's page, similar songs on a song's, and songs recommended for you. Melodex asks all of these and puts first what they agree on, counting the first in the order most.",
+            "No discovery sources, so no similar artists, similar songs or recommendations are shown.")
     </div>
 
     @if (_choosing is { } type)
@@ -215,6 +218,7 @@ else
         PluginType.Connector => "media server",
         PluginType.Index => "catalogue",
         PluginType.Lyrics => "lyrics",
+        PluginType.Discovery => "discovery",
         _ => "artwork",
     };
 
@@ -287,11 +291,12 @@ else
         PluginType.Connector => "Media server",
         PluginType.Index => "Catalogue",
         PluginType.Lyrics => "Lyrics",
+        PluginType.Discovery => "Discovery",
         _ => "Artwork",
     };
 
     // Sources aren't: every one is searched, and the quality profile chooses between them.
-    private static bool Ordered(PluginType type) => type is PluginType.Artwork or PluginType.Lyrics or PluginType.Index;
+    private static bool Ordered(PluginType type) => type is PluginType.Artwork or PluginType.Lyrics or PluginType.Index or PluginType.Discovery;
 
     private RenderFragment Section(PluginType type, string title, string about, string empty) => __builder =>
     {

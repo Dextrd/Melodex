@@ -60,6 +60,8 @@ builder.Services.AddScoped<IndexPlugins>();
 builder.Services.AddScoped<ConnectorPlugins>();
 builder.Services.AddScoped<ArtworkPlugins>();
 builder.Services.AddScoped<LyricsPlugins>();
+builder.Services.AddScoped<DiscoveryPlugins>();
+builder.Services.AddScoped<DiscoveryService>();
 builder.Services.AddSingleton<ArtworkCache>();
 builder.Services.AddHostedService<ArtworkWarmer>();
 builder.Services.AddScoped<RetrievalPlugins>();
@@ -165,6 +167,7 @@ using (var scope = app.Services.CreateScope())
     await IndexPlugins.EnsureDefaultAsync(db, scope.ServiceProvider.GetRequiredService<PluginCatalog>());
     await ArtworkPlugins.EnsureDefaultAsync(db, scope.ServiceProvider.GetRequiredService<PluginCatalog>());
     await LyricsPlugins.EnsureDefaultAsync(db, scope.ServiceProvider.GetRequiredService<PluginCatalog>());
+    await DiscoveryPlugins.EnsureDefaultAsync(db, scope.ServiceProvider.GetRequiredService<PluginCatalog>());
     await app.Services.GetRequiredService<StreamSigner>().InitialiseAsync(db);
 }
 
@@ -230,6 +233,7 @@ api.MapPlaylistEndpoints();
 api.MapWishlistEndpoints();
 api.MapMarkEndpoints();
 api.MapPlayEndpoints();
+api.MapDiscoveryEndpoints();
 api.MapUpgradeEndpoints();
 api.MapScheduleEndpoints();
 api.MapToolEndpoints();

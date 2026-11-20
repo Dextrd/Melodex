@@ -31,6 +31,9 @@ public sealed class CatalogueService(MelodexDbContext db, IndexPlugins indexPlug
     /// <summary>The core catalogue's plugin.</summary>
     public async Task<IIndexPlugin> PluginAsync(CancellationToken ct) => (await IndexAsync(ct)).Plugin;
 
+    /// <summary>Whether a catalogue that's on has IDs in this scheme, so an entity with one can be added from it.</summary>
+    public async Task<bool> UsesAsync(string provider, CancellationToken ct) => await IndexForAsync(provider, ct) is not null;
+
     /// <summary>The catalogue whose IDs are in this scheme, if one is on.</summary>
     private async Task<CatalogueIndex?> IndexForAsync(string provider, CancellationToken ct) =>
         (await IndexesAsync(ct)).FirstOrDefault(i => i.Provider == provider);
@@ -398,6 +401,10 @@ public sealed class CatalogueService(MelodexDbContext db, IndexPlugins indexPlug
         var inLibrary = candidates.Where(a => a.InLibrary).ToList();
         return inLibrary.Count == 1 ? inLibrary[0] : null;
     }
+
+    /// <summary>Artists the catalogue holds with this name, ignoring case, accents and punctuation.</summary>
+    public Task<List<Artist>> ArtistsNamedAsync(string name, CancellationToken ct) =>
+        TextMatch.NormaliseArtist(name) is { Length: > 0 } key ? NamedAsync(name, key, ct) : Task.FromResult(new List<Artist>());
 
     /// <summary>Artists, saved or about to be, with this name, ignoring case, accents and punctuation.</summary>
     private async Task<List<Artist>> NamedAsync(string name, string key, CancellationToken ct)

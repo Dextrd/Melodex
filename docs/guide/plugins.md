@@ -1,6 +1,6 @@
 # Plugins
 
-Melodex is pluggable in five ways. Manage them under **Settings → Plugins**, where **Add** offers what's available and
+Melodex is pluggable in six ways. Manage them under **Settings → Plugins**, where **Add** offers what's available and
 **Test** checks each one.
 
 | Kind | Does | Comes with Melodex |
@@ -10,6 +10,7 @@ Melodex is pluggable in five ways. Manage them under **Settings → Plugins**, w
 | **Retrieval** | Fetches music | None built in: each is a container you add, from [the list below](#retrieval-plugins) |
 | **Artwork** | Covers and artist pictures | Cover Art Archive, Deezer, Wikimedia Commons, fanart.tv (with your own key) |
 | **Lyrics** | The words of songs, synced where they can be | LRCLIB |
+| **Discovery** | Similar artists and songs, and recommendations | ListenBrainz, Last.fm (with your own key) |
 
 ## Without a catalogue
 
@@ -18,6 +19,23 @@ and played as their tags say, as [your own music](library.md#your-own-music) is.
 fetch, and search finds only what you have. Add a catalogue whenever you like, and the next scan matches your files
 against it. Files matched before it was removed stay as they are. Beets doesn't need MusicBrainz either: music fetched
 through a catalogue that isn't MusicBrainz, such as Deezer, is filed as it's tagged.
+
+## Discovery
+
+Discovery plugins find music like what you play: **Similar artists** at the foot of an artist's page, and **Similar
+songs** on a song's. Those in the catalogue open their page, with whether you have them; the rest search for their name
+when opened. Melodex asks every discovery plugin at once and puts first what they agree on, counting the first in the
+order most, so drag the one you trust most to the top. Answers are kept a day.
+
+- **ListenBrainz** is set up from the start and needs no account. It knows artists and songs by their MusicBrainz IDs,
+  so music no MusicBrainz ID is known for gets nothing from it. Once you link your ListenBrainz account for
+  [scrobbling](library.md#history), it can also recommend songs for you, from the listens sent there, once ListenBrainz
+  has made them.
+- **Last.fm** needs an API key, free from [last.fm/api/account/create](https://www.last.fm/api/account/create); it can
+  be the same one as for sending plays to Last.fm. It finds similar music by name too.
+
+[Your own plugins](#your-own-plugins) can be discovery plugins too: see the
+[discovery contract](../contracts/discovery-plugins.md).
 
 ## Retrieval plugins
 

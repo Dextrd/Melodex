@@ -31,6 +31,8 @@
     <ProjectReference Include="..\Melodex.Plugins.Wikimedia\Melodex.Plugins.Wikimedia.csproj" />
     <ProjectReference Include="..\Melodex.Plugins.Deezer\Melodex.Plugins.Deezer.csproj" />
     <ProjectReference Include="..\Melodex.Plugins.Lrclib\Melodex.Plugins.Lrclib.csproj" />
+    <ProjectReference Include="..\Melodex.Plugins.ListenBrainz\Melodex.Plugins.ListenBrainz.csproj" />
+    <ProjectReference Include="..\Melodex.Plugins.LastFm\Melodex.Plugins.LastFm.csproj" />
   </ItemGroup>
 
 </Project>
