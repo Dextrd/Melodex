@@ -23,7 +23,8 @@ public sealed record SubsonicSong(
 
 public sealed record SubsonicAlbum(
     Guid Id, string Name, Guid ArtistId, string Artist, int? Year, string? CoverUrl, IReadOnlyList<SubsonicSong> Songs,
-    IReadOnlyList<string> Genres, string? MusicBrainzId, AlbumType Type, IReadOnlyList<AlbumSecondaryType> SecondaryTypes)
+    IReadOnlyList<string> Genres, string? MusicBrainzId, AlbumType Type, IReadOnlyList<AlbumSecondaryType> SecondaryTypes,
+    AlbumStatus Status = AlbumStatus.Complete, int? OwnedTracks = null, int? TotalTracks = null)
 {
     public DateTime Created => Songs.Count == 0 ? DateTime.UnixEpoch : Songs.Min(s => s.Created);
     public int Duration => Songs.Sum(s => (int)Math.Round(s.Track.DurationSeconds ?? 0));
@@ -112,7 +113,8 @@ public sealed class SubsonicLibrary(LibraryCache cache, IServiceScopeFactory sco
                 .OrderByDescending(g => g.Count()).Select(g => g.Key).ToList();
             albumList.Add(new SubsonicAlbum(summary.Id, summary.Title, summary.ArtistId, summary.ArtistCredit.Length > 0 ? summary.ArtistCredit : artistName,
                 year ?? own.Select(s => s.Year).FirstOrDefault(y => y is not null), summary.CoverUrl, own, genres,
-                summary.Ids.FirstOrDefault(i => i.Provider == "musicbrainz")?.Value, summary.Type, summary.SecondaryTypes));
+                summary.Ids.FirstOrDefault(i => i.Provider == "musicbrainz")?.Value, summary.Type, summary.SecondaryTypes,
+                summary.Status, summary.OwnedTracks, summary.TotalTracks));
         }
         var albumsById = albumList.GroupBy(a => a.Id).ToDictionary(g => g.Key, g => g.First());
         var albumOfSong = albumsById.Values.SelectMany(a => a.Songs.Select(s => (s.Id, a))).ToDictionary(x => x.Id, x => x.a);
@@ -198,6 +200,10 @@ public sealed class SubsonicLibrary(LibraryCache cache, IServiceScopeFactory sco
             ["sortName"] = album.Name,
             ["releaseTypes"] = new JsonArray(new[] { album.Type.ToString() }.Concat(album.SecondaryTypes.Select(t => t.ToString())).Select(t => (JsonNode)t).ToArray()),
             ["isCompilation"] = album.SecondaryTypes.Contains(AlbumSecondaryType.Compilation),
+            // Melodex's own (the melodex extension): whether you have all of it, and how much.
+            ["melodexStatus"] = album.Status == AlbumStatus.Partial ? "partial" : "complete",
+            ["melodexOwnedSongs"] = album.OwnedTracks,
+            ["melodexTotalSongs"] = album.TotalTracks,
         };
         if (asDirectory)
         {
@@ -242,6 +248,8 @@ public sealed class SubsonicLibrary(LibraryCache cache, IServiceScopeFactory sco
         ["sortName"] = song.Track.Title,
         ["musicBrainzId"] = song.MusicBrainzId,
         ["genres"] = new JsonArray(song.Genres.Select(g => (JsonNode)new JsonObject { ["name"] = g }).ToArray()),
+        // Melodex's own (the melodex extension): the song's ID in Melodex's API, where a file of your own goes by its file's.
+        ["melodexTrackId"] = song.Track.TrackId.ToString(),
     });
 
     /// <summary>Leaves out what isn't known, rather than sending nulls.</summary>

@@ -104,6 +104,36 @@ public sealed class SubsonicTests : IDisposable
         Assert.InRange(made, before, DateTime.UtcNow.AddSeconds(1));
     }
 
+    [Fact]
+    public async Task Stars_ratings_and_queues_are_each_persons_own()
+    {
+        var album = Guid.NewGuid();
+        var mark = await _api.SetMarkAsync(MarkKind.Album, album, new SetMark(Starred: true, Rating: 3));
+        Assert.Equal((3, true), (mark!.Rating, mark.StarredAt is not null));
+        // What's left out stays as it was.
+        Assert.Equal(3, (await _api.SetMarkAsync(MarkKind.Album, album, new SetMark(Starred: false)))!.Rating);
+        Assert.Null(await _api.SetMarkAsync(MarkKind.Album, album, new SetMark(Rating: 0)));
+        await _api.SetMarkAsync(MarkKind.Artist, album, new SetMark(Starred: true));
+        Assert.Equal(HttpStatusCode.BadRequest,
+            (await Assert.ThrowsAsync<MelodexApiException>(() => _api.SetMarkAsync(MarkKind.Song, album, new SetMark(Rating: 6)))).Status);
+        Assert.Equal(HttpStatusCode.BadRequest,
+            (await _factory.CreateSignedInClient().PutAsJsonAsync($"api/v1/marks/playlist/{album}", new SetMark(Starred: true), MelodexJson.Options)).StatusCode);
+        var song = new PlayQueueItem(Guid.NewGuid(), "A song", "Someone");
+        await _api.SavePlayQueueAsync(new SavePlayQueue([song], 0, 61.5));
+        Assert.Equal(HttpStatusCode.BadRequest,
+            (await Assert.ThrowsAsync<MelodexApiException>(() => _api.SavePlayQueueAsync(new SavePlayQueue([song], 1, 0)))).Status);
+
+        await _api.CreateUserAsync(new CreateUser("bob", "bob's password", [UserPermissions.Read, UserPermissions.Listen]));
+        var http = _factory.CreateClient();
+        (await http.PostAsJsonAsync("api/v1/auth/login", new SignIn("bob", "bob's password"))).EnsureSuccessStatusCode();
+        var bob = new MelodexClient(http);
+        Assert.Empty(await bob.ListMarksAsync());
+        Assert.Null(await bob.GetPlayQueueAsync());
+        await bob.SetMarkAsync(MarkKind.Album, album, new SetMark(Starred: true));
+        Assert.Equal([MarkKind.Artist], (await _api.ListMarksAsync()).Select(m => m.Kind));
+        Assert.Equal((61.5, "web"), ((await _api.GetPlayQueueAsync())!.Position, (await _api.GetPlayQueueAsync())!.ChangedBy));
+    }
+
     // ---- With the test library ----
 
     private async Task<JsonNode> CallAsync(string method, string auth, string query = "")
@@ -234,7 +264,7 @@ public sealed class SubsonicTests : IDisposable
         Assert.Equal(byName.Order(StringComparer.CurrentCultureIgnoreCase), byName);
         Assert.Equal(5, (await OkAsync("getRandomSongs", key, "size=5"))["randomSongs"]!["song"]!.AsArray().Count);
         await OkAsync("getGenres", key);
-        Assert.Empty((await OkAsync("getStarred2", key))["starred2"]!.AsObject());
+        Assert.All((await OkAsync("getStarred2", key))["starred2"]!.AsObject(), list => Assert.Empty(list.Value!.AsArray()));
 
         // A song plays as it is, from anywhere in it.
         var id = (string)song["id"]!;
@@ -293,6 +323,73 @@ public sealed class SubsonicTests : IDisposable
         await OkAsync("deletePlaylist", key, $"id={id}");
         Assert.Empty(await _api.ListPlaylistsAsync());
         Assert.Equal(70, ErrorOf(await CallAsync("getPlaylist", key, $"id={id}")));
+    }
+
+    [TestLibraryFact]
+    public async Task Stars_ratings_and_the_play_queue_are_the_same_in_players_and_the_web_app()
+    {
+        await ScanAsync();
+        var key = $"apiKey={(await _api.CreateApiKeyAsync(new CreateApiKey("Player", [UserPermissions.Listen]))).Key}";
+        var album = (await OkAsync("getAlbumList2", key, "type=alphabeticalByName&size=500"))["albumList2"]!["album"]!.AsArray().First(a => (int)a!["songCount"]! >= 2)!;
+        var albumId = (string)album["id"]!;
+        var songs = (await OkAsync("getAlbum", key, $"id={albumId}"))["album"]!["song"]!.AsArray();
+        string first = (string)songs[0]!["id"]!, second = (string)songs[1]!["id"]!;
+        Assert.Contains("melodex", (await OkAsync("getOpenSubsonicExtensions", key))["openSubsonicExtensions"]!.AsArray().Select(e => (string)e!["name"]!));
+        Assert.NotNull(songs[0]!["melodexTrackId"]);
+        Assert.NotNull(album["melodexStatus"]);
+
+        // Starred in a player, it's starred in Melodex, by the song's track; and the other way round.
+        await OkAsync("star", key, $"id={first}&albumId={albumId}&artistId={album["artistId"]}");
+        var marks = await _api.ListMarksAsync();
+        Assert.Equal([MarkKind.Song, MarkKind.Album, MarkKind.Artist], marks.Select(m => m.Kind).Order());
+        Assert.Equal(Guid.Parse((string)songs[0]!["melodexTrackId"]!), marks.Single(m => m.Kind == MarkKind.Song).Id);
+        var starred = (await OkAsync("getStarred2", key))["starred2"]!;
+        Assert.Equal(first, (string)starred["song"]![0]!["id"]!);
+        Assert.Equal(albumId, (string)starred["album"]![0]!["id"]!);
+        Assert.NotNull((await OkAsync("getSong", key, $"id={first}"))["song"]!["starred"]);
+        Assert.Equal(albumId, (string)(await OkAsync("getAlbumList2", key, "type=starred"))["albumList2"]!["album"]![0]!["id"]!);
+        await _api.SetMarkAsync(MarkKind.Song, Guid.Parse((string)songs[1]!["melodexTrackId"]!), new SetMark(Starred: true));
+        Assert.Equal(2, (await OkAsync("getStarred2", key))["starred2"]!["song"]!.AsArray().Count);
+        await OkAsync("unstar", key, $"id={first}&id={second}");
+        Assert.Null((await OkAsync("getSong", key, $"id={first}"))["song"]!["starred"]);
+
+        // Ratings, 1 to 5, and 0 takes one away.
+        await OkAsync("setRating", key, $"id={albumId}&rating=4");
+        Assert.Equal(4, (int)(await OkAsync("getAlbum", key, $"id={albumId}"))["album"]!["userRating"]!);
+        Assert.Equal(4, (await _api.ListMarksAsync()).Single(m => m.Kind == MarkKind.Album).Rating);
+        Assert.Equal(albumId, (string)(await OkAsync("getAlbumList2", key, "type=highest"))["albumList2"]!["album"]![0]!["id"]!);
+        Assert.Equal(0, ErrorOf(await CallAsync("setRating", key, $"id={albumId}&rating=6")));
+        await OkAsync("setRating", key, $"id={albumId}&rating=0");
+        await OkAsync("unstar", key, $"albumId={albumId}&artistId={album["artistId"]}");
+        Assert.Empty(await _api.ListMarksAsync());
+        Assert.Equal(70, ErrorOf(await CallAsync("star", key, $"id={Guid.NewGuid()}")));
+
+        // The web player's queue is the player's, less what isn't in the library; where it was, in milliseconds.
+        var tracks = await _api.GetLibraryTracksAsync();
+        var owned = tracks.Take(3).Select(t => new PlayQueueItem(t.TrackId, t.Title, t.ArtistCredit)).ToList();
+        var missing = new PlayQueueItem(Guid.NewGuid(), "Not here", "Someone", Missing: true);
+        await _api.SavePlayQueueAsync(new SavePlayQueue([owned[0], missing, owned[1], owned[2]], 2, 12.5));
+        var queue = (await OkAsync("getPlayQueue", key))["playQueue"]!;
+        Assert.Equal(3, queue["entry"]!.AsArray().Count);
+        Assert.Equal(tracks[1].FileId.ToString(), (string)queue["current"]!);
+        Assert.Equal(12500, (long)queue["position"]!);
+        Assert.Equal("web", (string)queue["changedBy"]!);
+        Assert.Equal(1, (int)(await OkAsync("getPlayQueueByIndex", key))["playQueueByIndex"]!["currentIndex"]!);
+
+        // A player's queue is the web player's.
+        await OkAsync("savePlayQueue", key, $"id={tracks[2].FileId}&id={tracks[0].FileId}&current={tracks[0].FileId}&position=3000");
+        var saved = (await _api.GetPlayQueueAsync())!;
+        Assert.Equal([tracks[2].TrackId, tracks[0].TrackId], saved.Items.Select(i => i.TrackId));
+        Assert.Equal((1, 3.0, "tests"), (saved.Current, saved.Position, saved.ChangedBy));
+        Assert.Equal(tracks[2].Title, saved.Items[0].Title);
+        await OkAsync("savePlayQueueByIndex", key, $"id={tracks[1].FileId}&currentIndex=0&position=0");
+        Assert.Equal(tracks[1].TrackId, (await _api.GetPlayQueueAsync())!.Items.Single().TrackId);
+        Assert.Equal(70, ErrorOf(await CallAsync("savePlayQueue", key, $"id={Guid.NewGuid()}")));
+
+        // Saving none clears it.
+        await OkAsync("savePlayQueue", key);
+        Assert.Null(await _api.GetPlayQueueAsync());
+        Assert.Null((await OkAsync("getPlayQueue", key))["playQueue"]!["entry"]);
     }
 
     private async Task ScanAsync()

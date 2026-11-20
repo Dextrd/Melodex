@@ -745,6 +745,39 @@ namespace Melodex.Core.Data.Migrations
                     b.ToTable("ListenNowItems");
                 });
 
+            modelBuilder.Entity("Melodex.Core.Data.Mark", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("ChangedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("ItemId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("Rating")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime?>("StarredAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "Kind", "ItemId")
+                        .IsUnique();
+
+                    b.ToTable("Marks");
+                });
+
             modelBuilder.Entity("Melodex.Core.Data.MediaServerLogin", b =>
                 {
                     b.Property<Guid>("UserId")
@@ -1094,6 +1127,36 @@ namespace Melodex.Core.Data.Migrations
                     b.ToTable("Requests");
                 });
 
+            modelBuilder.Entity("Melodex.Core.Data.SavedPlayQueue", b =>
+                {
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("ChangedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ChangedBy")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Current")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("ItemsJson")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("OrderedJson")
+                        .HasColumnType("TEXT");
+
+                    b.Property<double>("Position")
+                        .HasColumnType("REAL");
+
+                    b.HasKey("UserId");
+
+                    b.ToTable("PlayQueues");
+                });
+
             modelBuilder.Entity("Melodex.Core.Data.Setting", b =>
                 {
                     b.Property<string>("Key")
@@ -1434,6 +1497,15 @@ namespace Melodex.Core.Data.Migrations
                     b.Navigation("Track");
                 });
 
+            modelBuilder.Entity("Melodex.Core.Data.Mark", b =>
+                {
+                    b.HasOne("Melodex.Core.Data.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Melodex.Core.Data.MediaServerLogin", b =>
                 {
                     b.HasOne("Melodex.Core.Data.PluginInstance", "PluginInstance")
@@ -1488,6 +1560,15 @@ namespace Melodex.Core.Data.Migrations
                         .WithMany()
                         .HasForeignKey("ParentRequestId")
                         .OnDelete(DeleteBehavior.Cascade);
+                });
+
+            modelBuilder.Entity("Melodex.Core.Data.SavedPlayQueue", b =>
+                {
+                    b.HasOne("Melodex.Core.Data.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Melodex.Core.Data.Track", b =>

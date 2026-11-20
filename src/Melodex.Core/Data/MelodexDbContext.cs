@@ -92,6 +92,8 @@ public partial class MelodexDbContext(DbContextOptions<MelodexDbContext> options
     public DbSet<PlaylistEntry> PlaylistEntries => Set<PlaylistEntry>();
     public DbSet<PlaylistFolder> PlaylistFolders => Set<PlaylistFolder>();
     public DbSet<WishlistEntry> WishlistEntries => Set<WishlistEntry>();
+    public DbSet<Mark> Marks => Set<Mark>();
+    public DbSet<SavedPlayQueue> PlayQueues => Set<SavedPlayQueue>();
     public DbSet<ListImport> Imports => Set<ListImport>();
     public DbSet<ImportLine> ImportLines => Set<ImportLine>();
 
@@ -219,6 +221,18 @@ public partial class MelodexDbContext(DbContextOptions<MelodexDbContext> options
         {
             e.HasOne<User>().WithMany().HasForeignKey(w => w.UserId).OnDelete(DeleteBehavior.Cascade);
             e.HasIndex(w => new { w.UserId, w.TargetId }).IsUnique();
+        });
+
+        modelBuilder.Entity<Mark>(e =>
+        {
+            e.HasOne<User>().WithMany().HasForeignKey(m => m.UserId).OnDelete(DeleteBehavior.Cascade);
+            e.HasIndex(m => new { m.UserId, m.Kind, m.ItemId }).IsUnique();
+        });
+
+        modelBuilder.Entity<SavedPlayQueue>(e =>
+        {
+            e.HasKey(q => q.UserId);
+            e.HasOne<User>().WithMany().HasForeignKey(q => q.UserId).OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<PlaylistEntry>(e =>

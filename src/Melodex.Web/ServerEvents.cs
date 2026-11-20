@@ -13,7 +13,10 @@ public sealed class ServerEvents(IJSRuntime js, AuthState auth) : IAsyncDisposab
     private IJSObjectReference? _module;
     private IJSObjectReference? _source;
 
-    /// <summary>The kind of thing that changed: <c>requests</c>, <c>listen</c>, <c>library</c> or <c>tasks</c>.</summary>
+    /// <summary>
+    /// The kind of thing that changed: <c>requests</c>, <c>listen</c>, <c>library</c>, <c>tasks</c>, or someone's stars
+    /// (<c>marks</c>) or play queue (<c>queue</c>).
+    /// </summary>
     public event Action<string>? Received;
 
     /// <summary>Whether events are arriving, so pollers can slow down.</summary>

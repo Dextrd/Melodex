@@ -38,7 +38,7 @@ public static partial class SubsonicEndpoints
         ["ping"] = _ => Answer(SubsonicResponse.Ok()),
         ["getLicense"] = _ => Answer(SubsonicResponse.Ok().With("license", new JsonObject { ["valid"] = true })),
         ["getOpenSubsonicExtensions"] = _ => Answer(SubsonicResponse.Ok().With("openSubsonicExtensions", new JsonArray(
-            Extension("apiKeyAuthentication"), Extension("formPost"), Extension("songLyrics"), Extension("transcodeOffset")))),
+            Extension("apiKeyAuthentication"), Extension("formPost"), Extension("indexBasedQueue"), Extension("melodex"), Extension("songLyrics"), Extension("transcodeOffset")))),
         ["getMusicFolders"] = _ => Answer(SubsonicResponse.Ok().With("musicFolders", new JsonObject
         {
             ["musicFolder"] = new JsonArray(new JsonObject { ["id"] = MusicFolderId, ["name"] = "Music" }),
@@ -66,8 +66,6 @@ public static partial class SubsonicEndpoints
         ["getTopSongs"] = _ => Empty("topSongs"),
         ["getSimilarSongs"] = _ => Empty("similarSongs"),
         ["getSimilarSongs2"] = _ => Empty("similarSongs2"),
-        ["getStarred"] = _ => Empty("starred"),
-        ["getStarred2"] = _ => Empty("starred2"),
         ["getNowPlaying"] = _ => Empty("nowPlaying"),
         ["stream"] = StreamAsync,
         ["download"] = DownloadAsync,
@@ -79,6 +77,15 @@ public static partial class SubsonicEndpoints
         ["createPlaylist"] = CreatePlaylistAsync,
         ["updatePlaylist"] = UpdatePlaylistAsync,
         ["deletePlaylist"] = DeletePlaylistAsync,
+        ["star"] = c => StarAsync(c, starred: true),
+        ["unstar"] = c => StarAsync(c, starred: false),
+        ["setRating"] = SetRatingAsync,
+        ["getStarred"] = c => GetStarredAsync(c, "starred"),
+        ["getStarred2"] = c => GetStarredAsync(c, "starred2"),
+        ["getPlayQueue"] = c => GetPlayQueueAsync(c, byIndex: false),
+        ["savePlayQueue"] = c => SavePlayQueueAsync(c, byIndex: false),
+        ["getPlayQueueByIndex"] = c => GetPlayQueueAsync(c, byIndex: true),
+        ["savePlayQueueByIndex"] = c => SavePlayQueueAsync(c, byIndex: true),
     };
 
     /// <summary>The one music folder Melodex has, for players that browse by folders.</summary>
@@ -123,7 +130,10 @@ public static partial class SubsonicEndpoints
             try
             {
                 var username = caller!.Kind == CallerKind.Key && await db.Users.FindAsync([caller.UserId], ct) is { } owner ? owner.Username : caller.Name;
-                result = await handler(new SubsonicCall(http, p, caller, username, ct));
+                var call = new SubsonicCall(http, p, caller, username, ct);
+                result = await handler(call);
+                if (result is SubsonicResponse answer)
+                    await MarkAsync(call, answer);
             }
             catch (SubsonicException e)
             {
@@ -364,8 +374,10 @@ public static partial class SubsonicEndpoints
             "byYear" => ByYear(albums, c.P.Int("fromYear") ?? throw Missing("fromYear"), c.P.Int("toYear") ?? throw Missing("toYear")),
             "byGenre" => albums.Where(a => a.Genres.Contains(c.P["genre"] ?? throw Missing("genre"), StringComparer.OrdinalIgnoreCase))
                 .OrderBy(a => a.Name, StringComparer.CurrentCultureIgnoreCase),
-            // Ratings, stars and plays aren't kept yet.
-            "highest" or "frequent" or "recent" or "starred" => [],
+            "starred" => await MarkedAlbumsAsync(c, library, starred: true),
+            "highest" => await MarkedAlbumsAsync(c, library, starred: false),
+            // Plays aren't kept yet.
+            "frequent" or "recent" => [],
             _ => throw new SubsonicException(SubsonicErrors.Generic, $"There's no list of albums called {type}."),
         };
         return SubsonicResponse.Ok().With(name, new JsonObject

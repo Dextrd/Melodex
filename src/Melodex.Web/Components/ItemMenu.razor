@@ -5,9 +5,10 @@
 @inject Notices Notices
 @inject NavigationManager Nav
 @inject WishlistStore Wishlist
+@inject MarkStore Marks
 
 @*
-    Everything for one song, album or artist, behind a "more" button: play it, next or last; add it to a playlist; get
+    Everything for one song, album or artist, behind a "more" button: play it, next or last; star it; add it to a playlist; get
     it into the library; look for a better copy; move it in its list or take it out; go to its album or artist; or remove it from the library. Right-clicking its row or tile, or pressing
     and holding it on a phone, opens it too (see songmenu.js). Each item shows only where it applies, from what's given.
 *@
@@ -52,6 +53,13 @@
                 {
                     <button type="button" role="menuitem" @onclick="() => { _open = false; _adding = true; }"><Icon Name="playlist" />Add to a playlist…</button>
                 }
+            }
+            @if (Starring is { } star && Auth.May(UserPermissions.Read))
+            {
+                var starred = Marks.IsStarred(star.Kind, star.Id);
+                <button type="button" role="menuitem" @onclick="() => Do(() => Marks.StarAsync(star.Kind, star.Id, !starred))">
+                    <Icon Name="@(starred ? "starred" : "star")" />@(starred ? "Take the star off" : "Star")
+                </button>
             }
             @if (Auth.May(UserPermissions.Request))
             {
@@ -197,6 +205,14 @@
 
     private IReadOnlyList<PlayerEntry>? Playing => Entries ?? (Entry is null ? null : [Entry]);
 
+    /// <summary>A song, album or artist you have, to star; songs you have and albums in the library are starred without being given.</summary>
+    [Parameter] public (MarkKind Kind, Guid Id)? Star { get; set; }
+
+    private (MarkKind Kind, Guid Id)? Starring => Star
+        ?? (Entry is { Missing: false, ListenId: null } song && Entries is null ? (MarkKind.Song, song.TrackId)
+            : What == "album" && AlbumId is { } album && AlbumStatus is not (null or Melodex.Client.AlbumStatus.Missing) ? (MarkKind.Album, album)
+            : null);
+
     private FormatScope? UpgradeScope => Upgrade ?? (UpgradeTrackId is { } id ? new FormatScope(FormatScopeKind.Track, id) : null);
 
     private async Task Toggle()
@@ -204,6 +220,8 @@
         // Known before it opens, so it doesn't say the wrong thing first.
         if (!_open && (Wish is not null || ListenTrackId is not null || AlbumId is not null))
             await Wishlist.EnsureLoadedAsync();
+        if (!_open && Starring is not null)
+            await Marks.EnsureLoadedAsync();
         _open = !_open;
     }
 

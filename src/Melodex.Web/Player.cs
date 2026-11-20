@@ -914,6 +914,8 @@ public sealed class Player : IAsyncDisposable
     {
         if (type is "listen" or "connected")
             _ = RefreshListeningAsync();
+        if (type is "queue" or "connected")
+            _ = PickUpAsync();
     }
 
     private async Task RefreshListeningAsync()
@@ -962,10 +964,10 @@ public sealed class Player : IAsyncDisposable
         else if (duration > 0)
             Duration = duration;
         TimeChanged?.Invoke();
-        // Where it's got to is kept every few seconds, to pick up from after a reload.
-        if ((int)position / 5 != _savedSecond)
+        // Where it's got to is kept every so often, to pick up from after a reload or on a phone.
+        if ((int)position / 15 != _savedSecond)
         {
-            _savedSecond = (int)position / 5;
+            _savedSecond = (int)position / 15;
             _ = SaveAsync();
         }
     }
@@ -984,14 +986,23 @@ public sealed class Player : IAsyncDisposable
         _ => Task.CompletedTask,
     };
 
-    // ---- Kept per person in this browser ----
+    // ---- Kept per person, on the server ----
 
+    // Where the queue was kept before it moved to the server (#7): read once, to move it there.
     private sealed record Saved(List<PlayerEntry> Queue, int Current, double Position, List<int>? Ordered);
 
     private string SavedKey => $"player.queue.{_owner:N}";
 
+    // What was saved or picked up last, so the same isn't saved again and a queue isn't sent back where it came from;
+    // and when this browser saved it, so its own save isn't taken for another's.
+    private string? _lastKept;
+    private DateTime? _savedAt;
+    private Task? _saving;
+    private bool _saveAgain;
+
     /// <summary>
-    /// Picks up the queue this person left in this browser, paused where they were, and starts the keyboard shortcuts.
+    /// Picks up the queue this person left, here, in another browser or in a Subsonic player, paused where they were,
+    /// and starts the keyboard shortcuts.
     /// </summary>
     public async Task AttachAsync(Guid? userId)
     {
@@ -1002,25 +1013,138 @@ public sealed class Player : IAsyncDisposable
         await LoadModesAsync();
         if (_queue.Count > 0)
             return;
+        if (await LoadQueueAsync() is { } queue)
+        {
+            Adopt(queue);
+            return;
+        }
+        // Kept in this browser before: moved to the server now.
         var saved = await _prefs.GetAsync<Saved?>(SavedKey, null);
+        await _prefs.SetAsync<Saved?>(SavedKey, null);
         if (saved is not { Queue.Count: > 0 } || saved.Current < 0 || saved.Current >= saved.Queue.Count)
             return;
-        _queue.AddRange(saved.Queue);
-        // The order it was given in, while shuffled, as places in the queue.
-        _ordered = saved.Ordered?.Where(i => i >= 0 && i < _queue.Count).Select(i => _queue[i]).ToList();
-        Current = saved.Current;
-        Position = saved.Position;
-        Duration = Now!.DurationSeconds ?? 0;
-        _resumeAt = saved.Position;
-        Changed?.Invoke();
+        Adopt(saved.Queue, saved.Current, saved.Position, saved.Ordered);
+        await SaveAsync();
     }
 
-    private async Task SaveAsync()
+    private async Task<PlayQueue?> LoadQueueAsync()
+    {
+        try
+        {
+            return await _api.GetPlayQueueAsync();
+        }
+        catch (Exception e) when (e is HttpRequestException or MelodexApiException)
+        {
+            // Someone who may not listen has none.
+            return null;
+        }
+    }
+
+    private void Adopt(PlayQueue queue)
+    {
+        _lastKept = Kept(queue.Items, queue.Current, queue.Position, queue.Ordered);
+        Adopt(queue.Items.Select(Entry).ToList(), queue.Current, queue.Position, queue.Ordered);
+    }
+
+    private void Adopt(List<PlayerEntry> entries, int current, double position, IReadOnlyList<int>? ordered)
+    {
+        _queue.Clear();
+        _queue.AddRange(entries);
+        // The order it was given in, while shuffled, as places in the queue.
+        _ordered = ordered?.Where(i => i >= 0 && i < _queue.Count).Select(i => _queue[i]).ToList();
+        Current = current >= 0 && current < _queue.Count ? current : _queue.Count > 0 ? 0 : -1;
+        Position = position;
+        Duration = Now?.DurationSeconds ?? 0;
+        _resumeAt = Now is null ? null : position;
+        _length = null;
+        Changed?.Invoke();
+        _ = RefreshListeningAsync();
+    }
+
+    /// <summary>
+    /// The queue was saved somewhere: picked up here unless something's playing, so a phone can carry on from where the
+    /// browser left off and the browser from the phone, without either interrupting the other.
+    /// </summary>
+    private async Task PickUpAsync()
+    {
+        if (_owner is null || Playing || _starting > 0)
+            return;
+        var queue = await LoadQueueAsync();
+        if (Playing || queue is not null && queue.ChangedAt == _savedAt)
+            return;
+        if (queue is null)
+        {
+            if (_queue.Count == 0)
+                return;
+            _lastKept = Kept([], -1, 0, null);
+            await StopForPickUpAsync();
+            Adopt([], -1, 0, null);
+            return;
+        }
+        if (Kept(queue.Items, queue.Current, queue.Position, queue.Ordered) == _lastKept)
+            return;
+        await StopForPickUpAsync();
+        Adopt(queue);
+    }
+
+    // What's loaded in the audio element belongs to the queue being replaced.
+    private async Task StopForPickUpAsync()
+    {
+        if (_audio is not null)
+            await _audio.InvokeVoidAsync("stop");
+    }
+
+    private static PlayQueueItem Item(PlayerEntry e) => new(
+        e.TrackId, e.Title, e.ArtistCredit, e.FileId, e.EditionId, e.ArtistId, e.AlbumId, e.AlbumTitle, e.CoverUrl, e.DurationSeconds, e.Missing, e.ListenId);
+
+    private static PlayerEntry Entry(PlayQueueItem i) => new()
+    {
+        TrackId = i.TrackId, Title = i.Title, ArtistCredit = i.ArtistCredit, FileId = i.FileId, EditionId = i.EditionId, ArtistId = i.ArtistId,
+        AlbumId = i.AlbumId, AlbumTitle = i.AlbumTitle, CoverUrl = i.CoverUrl, DurationSeconds = i.DurationSeconds, Missing = i.Missing, ListenId = i.ListenId,
+    };
+
+    // A queue as it's kept, to tell whether it's changed: where in a song is to the second.
+    private static string Kept(IReadOnlyList<PlayQueueItem> items, int current, double position, IReadOnlyList<int>? ordered) =>
+        System.Text.Json.JsonSerializer.Serialize(new { items, current, position = Math.Floor(position), ordered }, MelodexJson.Options);
+
+    /// <summary>Keeps the queue on the server, once whatever's being saved now has been.</summary>
+    private Task SaveAsync()
     {
         if (_owner is null)
-            return;
-        var ordered = _ordered?.Select(e => _queue.IndexOf(e)).ToList();
-        await _prefs.SetAsync(SavedKey, _queue.Count == 0 ? null : new Saved([.. _queue], Current, _resumeAt ?? Position, ordered));
+            return Task.CompletedTask;
+        if (_saving is { IsCompleted: false })
+        {
+            _saveAgain = true;
+            return _saving;
+        }
+        return _saving = SaveWhileChangedAsync();
+    }
+
+    private async Task SaveWhileChangedAsync()
+    {
+        do
+        {
+            _saveAgain = false;
+            // Changes come in bursts: one save for each.
+            await Task.Delay(300);
+            var items = _queue.Select(Item).ToList();
+            var current = _queue.Count == 0 ? -1 : Current;
+            var position = _resumeAt ?? Position;
+            var ordered = _ordered?.Select(e => _queue.IndexOf(e)).ToList();
+            var kept = Kept(items, current, position, ordered);
+            if (kept == _lastKept)
+                continue;
+            try
+            {
+                var saved = await _api.SavePlayQueueAsync(new SavePlayQueue(items, current, position, ordered));
+                _lastKept = kept;
+                _savedAt = saved?.ChangedAt;
+            }
+            catch (Exception e) when (e is HttpRequestException or MelodexApiException)
+            {
+                // Tried again with the next change.
+            }
+        } while (_saveAgain);
     }
 
     [JSInvokable]

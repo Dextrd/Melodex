@@ -7,6 +7,7 @@
 @using Microsoft.AspNetCore.Components.Web.Virtualization
 @inject NavigationManager Nav
 @inject ViewTransitions Transitions
+@inject MarkStore Marks
 
 <PageTitle>Library · Melodex</PageTitle>
 
@@ -24,6 +25,8 @@
                 aria-expanded="@(_filterOpen ? "true" : "false")" @onclick="ToggleFilter">
             <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6" /><path d="M20 20l-4.5-4.5" /></svg>
         </button>
+        <IconButton Icon="@(_starred ? "starred" : "star")" On="_starred" Disabled="Busy" Title="@(_starred ? "Show everything, starred or not" : "Only what you've starred")"
+                    OnClick="ToggleStarredAsync" />
         <SortMenu Options="SortMenuOptions" Value="@_sort.Key" Descending="_sort.Descending" DirectionHint="@DirectionHint" Disabled="Busy"
                   OnChange="key => SortAsync(key, null)" OnReverse="() => SortAsync(_sort.Key, !_sort.Descending)" />
         @if (_view != "artists")
@@ -74,7 +77,8 @@
                 <span><i class="complete"></i>Tracks you have</span>
                 <span><i class="missing"></i>Tracks missing</span>
             </div>
-            @if (albums.Count == 0) { <div class="empty card">@(Prefs.Ownership switch { OwnershipView.Missing => "No partly owned albums", OwnershipView.Owned => "No complete albums", _ => "No albums" }) @(_filter.Length > 0 ? "match that filter." : "right now.")</div> }
+            @if (albums.Count == 0 && _starred) { <div class="empty card">No starred albums @(_filter.Length > 0 || Prefs.Ownership != OwnershipView.All ? "match those filters." : "yet: star one from its page or its menu.")</div> }
+            else if (albums.Count == 0) { <div class="empty card">@(Prefs.Ownership switch { OwnershipView.Missing => "No partly owned albums", OwnershipView.Owned => "No complete albums", _ => "No albums" }) @(_filter.Length > 0 ? "match that filter." : "right now.")</div> }
             <TileGrid Items="albums" Context="item">
                 @{ var album = item.Album; }
                     <div class="tile-wrap" @key="album.Id" data-vt="@album.Id.ToString("N")">
@@ -100,7 +104,7 @@
     case "tracks":
         @if (Store.Tracks is null) { <Loading Text="@LoadingText" /> }
         else if (Store.Tracks.Count == 0) { <div class="empty card">No tracks yet. Scan the library to read your music folder.</div> }
-        else if (!VisibleTracks.Any()) { <div class="empty card">No tracks match that filter.</div> }
+        else if (!VisibleTracks.Any()) { <div class="empty card">@(_starred ? _filter.Length > 0 ? "No starred tracks match that filter." : "No starred tracks yet: star one from its menu or its page." : "No tracks match that filter.")</div> }
         else
         {
             var tracks = VisibleTracks.ToList();
@@ -164,7 +168,8 @@
                 <span><i class="covered"></i>Covered by other albums</span>
                 <span><i class="missing"></i>Missing</span>
             </div>
-            @if (artists.Count == 0) { <div class="empty card">@(Prefs.Ownership switch { OwnershipView.Missing => "Nothing missing", OwnershipView.Owned => "No artist you have everything of", _ => "No artists" }) @(_filter.Length == 0 ? "right now." : Prefs.Ownership == OwnershipView.All ? "match that filter." : "matches that filter.")</div> }
+            @if (artists.Count == 0 && _starred) { <div class="empty card">No starred artists @(_filter.Length > 0 || Prefs.Ownership != OwnershipView.All ? "match those filters." : "yet: star one from its page or its menu.")</div> }
+            else if (artists.Count == 0) { <div class="empty card">@(Prefs.Ownership switch { OwnershipView.Missing => "Nothing missing", OwnershipView.Owned => "No artist you have everything of", _ => "No artists" }) @(_filter.Length == 0 ? "right now." : Prefs.Ownership == OwnershipView.All ? "match that filter." : "matches that filter.")</div> }
             <TileGrid Items="artists" Context="artist">
                 @{ var total = artist.OwnedAlbums + artist.MissingAlbums; }
                     <div class="tile-wrap" @key="artist.Id" data-vt="@artist.Id.ToString("N")">
@@ -178,7 +183,7 @@
                             </div>
                         </a>
                         <ItemMenu What="artist" Class="tile-menu" Name="@artist.Name" ArtistHref="@($"{(artist.Local ? "local/artists" : "artists")}/{artist.Id}")"
-                                  Get="@(artist.Local || artist.MissingAlbums == 0 ? null : (RequestKind.Artist, artist.Id))" GetLabel="Get everything missing"
+                                  Star="(MarkKind.Artist, artist.Id)" Get="@(artist.Local || artist.MissingAlbums == 0 ? null : (RequestKind.Artist, artist.Id))" GetLabel="Get everything missing"
                                   Upgrade="@(artist.Local ? null : new FormatScope(FormatScopeKind.Artist, artist.Id))"
                                   OnRemove="@(artist.Local ? default : EventCallback.Factory.Create(this, () => Remove(LibraryItemKind.Artist, artist.Id, artist.Name)))" />
                     </div>
@@ -207,11 +212,12 @@
         [
             new("title", "Title", false), new("artist", "Artist", false), new("year", "Year", true),
             new("complete", "How complete", true), new("tracks", "Tracks owned", true), new("quality", "Quality", true),
+            new("rating", "Your rating", true),
         ],
         ["tracks"] =
         [
             new("title", "Title", false), new("artist", "Artist", false), new("album", "Album", false), new("length", "Length", true),
-            new("quality", "Quality", true),
+            new("quality", "Quality", true), new("rating", "Your rating", true),
         ],
     };
 
@@ -219,6 +225,15 @@
 
     // Kept for both lists of songs and albums, as the choice of view is.
     private QualityFilter _quality;
+
+    // Only what's starred (#7), in every view.
+    private bool _starred;
+
+    private async Task ToggleStarredAsync()
+    {
+        _starred = !_starred;
+        await Prefs.SetAsync("libraryStarred", _starred);
+    }
 
     private async Task FilterQualityAsync(QualityFilter filter)
     {
@@ -296,6 +311,7 @@
     // Owned and missing split the list in two: an artist or album is one or the other.
     private IEnumerable<LibraryArtist> VisibleArtists => Sorted(Store.Artists!
             .Where(a => Matches(a.Name))
+            .Where(a => !_starred || Marks.IsStarred(MarkKind.Artist, a.Id))
             .Where(a => Prefs.Ownership == OwnershipView.All || (a.MissingAlbums > 0 || a.PartialAlbums > 0) == (Prefs.Ownership == OwnershipView.Missing)),
         a => a.SortName ?? a.Name,
         (a, key) => key switch
@@ -310,7 +326,8 @@
     private IEnumerable<LibraryAlbum> VisibleAlbums => Sorted(Store.Albums!
             .Where(a => Matches(a.Album.Title, a.ArtistName))
             .Where(a => Prefs.Ownership == OwnershipView.All || (a.Album.Status == AlbumStatus.Partial) == (Prefs.Ownership == OwnershipView.Missing))
-            .Where(a => _quality.Shows(a.Album.Quality)),
+            .Where(a => _quality.Shows(a.Album.Quality))
+            .Where(a => !_starred || Marks.IsStarred(MarkKind.Album, a.Album.Id)),
         a => a.Album.Title,
         (a, key) => key switch
         {
@@ -319,10 +336,12 @@
             "complete" => Ratio(a.Album.OwnedTracks, a.Album.TotalTracks),
             "tracks" => a.Album.OwnedTracks ?? 0,
             "quality" => a.Album.Quality?.Rank ?? 0,
+            "rating" => Marks.RatingOf(MarkKind.Album, a.Album.Id),
             _ => a.Album.Title,
         });
 
-    private IEnumerable<LibraryTrack> VisibleTracks => Sorted(Store.Tracks!.Where(t => Matches(t.Title, t.ArtistCredit, t.AlbumTitle) && _quality.Shows(t.Quality)),
+    private IEnumerable<LibraryTrack> VisibleTracks => Sorted(Store.Tracks!.Where(t => Matches(t.Title, t.ArtistCredit, t.AlbumTitle) && _quality.Shows(t.Quality)
+            && (!_starred || Marks.IsStarred(MarkKind.Song, t.TrackId))),
         t => t.Title,
         (t, key) => key switch
         {
@@ -330,6 +349,7 @@
             "album" => t.AlbumTitle,
             "length" => t.DurationSeconds ?? 0,
             "quality" => t.Quality?.Rank ?? 0,
+            "rating" => Marks.RatingOf(MarkKind.Song, t.TrackId),
             _ => t.Title,
         });
 
@@ -364,6 +384,9 @@
         ScanStatus.PreparingChanged += Redraw;
         await Prefs.LoadAsync();
         _quality = await Prefs.GetAsync("libraryQuality", QualityFilter.Any);
+        _starred = await Prefs.GetAsync("libraryStarred", false);
+        Marks.Changed += Redraw;
+        await Marks.EnsureLoadedAsync();
     }
 
     protected override async Task OnParametersSetAsync()
@@ -460,5 +483,6 @@
         ScanStatus.LibraryChanged -= Reload;
         Player.Changed -= Redraw;
         ScanStatus.PreparingChanged -= Redraw;
+        Marks.Changed -= Redraw;
     }
 }

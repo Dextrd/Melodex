@@ -21,6 +21,7 @@ guide covers what the reference can't: how the pieces fit together.
 - [Errors](#errors)
 - [Versioning](#versioning)
 - [The Subsonic API](#the-subsonic-api)
+- [Stars, ratings and the play queue](#stars-ratings-and-the-play-queue)
 - [The API reference](#the-api-reference)
 
 ## Getting a key
@@ -238,7 +239,8 @@ isn't.
 (`read` scope). It sends two sorts of event:
 
 - **Changes**, named `requests`, `listen`, `library` or `tasks`: something of that kind changed, so reload what you
-  show of it. These come at most four times a second per kind.
+  show of it. `marks` and `queue` say someone's stars and ratings, or play queue, changed: reload your own from
+  `GET /marks` or `GET /player/queue`. These come at most four times a second per kind.
 - **Happenings**, such as `request.completed`, with an `id` and data: the same events webhooks get, described below.
 
 ```text
@@ -388,10 +390,40 @@ listener's side.
 - **The calls Melodex answers**: `ping`, `getLicense`, `getOpenSubsonicExtensions`, `getMusicFolders`, `getUser`,
   `getScanStatus`; `getIndexes`, `getMusicDirectory`, `getArtists`, `getArtist`, `getAlbum`, `getSong`,
   `getAlbumList`, `getAlbumList2`, `getRandomSongs`, `getGenres`, `getSongsByGenre`; `search2`, `search3`;
-  `stream`, `download`, `getCoverArt`, `getLyrics`, `getLyricsBySongId`; and `getPlaylists`, `getPlaylist`,
-  `createPlaylist`, `updatePlaylist`, `deletePlaylist`. `getArtistInfo`, `getAlbumInfo`, `getTopSongs`,
-  `getSimilarSongs`, `getStarred` and `getNowPlaying` (and their `2`s) answer empty for now. Anything else is error
-  70.
+  `stream`, `download`, `getCoverArt`, `getLyrics`, `getLyricsBySongId`; `getPlaylists`, `getPlaylist`,
+  `createPlaylist`, `updatePlaylist`, `deletePlaylist`; `star`, `unstar`, `setRating`, `getStarred`,
+  `getStarred2`; and `getPlayQueue`, `savePlayQueue`, with OpenSubsonic's `getPlayQueueByIndex` and
+  `savePlayQueueByIndex` (`indexBasedQueue`). `getArtistInfo`, `getAlbumInfo`, `getTopSongs`, `getSimilarSongs` and
+  `getNowPlaying` (and their `2`s) answer empty for now. Anything else is error 70.
+- **Stars, ratings and the queue** are the same as `/marks` and `/player/queue` below: a song's star is kept on its
+  track, so it stays when the file's replaced. A queue saved by a player shows in the web player, and one saved by the
+  web player shows in players, less songs not in the library.
+
+### Melodex's own extension
+
+`getOpenSubsonicExtensions` lists `melodex`, version 1, for apps that know Melodex. Its answers carry a little more:
+
+- Every song has `melodexTrackId`, its ID in `/api/v1` (where a file of your own goes by its file's ID), so search
+  results, requests and Listen now from `/api/v1` can be matched to the songs a player lists.
+- Every album has `melodexStatus`, `complete` or `partial`, and `melodexOwnedSongs` and `melodexTotalSongs`, to badge
+  albums with songs missing.
+
+The rest of what such an app wants, such as searching the whole catalogue with what you have marked, asking for music
+and following it, and Listen now, is `/api/v1` itself: a player's key works there too, sent as `X-Api-Key`, with what
+it may do there set by its scopes. Other players ignore all of this.
+
+## Stars, ratings and the play queue
+
+Each person's own, the same as in Subsonic players:
+
+- `GET /marks` (`read` scope) lists your stars and ratings, latest first: `kind` (`song`, `album` or `artist`), `id`
+  (a song's track ID), `starredAt` and `rating` (1 to 5).
+- `PUT /marks/{kind}/{id}` with `{"starred": true}`, `{"rating": 4}`, or both, changes one; what's left out stays as it
+  was, and `"rating": 0` takes a rating away. It answers with what's left, or 204 once there's neither.
+- `GET /player/queue` (`listen` scope) is your queue: its songs, with what a player shows of each; `current`, the place
+  of the one playing; `position` in seconds; and `changedBy`, `web` or a player's name. 204 when there's none.
+- `PUT /player/queue` keeps a queue in place of the one before, at most 5000 songs; an empty one clears it. Say who you
+  are with `client`.
 
 ## The API reference
 

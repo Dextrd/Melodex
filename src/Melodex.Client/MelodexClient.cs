@@ -956,6 +956,34 @@ public sealed class MelodexClient(HttpClient http)
         await EnsureAsync(response, ct);
     }
 
+    /// <summary>Your stars and ratings, the latest first.</summary>
+    public async Task<IReadOnlyList<ItemMark>> ListMarksAsync(CancellationToken ct = default) =>
+        await http.GetFromJsonAsync<List<ItemMark>>($"{Api}/marks", MelodexJson.Options, ct) ?? [];
+
+    /// <summary>Stars, unstars or rates a song (by track ID), album or artist; what's left of its mark, or null once it has neither.</summary>
+    public async Task<ItemMark?> SetMarkAsync(MarkKind kind, Guid id, SetMark change, CancellationToken ct = default)
+    {
+        using var response = await http.PutAsJsonAsync($"{Api}/marks/{kind.ToString().ToLowerInvariant()}/{id}", change, MelodexJson.Options, ct);
+        await EnsureAsync(response, ct);
+        return response.StatusCode == System.Net.HttpStatusCode.NoContent ? null : await response.Content.ReadFromJsonAsync<ItemMark>(MelodexJson.Options, ct);
+    }
+
+    /// <summary>Your play queue as you or a Subsonic player left it, or null if there's none.</summary>
+    public async Task<PlayQueue?> GetPlayQueueAsync(CancellationToken ct = default)
+    {
+        using var response = await http.GetAsync($"{Api}/player/queue", ct);
+        await EnsureAsync(response, ct);
+        return response.StatusCode == System.Net.HttpStatusCode.NoContent ? null : await response.Content.ReadFromJsonAsync<PlayQueue>(MelodexJson.Options, ct);
+    }
+
+    /// <summary>Keeps your play queue for the web player and Subsonic players; an empty one clears it.</summary>
+    public async Task<PlayQueue?> SavePlayQueueAsync(SavePlayQueue queue, CancellationToken ct = default)
+    {
+        using var response = await http.PutAsJsonAsync($"{Api}/player/queue", queue, MelodexJson.Options, ct);
+        await EnsureAsync(response, ct);
+        return response.StatusCode == System.Net.HttpStatusCode.NoContent ? null : await response.Content.ReadFromJsonAsync<PlayQueue>(MelodexJson.Options, ct);
+    }
+
     public async Task<IReadOnlyList<PlaylistSummary>> ListPlaylistsAsync(CancellationToken ct = default) =>
         await http.GetFromJsonAsync<List<PlaylistSummary>>($"{Api}/playlists", MelodexJson.Options, ct) ?? [];
 
