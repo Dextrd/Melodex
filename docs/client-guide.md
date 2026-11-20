@@ -22,6 +22,7 @@ guide covers what the reference can't: how the pieces fit together.
 - [Versioning](#versioning)
 - [The Subsonic API](#the-subsonic-api)
 - [Stars, ratings and the play queue](#stars-ratings-and-the-play-queue)
+- [Listening history](#listening-history)
 - [The API reference](#the-api-reference)
 
 ## Getting a key
@@ -272,10 +273,11 @@ Every event has the same envelope:
 | `listen.ready` | A listen-now track became playable | `{ listen, requester }` |
 | `scan.completed` | A library scan finished | `{ task }` |
 | `scan.failed` | A library scan failed | `{ task }` |
+| `play.recorded` | Someone played a song | `{ play, username }` |
 | `ping` | Only from **Test** on a webhook | `{ message }` |
 
 `request` is the same object `GET /requests/{id}` returns (without `children` and `jobs`), `listen` the same as
-`GET /listen/{id}`, and `task` the same as `GET /tasks/{id}`. `requester` is the username of whoever asked, or
+`GET /listen/{id}`, `task` the same as `GET /tasks/{id}`, and `play` the same as one of `GET /plays`. `requester` is the username of whoever asked, or
 the name of the key that did. Only requests asked for directly are announced, not the parts of an artist or album request. More types may
 be added; ignore ones you don't know.
 
@@ -392,12 +394,14 @@ listener's side.
   `getAlbumList`, `getAlbumList2`, `getRandomSongs`, `getGenres`, `getSongsByGenre`; `search2`, `search3`;
   `stream`, `download`, `getCoverArt`, `getLyrics`, `getLyricsBySongId`; `getPlaylists`, `getPlaylist`,
   `createPlaylist`, `updatePlaylist`, `deletePlaylist`; `star`, `unstar`, `setRating`, `getStarred`,
-  `getStarred2`; and `getPlayQueue`, `savePlayQueue`, with OpenSubsonic's `getPlayQueueByIndex` and
-  `savePlayQueueByIndex` (`indexBasedQueue`). `getArtistInfo`, `getAlbumInfo`, `getTopSongs`, `getSimilarSongs` and
-  `getNowPlaying` (and their `2`s) answer empty for now. Anything else is error 70.
+  `getStarred2`; `getPlayQueue`, `savePlayQueue`, with OpenSubsonic's `getPlayQueueByIndex` and
+  `savePlayQueueByIndex` (`indexBasedQueue`); and `scrobble` and `getNowPlaying`. `getArtistInfo`, `getAlbumInfo`,
+  `getTopSongs` and `getSimilarSongs` (and their `2`s) answer empty for now. Anything else is error 70.
 - **Stars, ratings and the queue** are the same as `/marks` and `/player/queue` below: a song's star is kept on its
   track, so it stays when the file's replaced. A queue saved by a player shows in the web player, and one saved by the
   web player shows in players, less songs not in the library.
+- **Plays**: `scrobble` records a play in the same history as `POST /plays` (or with `submission=false`, what's playing
+  now), and songs and albums carry `playCount` and `played`; `getAlbumList`'s `frequent` and `recent` are by them.
 
 ### Melodex's own extension
 
@@ -424,6 +428,26 @@ Each person's own, the same as in Subsonic players:
   of the one playing; `position` in seconds; and `changedBy`, `web` or a player's name. 204 when there's none.
 - `PUT /player/queue` keeps a queue in place of the one before, at most 5000 songs; an empty one clears it. Say who you
   are with `client`.
+
+## Listening history
+
+Each person's own, from the web player and Subsonic players alike:
+
+- `POST /plays` (`listen` scope) records a song you played, once it's played for half its length or four minutes,
+  whichever comes first. A song in the library needs only `trackId` (and `fileId`, if you know which file); any other
+  needs `title` and `artistCredit` too. `playedAt` is when it started, now if left out; `source` says what it was
+  played from (`{"kind": "playlist", "id": ..., "name": ...}`); `client` names your app. The same song again within 30
+  seconds is the same play, and the one already recorded comes back. Linked ListenBrainz and Last.fm accounts get it
+  too.
+- `PUT /plays/now` with the same body says what you've started: Subsonic players' now playing shows it, and linked
+  accounts are told.
+- `GET /plays` (`read` scope) lists your plays, latest first, with `skip` and `take` (at most 500), and the `total`.
+- `GET /plays/top/songs`, `/albums` or `/artists` lists what you've played most, with `period` (`week`, `month`,
+  `year` or `all`) and `take`.
+- `DELETE /plays/{id}` takes one out.
+
+Linking accounts is for a signed-in person, in the web app (`/account/scrobbling`); the admin sets the Last.fm API
+key and secret with `PUT /settings/scrobbling`.
 
 ## The API reference
 

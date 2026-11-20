@@ -60,4 +60,10 @@ at most at some bitrate, Melodex turns the song into that as it plays, which sui
 A song already small enough in that format is sent as it is. Downloading for offline listening always gives the file
 as it is in your library.
 
-Plays aren't counted (scrobbling) yet, so most played and recently played stay empty.
+## Plays
+
+What a player scrobbles goes into your [listening history](library.md#history), alongside what you play in Melodex's
+own player, and on to ListenBrainz or Last.fm if you've linked them: so turn scrobbling on in the player, and don't
+also have it send plays to Last.fm itself, or they'll be counted twice there. Each song and album shows how often you've
+played it and when last, and the most played and recently played album lists are yours. **Now playing** shows what
+everyone using Melodex is playing, in a player or the web app.

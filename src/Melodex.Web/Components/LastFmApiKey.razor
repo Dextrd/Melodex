@@ -1,0 +1,79 @@
+@inject MelodexClient Api
+
+@*
+    The Last.fm API account that people's plays are sent with (#2), under Settings → Playback. Last.fm only lets an app
+    send plays with an API key of its own, so the admin makes one and everyone links their account through it.
+*@
+<h2 id="lastfm">Last.fm</h2>
+<p class="muted small">
+    So people can send their plays to Last.fm from their account page. Make an API account at
+    <a href="https://www.last.fm/api/account/create" target="_blank" rel="noopener">last.fm/api/account/create</a>, leaving the callback URL empty,
+    and copy its API key and shared secret here. ListenBrainz needs nothing here: each person uses their own token.
+</p>
+@if (_info is null)
+{
+    <Loading Inline="true" />
+}
+else
+{
+    <div class="card settings-card">
+        <label class="field">
+            <span class="field-label">API key</span>
+            <input type="text" autocomplete="off" @bind="_key" @bind:event="oninput" />
+        </label>
+        <label class="field">
+            <span class="field-label">Shared secret</span>
+            <input type="password" autocomplete="off" placeholder="@(_info.HasLastFmSecret ? "Set: leave empty to keep it" : "")" @bind="_secret" @bind:event="oninput" />
+        </label>
+        <div class="row">
+            <button type="button" class="primary" disabled="@_saving" @onclick="SaveAsync">Save</button>
+            @if (_info.HasLastFmSecret)
+            {
+                <button type="button" disabled="@_saving" @onclick="ForgetAsync">Remove the key</button>
+            }
+            @if (_saved) { <span class="muted small" role="status">Saved.</span> }
+            @if (_error is not null) { <span class="error small" role="alert">@_error</span> }
+        </div>
+    </div>
+}
+
+@code {
+    private ScrobbleSettingsInfo? _info;
+    private string _key = "", _secret = "";
+    private bool _saving, _saved;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _info = await Api.GetScrobblingSettingsAsync();
+            _key = _info.LastFmApiKey ?? "";
+        }
+        catch (Exception e) when (e is HttpRequestException or MelodexApiException)
+        {
+            _error = e.Message;
+            _info = new ScrobbleSettingsInfo(null, false);
+        }
+    }
+
+    private Task SaveAsync() => SaveAsync(new SaveScrobbleSettings(_key, _secret.Trim().Length > 0 ? _secret : null));
+
+    private Task ForgetAsync() => SaveAsync(new SaveScrobbleSettings(null, ""));
+
+    private async Task SaveAsync(SaveScrobbleSettings settings)
+    {
+        (_saving, _saved, _error) = (true, false, null);
+        try
+        {
+            await Api.SaveScrobblingSettingsAsync(settings);
+            _info = await Api.GetScrobblingSettingsAsync();
+            (_key, _secret, _saved) = (_info.LastFmApiKey ?? "", "", true);
+        }
+        catch (Exception e) when (e is HttpRequestException or MelodexApiException)
+        {
+            _error = e.Message;
+        }
+        _saving = false;
+    }
+}

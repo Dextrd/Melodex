@@ -481,7 +481,7 @@ else
     private async Task PlayAsync(Guid id)
     {
         if (await Api.GetPlaylistAsync(id) is { } playlist)
-            await Player.PlayAsync(PlaylistNames.Playable(playlist.Songs));
+            await Player.PlayAsync(PlaylistNames.Playable(playlist.Songs), from: new PlaySource(PlaySourceKind.Playlist, playlist.Playlist.Id, playlist.Playlist.Name));
     }
 
     private void StartNew(string? folder)

@@ -26,10 +26,13 @@ public static class EventTypes
     /// <summary>A library scan failed. Data: <see cref="ScanEventData"/>.</summary>
     public const string ScanFailed = "scan.failed";
 
+    /// <summary>Someone played a song (#2). Data: <see cref="PlayEventData"/>.</summary>
+    public const string PlayRecorded = "play.recorded";
+
     /// <summary>Sent by <c>POST /webhooks/{id}/test</c> only. Data: <see cref="PingEventData"/>.</summary>
     public const string Ping = "ping";
 
-    public static IReadOnlyList<string> All { get; } = [RequestCompleted, RequestFailed, RequestNeedsReview, ListenReady, ScanCompleted, ScanFailed];
+    public static IReadOnlyList<string> All { get; } = [RequestCompleted, RequestFailed, RequestNeedsReview, ListenReady, ScanCompleted, ScanFailed, PlayRecorded];
 }
 
 /// <summary>Something that happened, as sent to webhooks and on the event stream.</summary>
@@ -51,6 +54,9 @@ public sealed record ListenEventData(ListenNowInfo Listen, string Requester);
 public sealed record ScanEventData(TaskInfo Task);
 
 public sealed record PingEventData(string Message);
+
+/// <summary>A song someone played, and who.</summary>
+public sealed record PlayEventData(PlayRecord Play, string Username);
 
 // ---- Webhooks ----
 

@@ -1,7 +1,7 @@
 // Reads GET /events with the browser's own EventSource and tells .NET each kind of change as it arrives.
 // EventSource reconnects by itself after a dropped connection, but gives up on a refusal, such as before signing in:
 // then this tries again, more slowly each time, or at once when asked.
-const kinds = ['requests', 'listen', 'library', 'tasks', 'marks', 'queue'];
+const kinds = ['requests', 'listen', 'library', 'tasks', 'marks', 'queue', 'plays'];
 
 export function listen(target) {
     let source = null;

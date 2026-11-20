@@ -30,6 +30,9 @@ public sealed class EventFeed : DbCommandInterceptor
     /// <summary>Someone's play queue was saved: each client reloads its own person's.</summary>
     public const string Queue = "queue";
 
+    /// <summary>Someone played a song, or their linked scrobbling accounts changed: each client reloads its own person's.</summary>
+    public const string Plays = "plays";
+
     /// <summary>How long changes of one kind are gathered into one event.</summary>
     public static readonly TimeSpan Coalesce = TimeSpan.FromMilliseconds(250);
 
@@ -42,6 +45,8 @@ public sealed class EventFeed : DbCommandInterceptor
         ("\"BackgroundTasks\"", [Tasks]),
         ("\"Marks\"", [Marks]),
         ("\"PlayQueues\"", [Queue]),
+        ("\"Plays\"", [Plays]),
+        ("\"ScrobbleAccounts\"", [Plays]),
     ];
 
     private readonly ConcurrentDictionary<Channel<Message>, byte> _subscribers = new();

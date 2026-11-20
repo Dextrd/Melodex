@@ -21,6 +21,7 @@ public sealed class SettingsService(MelodexDbContext db)
     private const string UpgradesKey = "upgrades";
     private const string UpgradeRunKey = "upgrades.lastRun";
     private const string PlaybackKey = "playback";
+    private const string ScrobblingKey = "scrobbling";
     private const string ScheduleKey = "schedule";
     private const string ScheduleRunsKey = "schedule.runs";
 
@@ -114,6 +115,12 @@ public sealed class SettingsService(MelodexDbContext db)
     public Task<PlaybackSettings> GetPlaybackAsync(CancellationToken ct) => GetAsync<PlaybackSettings>(PlaybackKey, ct);
 
     public Task SavePlaybackAsync(PlaybackSettings value, CancellationToken ct) => SaveAsync(PlaybackKey, value, ct);
+
+    /// <summary>The Last.fm API account plays are sent with (#2), its secret encrypted.</summary>
+    public Task<Melodex.Core.Listening.ScrobbleSettings> GetScrobblingAsync(CancellationToken ct) =>
+        GetAsync<Melodex.Core.Listening.ScrobbleSettings>(ScrobblingKey, ct);
+
+    public Task SaveScrobblingAsync(Melodex.Core.Listening.ScrobbleSettings value, CancellationToken ct) => SaveAsync(ScrobblingKey, value, ct);
 
     public Task<LogSettings> GetLogAsync(CancellationToken ct) => GetAsync<LogSettings>(LogKey, ct);
 

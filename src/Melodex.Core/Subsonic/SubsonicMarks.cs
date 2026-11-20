@@ -4,7 +4,7 @@ using Melodex.Core.Listening;
 
 namespace Melodex.Core.Subsonic;
 
-/// <summary>Stars, ratings and the play queue (#7): each person's own, the same ones the web app shows.</summary>
+/// <summary>Stars, ratings and the play queue (#7), and play counts (#2): each person's own, the same ones the web app shows.</summary>
 public static partial class SubsonicEndpoints
 {
     /// <summary>The marks a song, album or artist is kept under: a song goes by its track, so a new file of it keeps them.</summary>
@@ -18,15 +18,16 @@ public static partial class SubsonicEndpoints
         (await c.Get<MarkService>().ListAsync(c.UserId, c.Ct)).ToDictionary(m => (m.Kind, m.Id));
 
     /// <summary>
-    /// Puts the caller's stars and ratings on every song, album and artist in an answer, wherever it is, so no call can
-    /// leave them out.
+    /// Puts the caller's stars, ratings and play counts on every song, album and artist in an answer, wherever it is, so
+    /// no call can leave them out.
     /// </summary>
     private static async Task MarkAsync(SubsonicCall c, SubsonicResponse response)
     {
         if (response.Failed)
             return;
         var marks = await MarksAsync(c);
-        if (marks.Count == 0)
+        var counts = await c.Get<PlayService>().CountsAsync(c.UserId, c.Ct);
+        if (marks.Count == 0 && !counts.Any)
             return;
         var library = await c.Get<SubsonicLibrary>().GetAsync(c.Ct);
 
@@ -41,12 +42,26 @@ public static partial class SubsonicEndpoints
                 case JsonObject item:
                     if (item["id"]?.GetValueKind() == System.Text.Json.JsonValueKind.String && Guid.TryParse((string?)item["id"], out var id)
                         && (item.ContainsKey("isDir") || item.ContainsKey("songCount") || item.ContainsKey("albumCount"))
-                        && MarkKeyOf(library, id) is { } key && marks.TryGetValue(key, out var mark))
+                        && MarkKeyOf(library, id) is { } key)
                     {
-                        if (mark.StarredAt is { } starred)
-                            item["starred"] = SubsonicLibrary.Iso(starred);
-                        if (mark.Rating is { } rating)
-                            item["userRating"] = rating;
+                        if (marks.TryGetValue(key, out var mark))
+                        {
+                            if (mark.StarredAt is { } starred)
+                                item["starred"] = SubsonicLibrary.Iso(starred);
+                            if (mark.Rating is { } rating)
+                                item["userRating"] = rating;
+                        }
+                        var plays = key.Kind switch
+                        {
+                            MarkKind.Song => counts.Songs,
+                            MarkKind.Album => counts.Albums,
+                            _ => null,
+                        };
+                        if (plays is not null && plays.TryGetValue(key.Id, out var played) && played is var (count, last))
+                        {
+                            item["playCount"] = count;
+                            item["played"] = SubsonicLibrary.Iso(last);
+                        }
                     }
                     foreach (var (_, value) in item.ToList())
                         Visit(value);

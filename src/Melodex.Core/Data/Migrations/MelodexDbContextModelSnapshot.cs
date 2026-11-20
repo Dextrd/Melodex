@@ -801,6 +801,80 @@ namespace Melodex.Core.Data.Migrations
                     b.ToTable("MediaServerLogins");
                 });
 
+            modelBuilder.Entity("Melodex.Core.Data.Play", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("AlbumId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("AlbumTitle")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("Announced")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("ArtistCredit")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("ArtistId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Client")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("CoverUrl")
+                        .HasColumnType("TEXT");
+
+                    b.Property<double?>("DurationSeconds")
+                        .HasColumnType("REAL");
+
+                    b.Property<Guid?>("FileId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("PlayedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("RecordingMbid")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ReleaseMbid")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("SourceId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("SourceKind")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("SourceName")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("TrackId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Announced");
+
+                    b.HasIndex("UserId", "PlayedAt");
+
+                    b.HasIndex("UserId", "TrackId");
+
+                    b.ToTable("Plays");
+                });
+
             modelBuilder.Entity("Melodex.Core.Data.Playlist", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1155,6 +1229,76 @@ namespace Melodex.Core.Data.Migrations
                     b.HasKey("UserId");
 
                     b.ToTable("PlayQueues");
+                });
+
+            modelBuilder.Entity("Melodex.Core.Data.ScrobbleAccount", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Error")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("LastSentAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("LinkedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("Refused")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Secret")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Service")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Username")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "Service")
+                        .IsUnique();
+
+                    b.ToTable("ScrobbleAccounts");
+                });
+
+            modelBuilder.Entity("Melodex.Core.Data.ScrobbleSend", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("AccountId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("NextAttemptAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("PlayId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AccountId");
+
+                    b.HasIndex("NextAttemptAt");
+
+                    b.HasIndex("PlayId");
+
+                    b.ToTable("ScrobbleSends");
                 });
 
             modelBuilder.Entity("Melodex.Core.Data.Setting", b =>
@@ -1523,6 +1667,15 @@ namespace Melodex.Core.Data.Migrations
                     b.Navigation("PluginInstance");
                 });
 
+            modelBuilder.Entity("Melodex.Core.Data.Play", b =>
+                {
+                    b.HasOne("Melodex.Core.Data.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Melodex.Core.Data.Playlist", b =>
                 {
                     b.HasOne("Melodex.Core.Data.User", "User")
@@ -1569,6 +1722,34 @@ namespace Melodex.Core.Data.Migrations
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("Melodex.Core.Data.ScrobbleAccount", b =>
+                {
+                    b.HasOne("Melodex.Core.Data.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Melodex.Core.Data.ScrobbleSend", b =>
+                {
+                    b.HasOne("Melodex.Core.Data.ScrobbleAccount", "Account")
+                        .WithMany()
+                        .HasForeignKey("AccountId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Melodex.Core.Data.Play", "Play")
+                        .WithMany()
+                        .HasForeignKey("PlayId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Account");
+
+                    b.Navigation("Play");
                 });
 
             modelBuilder.Entity("Melodex.Core.Data.Track", b =>
