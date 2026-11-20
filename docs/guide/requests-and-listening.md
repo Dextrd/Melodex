@@ -204,16 +204,19 @@ up to about 1 GB, the least lately played forgotten first. Your music folder isn
 
 ### The visualiser
 
-The visualiser's bars are worked out from each song by Melodex, not your browser, so the song is downloaded once: they
-come as a small file of their own, about 300 KB for a four-minute song. **Settings → Playback** says when they're made:
+The visualiser's bars are drawn from each song's spectrum, worked out by Melodex, not your browser, so the song is
+downloaded once: it comes as a small file of its own, about 450 KB for a four-minute song, which other apps
+connected to Melodex can use for visualisers of their own (see the [client guide](../client-guide.md#spectrums)).
+**Settings → Playback** says when they're made:
 
 - **On demand** (the default): for the song playing while the visualiser shows, and the next in the queue ahead of it,
-  in a second or so. They're kept in Melodex's data folder, up to about 250 MB, the least lately played forgotten
+  in a second or so. They're kept in Melodex's data folder, up to about 500 MB, the least lately played forgotten
   first.
 - **When matching**: for every song in the library after each scan, kept beside it in a `.bars` file with the song's
   name, as [lyrics](library.md#lyrics) can be. Choosing it says about how much room that takes before anything is
-  made, about 1.4 KB for each second of music. They move and go with their songs, and media servers pass them by. A
-  song without one yet has its bars made on demand.
+  made, about 1.9 KB for each second of music. They move and go with their songs, and media servers pass them by. A
+  song without one yet has its spectrum made on demand. `.bars` files from before Melodex 1.7 are made again, in
+  the fuller format, as the visualiser's bars are next made when matching.
 - **Off**: there's no visualiser, and its button is gone from the full-screen player.
 
 Leaving **When matching** asks whether to delete the `.bars` files; kept, they're still used rather than making bars

@@ -13,7 +13,7 @@ namespace Melodex.Core.Library;
 /// matching (#89): after each scan, for every song without them. The core works them out and the beets worker writes
 /// them, as the core only reads the library. Asked to delete them, it takes every one away instead.
 /// </summary>
-public sealed class BarsTask(MelodexDbContext db, SettingsService settings, BarsMaker maker, IImportWorker worker,
+public sealed class BarsTask(MelodexDbContext db, SettingsService settings, SpectrumMaker maker, IImportWorker worker,
     IOptions<MelodexOptions> options, ILogger<BarsTask> logger) : ITaskHandler
 {
     public const string TaskKind = "library-bars";
@@ -41,7 +41,7 @@ public sealed class BarsTask(MelodexDbContext db, SettingsService settings, Bars
         long bytes = 0;
         foreach (var file in files)
         {
-            var sidecar = new FileInfo(BarsFile.SidecarOf(Path.Combine(root, file.Path)));
+            var sidecar = new FileInfo(SpectrumFormat.SidecarOf(Path.Combine(root, file.Path)));
             if (sidecar.Exists)
             {
                 count++;
@@ -49,7 +49,7 @@ public sealed class BarsTask(MelodexDbContext db, SettingsService settings, Bars
             }
         }
         var seconds = files.Sum(f => (f.Duration ?? TimeSpan.FromMinutes(4)).TotalSeconds);
-        return new PlaybackStatus(await settings.GetPlaybackAsync(ct), files.Count, (long)(seconds * BarsFile.BytesPerSecond), count, bytes);
+        return new PlaybackStatus(await settings.GetPlaybackAsync(ct), files.Count, (long)(seconds * SpectrumFormat.BytesPerSecond), count, bytes);
     }
 
     public async Task RunAsync(BackgroundTask task, IProgress<string> progress, CancellationToken ct)
@@ -63,7 +63,7 @@ public sealed class BarsTask(MelodexDbContext db, SettingsService settings, Bars
     private async Task MakeAsync(IProgress<string> progress, CancellationToken ct)
     {
         progress.Report("Looking for songs without the visualiser's bars");
-        var todo = (await SongsAsync(ct)).Where(s => File.Exists(s.Full) && !BarsFile.IsBars(BarsFile.SidecarOf(s.Full))).ToList();
+        var todo = (await SongsAsync(ct)).Where(s => File.Exists(s.Full) && !SpectrumFormat.IsSpectrum(SpectrumFormat.SidecarOf(s.Full))).ToList();
         int done = 0, made = 0, failed = 0;
         string? why = null;
         foreach (var batch in todo.Chunk(BatchSize))
@@ -84,7 +84,7 @@ public sealed class BarsTask(MelodexDbContext db, SettingsService settings, Bars
                     // Any already made on demand are used.
                     sidecars.Add(new BarsSidecar(path, Convert.ToBase64String(await maker.GetAsync(full, null, ct))));
                 }
-                catch (BarsException e)
+                catch (SpectrumException e)
                 {
                     failed++;
                     why ??= e.Message;
@@ -123,7 +123,7 @@ public sealed class BarsTask(MelodexDbContext db, SettingsService settings, Bars
     private async Task DeleteAsync(IProgress<string> progress, CancellationToken ct)
     {
         progress.Report("Looking for the visualiser's bars");
-        var todo = (await SongsAsync(ct)).Where(s => File.Exists(BarsFile.SidecarOf(s.Full))).ToList();
+        var todo = (await SongsAsync(ct)).Where(s => File.Exists(SpectrumFormat.SidecarOf(s.Full))).ToList();
         int deleted = 0, failed = 0;
         string? why = null;
         foreach (var batch in todo.Chunk(100))

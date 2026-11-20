@@ -82,7 +82,10 @@ public sealed class ScheduleTests : IDisposable
         status = await _api.GetSchedulesAsync();
         Assert.Empty(status.Unavailable);
         await tasks.TickAsync(now, default);
-        Assert.Equal(ScheduledTask.Bars, (await _api.GetSchedulesAsync()).Running!.Steps.Single().Task);
+        // Going, or with nothing to make, done already.
+        status = await _api.GetSchedulesAsync();
+        var run = status.Running ?? status.Windows.Single(w => w.Repeat == ScheduleRepeat.Daily).Last!;
+        Assert.Equal(ScheduledTask.Bars, run.Steps.Single().Task);
     }
 
     [Theory]

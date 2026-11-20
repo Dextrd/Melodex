@@ -383,14 +383,39 @@ export function setVolume(value) {
 
 // ---- The visualiser: bars that move with the music, drawn under the cover in the full-screen player ----
 
-// The bars are worked out from each song by the server (#89): how loud each band of pitch is, many times a second, from
-// bass up. They're fetched once for each song and played back with it. Nothing else plays: the music sent through Web
-// Audio would go quiet when a phone put the browser in the background, and a second, silent copy playing beside it took
-// an iPhone's controls with it, showing the music stopped when Safari was left while it carried on (#65).
-const HEADER = 8;
+// The bars are drawn from each song's spectrum, worked out by the server (#89, #102): how loud each band of pitch is,
+// many times a second, from bass up. It's fetched once for each song and played back with it. Nothing else plays: the
+// music sent through Web Audio would go quiet when a phone put the browser in the background, and a second, silent copy
+// playing beside it took an iPhone's controls with it, showing the music stopped when Safari was left while it carried
+// on (#65).
 let frame = 0, canvas, bars = null, barsSrc = null, loading = null;
 // Each bar's height now, 0 to 255, falling away while paused.
 let levels = new Float32Array(64);
+
+/**
+ * The bars for each frame of a spectrum (see the client guide for its format): each band's level smoothed over time,
+ * as a Web Audio analyser smooths, from -86 to -16 decibels of full scale over 0 to 255. Null if it isn't a spectrum.
+ */
+function barsOf(bytes) {
+    // MDXB, the version, frames a second, bands a frame, the header's length, ..., the quietest and loudest decibels,
+    // a frame's length.
+    if (bytes.length < 16 || String.fromCharCode(...bytes.subarray(0, 4)) !== "MDXB" || bytes[4] !== 2)
+        return null;
+    const fps = bytes[5], count = bytes[6], header = bytes[7];
+    const view = new DataView(bytes.buffer, bytes.byteOffset);
+    const floor = view.getInt8(12), ceiling = view.getInt8(13), size = view.getUint16(14, true);
+    const frames = Math.floor((bytes.length - header) / size);
+    const smoothed = new Float32Array(count), out = new Uint8Array(frames * count);
+    for (let f = 0; f < frames; f++)
+        for (let i = 0; i < count; i++) {
+            const level = bytes[header + f * size + i];
+            const amplitude = level === 0 ? 0 : Math.pow(10, (floor + level * (ceiling - floor) / 255) / 20);
+            smoothed[i] = 0.64 * smoothed[i] + 0.36 * amplitude;
+            const db = 20 * Math.log10(Math.max(smoothed[i], 1e-12));
+            out[f * count + i] = Math.min(255, Math.max(0, 255 * (db + 86) / 70));
+        }
+    return { fps, count, frames: out };
+}
 
 /** The song at src's bars, from the server: { fps, count, frames }; null until they're here, or if there are none. */
 function loadBars(src) {
@@ -401,18 +426,14 @@ function loadBars(src) {
     const controller = new AbortController();
     loading?.controller.abort();
     loading = { src, controller };
-    fetch(src.replace("/stream?", "/bars?"), { signal: controller.signal })
+    fetch(src.replace("/stream?", "/spectrum?"), { signal: controller.signal })
         .then(response => response.ok ? response.arrayBuffer() : Promise.reject(response.status))
         .then(buffer => {
-            const bytes = new Uint8Array(buffer);
-            // MDXB, the version, frames a second, bars a frame.
             if (loading?.src !== src)
                 return;
             barsSrc = src;
-            if (bytes.length < HEADER || String.fromCharCode(...bytes.subarray(0, 4)) !== "MDXB" || bytes[4] !== 1)
-                return;
-            bars = { fps: bytes[5], count: bytes[6], frames: bytes.subarray(HEADER) };
-            if (levels.length !== bars.count)
+            bars = barsOf(new Uint8Array(buffer));
+            if (bars && levels.length !== bars.count)
                 levels = new Float32Array(bars.count);
         })
         // Not asked for again for this song: the bars stay down.
@@ -461,7 +482,7 @@ export function startVisualiser(target) {
         // Still while paused, falling away as they would.
         spectrum(bars && barsSrc === src && !audio.paused ? audio.currentTime : -1);
         // Mirrored from the middle out: bass in the centre. Each bar drawn is the loudest of the bands it covers, about
-        // 40 Hz to 10 kHz on a logarithmic scale, as we hear pitch.
+        // 40 Hz to 16 kHz on a logarithmic scale, as we hear pitch.
         const half = Math.max(8, Math.floor(width / 14));
         const bar = width / (half * 2);
         g.fillStyle = getComputedStyle(canvas).color;

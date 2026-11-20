@@ -125,7 +125,7 @@ builder.Services.AddHostedService<UpgradeScheduler>();
 builder.Services.AddScoped<ScheduledTasks>();
 builder.Services.AddHostedService<ScheduleRunner>();
 builder.Services.AddSingleton<StreamSigner>();
-builder.Services.AddSingleton<BarsMaker>();
+builder.Services.AddSingleton<SpectrumMaker>();
 // Subsonic players (#7).
 builder.Services.AddSingleton<Transcoder>();
 builder.Services.AddSingleton<SubsonicLibrary>();
