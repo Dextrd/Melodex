@@ -251,6 +251,19 @@ public sealed class AccessTests : IDisposable
 
         var beyond = await Assert.ThrowsAsync<MelodexApiException>(() => maker.CreateApiKeyAsync(new CreateApiKey("Requester", [Scopes.Request])));
         Assert.Equal(HttpStatusCode.Forbidden, beyond.Status);
+
+        // Anyone may make their own keys, as many as they like, within what they may; a key needs the keys scope to make more.
+        await admin.CreateUserAsync(new CreateUser("listener only", "listening password", [Scopes.Listen]));
+        var listener = new MelodexClient(await SignInAsync("listener only", "listening password"));
+        var first = await listener.CreateApiKeyAsync(new CreateApiKey("Phone", [Scopes.Listen]));
+        await listener.CreateApiKeyAsync(new CreateApiKey("Tablet", [Scopes.Listen]));
+        Assert.Equal(["Phone", "Tablet"], (await listener.ListApiKeysAsync()).Select(k => k.Name));
+        Assert.Equal(HttpStatusCode.Forbidden,
+            (await Assert.ThrowsAsync<MelodexApiException>(() => listener.CreateApiKeyAsync(new CreateApiKey("Reader", [Scopes.Read])))).Status);
+        Assert.Equal(HttpStatusCode.Forbidden, (await Assert.ThrowsAsync<HttpRequestException>(() => listener.ListWebhooksAsync())).StatusCode);
+        var listenApp = _factory.CreateClient();
+        listenApp.DefaultRequestHeaders.Add(AccessService.KeyHeader, first.Key);
+        Assert.Equal(HttpStatusCode.Forbidden, (await listenApp.GetAsync("api/v1/keys")).StatusCode);
         // Admin on a key is everything its owner may.
         var everything = await maker.CreateApiKeyAsync(new CreateApiKey("Everything", [Scopes.Admin]));
         Assert.Equal("maker", everything.Info.Owner);
@@ -267,7 +280,7 @@ public sealed class AccessTests : IDisposable
             (await app.PostAsJsonAsync("api/v1/requests", new CreateRequest(RequestKind.Track, Guid.NewGuid()), MelodexJson.Options)).StatusCode);
         await admin.CreateApiKeyAsync(new CreateApiKey("Admin's own", [Scopes.Read]));
         Assert.Equal(["Everything"], (await maker.ListApiKeysAsync()).Select(k => k.Name));
-        Assert.Equal(2, (await admin.ListApiKeysAsync()).Count);
+        Assert.Equal(4, (await admin.ListApiKeysAsync()).Count);
 
         // Their keys go with them.
         await admin.RemoveUserAsync(owner.Id);

@@ -6,6 +6,13 @@ What changed in each release of Melodex. Versions follow [semantic versioning](h
 
 ### Added
 
+- **Subsonic players**: Melodex speaks the Subsonic API with OpenSubsonic's extensions, at `/rest`, so Symfonium,
+  Amperfy, Substreamer, Tempo, Feishin and other Subsonic apps can browse your library, search it, play it (turned
+  into MP3, Opus or AAC at a lower bitrate when a player asks), show covers and lyrics, and keep your playlists, the
+  same ones as in Melodex. Players sign in with an API key: tick **Let a Subsonic player sign in with it** when you
+  make one under **Settings → API**, and it's the password with your username. See the new guide page, Subsonic
+  players (#7).
+- Songs' genres are read from their tags. Files scanned before have theirs read on the next scan (#7).
 - **Settings → Scheduled tasks**: daily, weekly and monthly windows, each with its own times (running past midnight
   if it ends earlier than it starts), the weekly one on a day you pick and the monthly one on a day of the month (in a
   shorter month, its last day), all in one time zone. Tick what each runs: a scan, a catalogue update, the lossless
@@ -30,10 +37,18 @@ What changed in each release of Melodex. Versions follow [semantic versioning](h
 - The visualiser's bars reach 16 kHz, where they stopped at 10 kHz, and a song's spectrum is version 2 of its format.
   `.bars` files beside songs are made again in it as the visualiser's bars are next made when matching, and take
   about a third more room. `/bars` still gives version 1, for apps written for it (#102).
+- Everyone can make API keys under **Settings → API**, as many as they like, each able to do only what they may. The
+  permission that was **API keys and webhooks** is now **Webhooks**; on a key it still lets an app make and revoke its
+  owner's keys (#7).
 - The upgrade schedule has moved from **Settings → Quality** to **Settings → Scheduled tasks**, as it was set: on the
   daily schedule if it ran every day, or else the weekly one on the first of its days. Nothing else is scheduled on an
   existing install until you tick it. The upgrade settings' `scheduled`, `days`, `from`, `until` and `timeZone` are read
   only in the API now, saying what the schedules say (#112).
+
+### Fixed
+
+- Copy buttons work when Melodex is opened over plain http, such as at the server's own address at home, rather than
+  showing an error: browsers only offer the clipboard to https pages, so the text is copied the older way (#7).
 
 ## [1.6.0] - 2026-11-19
 

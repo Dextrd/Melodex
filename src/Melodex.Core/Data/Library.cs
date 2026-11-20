@@ -77,6 +77,12 @@ public class LibraryFile
     /// <summary>Tags as read from the file, as a JSON object of tag name to value.</summary>
     public string TagsJson { get; set; } = "{}";
 
+    /// <summary>
+    /// Its genres, from its tags, each on a line of its own: empty for none, null until they've been read, as they weren't
+    /// before Subsonic players were (#7).
+    /// </summary>
+    public string? Genres { get; set; }
+
     /// <summary>The artist the file is credited to, once resolved.</summary>
     public Guid? ArtistId { get; set; }
 
@@ -275,6 +281,12 @@ public class HeldFile
 
     /// <summary>Its tags, as the library file had them, for putting it back.</summary>
     public string TagsJson { get; set; } = "{}";
+
+    /// <summary>
+    /// Its genres, from its tags, each on a line of its own: empty for none, null until they've been read, as they weren't
+    /// before Subsonic players were (#7).
+    /// </summary>
+    public string? Genres { get; set; }
 
     public long Size { get; set; }
     public TimeSpan? Duration { get; set; }

@@ -1366,6 +1366,11 @@ svg.flip { transform: scaleY(-1); }
 .scope-list { display: flex; flex-wrap: wrap; gap: .3rem; }
 .secret-box { display: flex; align-items: center; gap: .5rem; padding: .5rem .5rem .5rem .75rem; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg); }
 .secret-box code { flex: 1; min-width: 0; overflow-wrap: anywhere; font-size: .85rem; }
+/* A key for a Subsonic player, just made: what to type into it, a row each. */
+.subsonic-login { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: .5rem 1rem; align-items: center; margin: 0 0 .75rem; }
+.subsonic-login dt { font-weight: 600; }
+.subsonic-login dd { margin: 0; }
+@media (max-width: 30rem) { .subsonic-login { grid-template-columns: minmax(0, 1fr); } }
 .table-scroll { overflow-x: auto; }
 
 /* Settings → Appearance. Each swatch shows its colour's accent in light and dark, half each. */

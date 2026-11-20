@@ -99,8 +99,7 @@
     // The first settings tab they may open.
     private string SettingsHref => Auth.May(UserPermissions.Settings) ? "settings"
         : Auth.May(UserPermissions.Users) ? "settings/users"
-        : Auth.May(UserPermissions.Keys) ? "settings/api"
-        : "settings/appearance";
+        : "settings/api";
 
     protected override async Task OnInitializedAsync()
     {

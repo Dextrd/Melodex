@@ -24,10 +24,7 @@
                 {
                     <a role="menuitem" href="settings/users" @onclick="() => _open = false">Users</a>
                 }
-                @if (status.May(UserPermissions.Keys))
-                {
-                    <a role="menuitem" href="settings/api" @onclick="() => _open = false">API keys</a>
-                }
+                <a role="menuitem" href="settings/api" @onclick="() => _open = false">API keys</a>
                 <hr />
                 <button type="button" role="menuitem" @onclick="SignOutAsync">Sign out</button>
             </div>

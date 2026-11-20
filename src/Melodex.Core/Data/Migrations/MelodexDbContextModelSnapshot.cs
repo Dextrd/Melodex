@@ -97,6 +97,9 @@ namespace Melodex.Core.Data.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("SubsonicSecret")
+                        .HasColumnType("TEXT");
+
                     b.Property<Guid?>("UserId")
                         .HasColumnType("TEXT");
 
@@ -318,6 +321,9 @@ namespace Melodex.Core.Data.Migrations
                     b.Property<TimeSpan?>("Duration")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("Genres")
+                        .HasColumnType("TEXT");
+
                     b.Property<DateTime>("HeldAt")
                         .HasColumnType("TEXT");
 
@@ -537,6 +543,9 @@ namespace Melodex.Core.Data.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("FormattedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Genres")
                         .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("HiddenAt")

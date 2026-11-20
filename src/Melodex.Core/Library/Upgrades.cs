@@ -381,8 +381,9 @@ public sealed class Upgrades(
             old.ModifiedAt = new FileInfo(full).LastWriteTimeUtc;
             try
             {
-                var (tags, duration, lyrics, read) = LibraryScanner.ReadTags(full);
+                var (tags, duration, lyrics, read, genres) = LibraryScanner.ReadTags(full);
                 old.TagsJson = tags.ToJson();
+                old.Genres = genres;
                 old.TrustedAt = null;
                 old.SetQuality(read);
                 old.Duration = duration ?? old.Duration;

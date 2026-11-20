@@ -36,6 +36,10 @@ If the visualiser's bars are kept beside your songs (**When matching** under **S
 files are made again in a fuller format the next time the visualiser's bars are made, after a scan or on a schedule,
 and take about a third more room. Until then, a song's are made as it plays.
 
+Melodex can be played from [Subsonic players](subsonic-players.md) now. Nothing changes until you make an API key for
+one under **Settings → API**. The next scan reads every song's genres from its tags, once, so it takes a little longer than
+usual.
+
 ## To 1.1.0: upgrades replace files
 
 1.1.0 upgrades songs below your quality cutoff, replacing their files in your music folder with better copies, and a

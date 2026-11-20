@@ -20,6 +20,7 @@ guide covers what the reference can't: how the pieces fit together.
 - [Webhooks](#webhooks)
 - [Errors](#errors)
 - [Versioning](#versioning)
+- [The Subsonic API](#the-subsonic-api)
 - [The API reference](#the-api-reference)
 
 ## Getting a key
@@ -366,6 +367,31 @@ Everything under `/api/v1` keeps working the same way for the life of v1. Within
 event types, enum values (such as a new request state) and query parameters, so ignore what you don't know and don't
 reject unknown values. Anything that would break a client goes into `/api/v2`, with v1 kept alongside for a while.
 `GET /version` gives the server's version and its `apiVersion`.
+
+## The Subsonic API
+
+Besides its own API, Melodex speaks the [Subsonic API](http://www.subsonic.org/pages/api.jsp), version 1.16.1, with
+[OpenSubsonic](https://opensubsonic.netlify.app/)'s extensions, at `/rest`, so an app built for Subsonic servers
+works with Melodex as it is. The user guide's [Subsonic players](guide/subsonic-players.md) page covers it from a
+listener's side.
+
+- **Signing in** is always with an API key that has the `listen` scope: OpenSubsonic's `apiKey` takes any such key;
+  otherwise `u` is the key's owner and the password is a key made with `"subsonic": true` (**Let a Subsonic player
+  sign in with it** in the web app), as `p` (plain, or `enc:` and hex) or as a token, `t` and `s`. Such a key is kept
+  encrypted, as a token can only be checked against the key itself. The person's own password doesn't work here.
+- **Answers** are XML, or JSON with `f=json`; errors are a 200 with Subsonic's error codes. Calls can be form posts
+  (`formPost`), and `stream` takes `timeOffset` when it transcodes (`transcodeOffset`).
+- **IDs** are Melodex's own: an artist's and album's are the same as in `/api/v1`, and a song's is its file's ID
+  (`fileId` in `/api/v1`). A file moved or renamed outside Melodex gets a new ID on the next scan. Pictures are
+  `al-`, `ar-`, `mf-` or `pl-` and the album's, artist's, song's or playlist's ID; `size` is ignored, and the picture
+  comes whole.
+- **The calls Melodex answers**: `ping`, `getLicense`, `getOpenSubsonicExtensions`, `getMusicFolders`, `getUser`,
+  `getScanStatus`; `getIndexes`, `getMusicDirectory`, `getArtists`, `getArtist`, `getAlbum`, `getSong`,
+  `getAlbumList`, `getAlbumList2`, `getRandomSongs`, `getGenres`, `getSongsByGenre`; `search2`, `search3`;
+  `stream`, `download`, `getCoverArt`, `getLyrics`, `getLyricsBySongId`; and `getPlaylists`, `getPlaylist`,
+  `createPlaylist`, `updatePlaylist`, `deletePlaylist`. `getArtistInfo`, `getAlbumInfo`, `getTopSongs`,
+  `getSimilarSongs`, `getStarred` and `getNowPlaying` (and their `2`s) answer empty for now. Anything else is error
+  70.
 
 ## The API reference
 

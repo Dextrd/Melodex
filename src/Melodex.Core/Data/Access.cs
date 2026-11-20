@@ -81,6 +81,13 @@ public class ApiKey
 
     /// <summary>Roughly when it was last used; updated at most once a minute.</summary>
     public DateTime? LastUsedAt { get; set; }
+
+    /// <summary>
+    /// For a key Subsonic players may sign in with as a password (#7), the key itself, encrypted with the data protection
+    /// keys: players that send a token, a hash of the password and a salt, can only be checked against the key itself.
+    /// Null for any other key, of which only the hash is kept.
+    /// </summary>
+    public string? SubsonicSecret { get; set; }
 }
 
 /// <summary>An address Melodex tells, with a signed POST, when something it cares about happens.</summary>

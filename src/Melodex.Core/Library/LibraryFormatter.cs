@@ -254,8 +254,9 @@ public sealed class FormatTask(
         file.Format = Path.GetExtension(full).TrimStart('.').ToLowerInvariant();
         try
         {
-            var (tags, duration, lyrics, quality) = LibraryScanner.ReadTags(full);
+            var (tags, duration, lyrics, quality, genres) = LibraryScanner.ReadTags(full);
             file.TagsJson = tags.ToJson();
+            file.Genres = genres;
             // Only its tags were rewritten, so its music's spectrum is as it was checked.
             var (cutoff, checkedAt) = (file.CutoffHz, file.SpectrumCheckedAt);
             file.SetQuality(quality);

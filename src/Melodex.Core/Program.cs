@@ -1,3 +1,4 @@
+using Melodex.Core.Subsonic;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using Melodex.Client;
@@ -125,6 +126,10 @@ builder.Services.AddScoped<ScheduledTasks>();
 builder.Services.AddHostedService<ScheduleRunner>();
 builder.Services.AddSingleton<StreamSigner>();
 builder.Services.AddSingleton<SpectrumMaker>();
+// Subsonic players (#7).
+builder.Services.AddSingleton<Transcoder>();
+builder.Services.AddSingleton<SubsonicLibrary>();
+builder.Services.AddScoped<SubsonicAuth>();
 builder.Services.AddSingleton<WebmCopies>();
 builder.Services.AddScoped<ListenNowService>();
 builder.Services.AddHostedService<ListenNowSweeper>();
@@ -225,6 +230,8 @@ api.MapToolEndpoints();
 app.MapStaticAssets();
 // The page itself is checked on every visit, as /index.html is: kept by the browser, an old one would load the new
 // app without the scripts it now needs.
+app.MapSubsonicEndpoints();
+
 app.MapFallbackToFile("index.html", new StaticFileOptions
 {
     OnPrepareResponse = file => file.Context.Response.Headers.CacheControl = "no-cache",

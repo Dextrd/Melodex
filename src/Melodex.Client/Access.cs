@@ -83,7 +83,7 @@ public static class UserPermissions
         new(Remove, "Remove music", "Delete music from the library, or hide it"),
         new(Scan, "Scan", "Scan the library, and pause, cancel and reorder tasks"),
         new(Settings, "Settings and plugins", "Change settings and plugins, and read the log"),
-        new(Keys, "API keys and webhooks", "Make API keys for apps, and manage webhooks"),
+        new(Keys, "Webhooks", "Manage webhooks, and on a key, let the app make and revoke keys"),
         new(Users, "Manage users", "Add, change and remove other users"),
     ];
 }
@@ -107,11 +107,16 @@ public sealed record UpdateUser(string? Username = null, string? Password = null
 /// <param name="Prefix">The start of the key, to tell keys apart.</param>
 /// <param name="Scopes">What it may do, as far as its owner may: see <see cref="UserPermissions"/>. Admin means all its owner may.</param>
 /// <param name="Owner">The username of whoever made it.</param>
+/// <param name="Subsonic">Subsonic players can sign in with it, as their owner's password.</param>
 public sealed record ApiKeyInfo(Guid Id, string Name, string Prefix, IReadOnlyList<string> Scopes, DateTime CreatedAt, DateTime? LastUsedAt,
-    Guid? UserId = null, string? Owner = null);
+    Guid? UserId = null, string? Owner = null, bool Subsonic = false);
 
 /// <summary>Body of <c>POST /keys</c>. A key can only be given permissions its maker has.</summary>
-public sealed record CreateApiKey(string Name, IReadOnlyList<string> Scopes);
+/// <param name="Subsonic">
+/// Let Subsonic players sign in with it, as your password, with your username. It needs the listen permission, and is
+/// kept encrypted rather than only hashed, as players that sign in with a token need it whole.
+/// </param>
+public sealed record CreateApiKey(string Name, IReadOnlyList<string> Scopes, bool Subsonic = false);
 
 /// <summary>A key just made. <paramref name="Key"/> is shown this once: Melodex keeps only a hash of it.</summary>
 public sealed record CreatedApiKey(ApiKeyInfo Info, string Key);
