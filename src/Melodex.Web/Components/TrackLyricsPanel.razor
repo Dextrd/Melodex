@@ -12,9 +12,9 @@
     {
         <span class="badge @(had.Kind is LyricsKind.Synced or LyricsKind.Plain ? "owned" : "neutral")">@Label(had)</span>
     }
-    @if (Open && _lyrics is { } shown)
+    @if (_lyrics is { } shown)
     {
-        <div class="row lyrics-actions">
+        <div class="row lyrics-actions @(Open ? "" : "section-actions-shut")">
             @if (shown.Kind != LyricsKind.None)
             {
                 <IconButton Icon="rename" Requires="@UserPermissions.Format" Label="Edit" Title="Edit the lyrics, line by line or as text" Disabled="_busy"
@@ -43,40 +43,41 @@
     }
 </div>
 
-@if (!Open) { }
-else if (_lyrics is null)
-{
-    <Loading Inline="true" />
-}
-else
-{
-    var lyrics = _lyrics;
-    <div class="card lyrics-card">
-        <p class="lyrics-status muted small">@Status(lyrics)</p>
-        @if (lyrics.Excluded)
-        {
-            <p class="lyrics-status muted small">
-                Excluded from lyrics matching, so scans don't look for its lyrics.
-                @if (Auth.May(UserPermissions.Format))
-                {
-                    <button class="link" disabled="@_busy" @onclick="() => ExcludeAsync(false)">Include it again</button>
-                }
-            </p>
-        }
-        @if (lyrics.Lines.Count > 0)
-        {
-            <div class="lyrics-lines lyrics-box" tabindex="0" aria-label="The lyrics">
-                @foreach (var line in lyrics.Lines)
-                {
-                    <div class="lyrics-line @(line.Text.Length == 0 ? "gap" : "")">
-                        @if (line.Seconds is { } at) { <span class="muted small lyrics-time">@LyricsText.Time(at)</span> }
-                        <span>@line.Text</span>
-                    </div>
-                }
-            </div>
-        }
-    </div>
-}
+<Collapsible Open="Open">
+    @if (_lyrics is null)
+    {
+        <Loading Inline="true" />
+    }
+    else
+    {
+        var lyrics = _lyrics;
+        <div class="card lyrics-card">
+            <p class="lyrics-status muted small">@Status(lyrics)</p>
+            @if (lyrics.Excluded)
+            {
+                <p class="lyrics-status muted small">
+                    Excluded from lyrics matching, so scans don't look for its lyrics.
+                    @if (Auth.May(UserPermissions.Format))
+                    {
+                        <button class="link" disabled="@_busy" @onclick="() => ExcludeAsync(false)">Include it again</button>
+                    }
+                </p>
+            }
+            @if (lyrics.Lines.Count > 0)
+            {
+                <div class="lyrics-lines lyrics-box" tabindex="0" aria-label="The lyrics">
+                    @foreach (var line in lyrics.Lines)
+                    {
+                        <div class="lyrics-line @(line.Text.Length == 0 ? "gap" : "")">
+                            @if (line.Seconds is { } at) { <span class="muted small lyrics-time">@LyricsText.Time(at)</span> }
+                            <span>@line.Text</span>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    }
+</Collapsible>
 @if (_error is not null) { <p class="error small">@_error</p> }
 
 @if (_editing && _lyrics is not null)
