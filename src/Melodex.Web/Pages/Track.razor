@@ -142,8 +142,6 @@ else
         </div>
     }
 
-    <SimilarSongs TrackId="track.Id" />
-
     @if (owned)
     {
         <TrackLyricsPanel TrackId="track.Id" Title="@track.Title" OnChanged="LoadAsync" />
@@ -226,6 +224,8 @@ else
             <div class="card"><HeldFiles Files="_held" ShowTitle="false" Changed="LoadAsync" /></div>
         }
     }
+
+    <SimilarSongs TrackId="track.Id" />
 }
 
 @if (_choosingCover && _track is not null)
