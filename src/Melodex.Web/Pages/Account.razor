@@ -3,7 +3,8 @@
 
 <PageTitle>Your account · Melodex</PageTitle>
 
-@* Your own login, what you may do, and your login on each media server: the page version of editing a user. *@
+@* Your own login, what you may do, and your login on each media server: the page version of editing a user. Below
+   it, the ListenBrainz and Last.fm accounts your plays are sent to. *@
 <h1>Your account</h1>
 @if (Auth.Status is { } status)
 {
@@ -15,4 +16,17 @@
             <UserEditor Self="true" />
         </div>
     </section>
+    @if (Auth.May(UserPermissions.Listen))
+    {
+        <h2 id="scrobbling">Scrobbling</h2>
+        <p class="muted small">
+            Every song you play, here or in a Subsonic player, is kept in your <a href="history">history</a>. Link an account and it's sent there too,
+            once it's played for half its length or four minutes; while one can't be reached, plays wait and are sent later.
+        </p>
+        <section class="panel" aria-label="Scrobbling">
+            <div class="panel-body">
+                <ScrobbleLinks />
+            </div>
+        </section>
+    }
 }

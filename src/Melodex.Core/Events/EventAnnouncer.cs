@@ -55,7 +55,7 @@ public sealed class EventAnnouncer(IServiceScopeFactory scopes, EventFeed feed, 
 
     private void OnRaised(string kind)
     {
-        if (kind is not (EventFeed.Requests or EventFeed.Tasks))
+        if (kind is not (EventFeed.Requests or EventFeed.Tasks or EventFeed.Plays))
             return;
         try
         {
@@ -115,7 +115,19 @@ public sealed class EventAnnouncer(IServiceScopeFactory scopes, EventFeed feed, 
             task.Announced = true;
         }
 
-        if (changed.Count == 0 && tasks.Count == 0)
+        var plays = await db.Plays.Where(p => !p.Announced).OrderBy(p => p.PlayedAt).Take(Batch).ToListAsync(ct);
+        if (plays.Count > 0)
+        {
+            var ids = plays.Select(p => p.UserId).Distinct().ToList();
+            var users = await db.Users.Where(u => ids.Contains(u.Id)).ToDictionaryAsync(u => u.Id, u => u.Username, ct);
+            foreach (var play in plays)
+            {
+                events.Add(New(EventTypes.PlayRecorded, play.PlayedAt, new PlayEventData(PlayService.Info(play), users.GetValueOrDefault(play.UserId, ""))));
+                play.Announced = true;
+            }
+        }
+
+        if (changed.Count == 0 && tasks.Count == 0 && plays.Count == 0)
             return false;
 
         var webhooks = events.Count == 0 ? [] : await db.Webhooks.Where(w => w.Enabled).ToListAsync(ct);
@@ -128,7 +140,7 @@ public sealed class EventAnnouncer(IServiceScopeFactory scopes, EventFeed feed, 
             feed.Publish(@event);
         if (webhooks.Count > 0)
             sender.Wake();
-        return changed.Count == Batch || tasks.Count == Batch;
+        return changed.Count == Batch || tasks.Count == Batch || plays.Count == Batch;
     }
 
     public static MelodexEvent New<T>(string type, DateTime occurredAt, T data) =>

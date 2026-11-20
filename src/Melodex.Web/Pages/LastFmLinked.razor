@@ -1,0 +1,41 @@
+@page "/account/lastfm"
+@inject MelodexClient Api
+@inject NavigationManager Nav
+
+<PageTitle>Last.fm · Melodex</PageTitle>
+
+@* Where Last.fm sends you back once you've allowed Melodex, with a token that's turned into the link. *@
+<h1>Linking Last.fm</h1>
+@if (_error is not null)
+{
+    <div class="notice warning" role="alert">@_error</div>
+    <p><a href="account#scrobbling">Back to your account</a></p>
+}
+else
+{
+    <Loading />
+}
+
+@code {
+    [SupplyParameterFromQuery(Name = "token")] public string? Token { get; set; }
+
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (string.IsNullOrWhiteSpace(Token))
+        {
+            _error = "Last.fm didn't send a token back. Try linking again.";
+            return;
+        }
+        try
+        {
+            await Api.LinkLastFmAsync(Token);
+            Nav.NavigateTo("account#scrobbling", replace: true);
+        }
+        catch (Exception e) when (e is HttpRequestException or MelodexApiException)
+        {
+            _error = e.Message;
+        }
+    }
+}

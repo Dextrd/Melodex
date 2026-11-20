@@ -122,7 +122,8 @@ else
 
     private void Redraw() => InvokeAsync(StateHasChanged);
 
-    private List<PlayerEntry> Entries() => _album!.Tracks.Select(t => PlayerEntry.Owned(t, _album)).ToList();
+    private List<PlayerEntry> Entries() =>
+        _album!.Tracks.Select(t => PlayerEntry.Owned(t, _album)).Select(e => { e.From = new PlaySource(PlaySourceKind.Album, _album.Id, _album.Title); return e; }).ToList();
 
     private Task PlayFromAsync(int index) => Player.PlayAsync(Entries(), index);
 

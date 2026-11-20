@@ -326,6 +326,42 @@ public sealed class SubsonicTests : IDisposable
     }
 
     [TestLibraryFact]
+    public async Task What_players_scrobble_is_listening_history_and_counts_their_plays()
+    {
+        await ScanAsync();
+        var key = $"apiKey={(await _api.CreateApiKeyAsync(new CreateApiKey("Player", [UserPermissions.Listen]))).Key}";
+        var album = (await OkAsync("getAlbumList2", key, "type=alphabeticalByName&size=500"))["albumList2"]!["album"]!.AsArray().First(a => (int)a!["songCount"]! >= 2)!;
+        var albumId = (string)album["id"]!;
+        var songs = (await OkAsync("getAlbum", key, $"id={albumId}"))["album"]!["song"]!.AsArray();
+        string first = (string)songs[0]!["id"]!, second = (string)songs[1]!["id"]!;
+        Assert.Empty((await OkAsync("getAlbumList2", key, "type=frequent"))["albumList2"]!["album"]!.AsArray());
+
+        // Started: it's playing now, with who and where, but not played yet.
+        await OkAsync("scrobble", key, $"id={first}&submission=false");
+        var playing = (await OkAsync("getNowPlaying", key))["nowPlaying"]!["entry"]!.AsArray().Single()!;
+        Assert.Equal((first, SignedIn.Username, "tests"), ((string)playing["id"]!, (string)playing["username"]!, (string)playing["playerName"]!));
+        Assert.Equal(0, (await _api.ListPlaysAsync()).Total);
+
+        // Played: in the history as the player, with the file's own details, and counted wherever the song or album is.
+        var at = DateTimeOffset.UtcNow.AddMinutes(-5).ToUnixTimeMilliseconds();
+        await OkAsync("scrobble", key, $"id={first}&time={at}&id={second}&time={at + 200000}");
+        await OkAsync("scrobble", key, $"id={first}");
+        var plays = (await _api.ListPlaysAsync()).Items;
+        Assert.Equal(3, plays.Count);
+        Assert.All(plays, p => Assert.Equal(("tests", Guid.Parse(albumId)), (p.Client, p.AlbumId!.Value)));
+        Assert.Equal((string)songs[0]!["title"]!, plays[0].Title);
+        Assert.Equal(at, new DateTimeOffset(plays[2].PlayedAt).ToUnixTimeMilliseconds());
+        var song = (await OkAsync("getSong", key, $"id={first}"))["song"]!;
+        Assert.Equal(2, (int)song["playCount"]!);
+        Assert.NotNull(song["played"]);
+        Assert.Equal(3, (int)(await OkAsync("getAlbum", key, $"id={albumId}"))["album"]!["playCount"]!);
+        Assert.Equal(albumId, (string)(await OkAsync("getAlbumList2", key, "type=frequent"))["albumList2"]!["album"]![0]!["id"]!);
+        Assert.Equal(albumId, (string)(await OkAsync("getAlbumList", key, "type=recent"))["albumList"]!["album"]![0]!["id"]!);
+        Assert.Equal(70, ErrorOf(await CallAsync("scrobble", key, $"id={Guid.NewGuid()}")));
+        Assert.Equal(10, ErrorOf(await CallAsync("scrobble", key)));
+    }
+
+    [TestLibraryFact]
     public async Task Stars_ratings_and_the_play_queue_are_the_same_in_players_and_the_web_app()
     {
         await ScanAsync();

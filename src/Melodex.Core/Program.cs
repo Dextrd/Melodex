@@ -133,6 +133,11 @@ builder.Services.AddSingleton<SubsonicLibrary>();
 builder.Services.AddScoped<SubsonicAuth>();
 builder.Services.AddSingleton<WebmCopies>();
 builder.Services.AddScoped<ListenNowService>();
+// Listening history, sent on to ListenBrainz and Last.fm (#2).
+builder.Services.AddScoped<PlayService>();
+builder.Services.AddHttpClient(Scrobbler.HttpClientName, http => http.Timeout = TimeSpan.FromSeconds(20));
+builder.Services.AddSingleton<Scrobbler>();
+builder.Services.AddHostedService(services => services.GetRequiredService<Scrobbler>());
 builder.Services.AddHostedService<ListenNowSweeper>();
 builder.Services.AddHostedService<RequestWorker>();
 
@@ -224,6 +229,7 @@ api.MapWebhookEndpoints();
 api.MapPlaylistEndpoints();
 api.MapWishlistEndpoints();
 api.MapMarkEndpoints();
+api.MapPlayEndpoints();
 api.MapUpgradeEndpoints();
 api.MapScheduleEndpoints();
 api.MapToolEndpoints();

@@ -153,6 +153,9 @@ An album goes on as one entry, so getting it from there gets the whole album.
 Play, queue and skip from any album, artist or track. While something's playing, the queue button asks where: **Play
 next**, straight after the song playing, or at the end. Songs you don't have are fetched as the queue reaches them.
 
+Each song you play goes into your [history](library.md#history) once it's played for half its length or four
+minutes, and on to ListenBrainz or Last.fm if you've linked them.
+
 The queue is kept for each person on the server: after a reload, the next time, or in another browser, it's there
 paused where you left it, and Play carries on. [Subsonic players](subsonic-players.md) that keep their queue on the
 server share it too, so you can carry on in one from where the browser left off and back again. A browser that isn't playing picks up a queue

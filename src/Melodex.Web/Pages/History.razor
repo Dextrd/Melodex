@@ -1,0 +1,267 @@
+@page "/history"
+@implements IDisposable
+@inject MelodexClient Api
+@inject ServerEvents Events
+@inject Preferences Prefs
+
+<PageTitle>History · Melodex</PageTitle>
+
+@*
+    Your listening history (#2), a tab of the Library: the songs you've played, here or in a Subsonic player, the latest
+    first, and what you've played most over a week, a month, a year or all time.
+*@
+<h1>Library</h1>
+<LibraryTabs Current="history" />
+
+<div class="toolbar">
+    <Segmented T="string" Value="_view" Options="Views" OnChange="ShowAsync" Label="Show" />
+    @if (_view != "recent")
+    {
+        <select aria-label="Over" value="@_period" @onchange="e => PeriodAsync(Enum.Parse<PlayPeriod>((string)e.Value!))">
+            <option value="@PlayPeriod.Week">This week</option>
+            <option value="@PlayPeriod.Month">This month</option>
+            <option value="@PlayPeriod.Year">This year</option>
+            <option value="@PlayPeriod.All">All time</option>
+        </select>
+    }
+    @if (_error is not null) { <span class="error small" title="@_error">@_error</span> }
+    <span class="spacer"></span>
+    <a class="small" href="account#scrobbling">Send plays to ListenBrainz or Last.fm</a>
+</div>
+<p class="muted small">
+    A song counts once it's played for half its length or four minutes, in the player here or in a Subsonic player.
+</p>
+
+@if (_loading)
+{
+    <Loading />
+}
+else if (_view == "recent")
+{
+    if (_plays.Count == 0)
+    {
+        <div class="empty card">Nothing played yet.</div>
+    }
+    else
+    {
+        <div class="card">
+            <table class="table track-list history-table">
+                <colgroup><col class="cover-col" /><col /><col class="left-col hide-narrow" /><col class="listen-action-col" /></colgroup>
+                <tbody>
+                    @foreach (var play in _plays)
+                    {
+                        <tr @key="play.Id">
+                            <td class="cover-col"><Cover Url="@play.CoverUrl" /></td>
+                            <td>
+                                <div class="ellipsis">
+                                    @if (SongHref(play) is { } song) { <a class="plain" href="@song">@play.Title</a> } else { @play.Title }
+                                </div>
+                                <div class="muted small ellipsis">
+                                    @Artist(play.ArtistId, play.ArtistCredit, play.Local)
+                                    @if (play.AlbumTitle is { } album)
+                                    {
+                                        <span> · </span>
+                                        @if (AlbumHref(play.AlbumId, play.Local) is { } href) { <a href="@href">@album</a> } else { @album }
+                                    }
+                                    @if (From(play) is { } from) { <span> · @from</span> }
+                                </div>
+                            </td>
+                            <td class="muted small hide-narrow" title="@play.PlayedAt.ToLocalTime().ToString("f")">
+                                @Format.Ago(play.PlayedAt)@(play.Client == "web" ? "" : $" in {play.Client}")
+                            </td>
+                            <td class="num actions">
+                                <IconButton Icon="remove" Requires="@UserPermissions.Listen" Title="Take it out of your history" OnClick="() => DeleteAsync(play)" />
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        @if (_plays.Count < _total)
+        {
+            <div class="toolbar"><button type="button" class="btn" disabled="@_more" @onclick="MoreAsync">Show more</button></div>
+        }
+    }
+}
+else if (_top.Count == 0)
+{
+    <div class="empty card">Nothing played @PeriodWords.</div>
+}
+else
+{
+    <div class="card">
+        <table class="table track-list history-table">
+            <colgroup><col class="num-col" /><col class="cover-col" /><col /><col class="left-col hide-narrow" /></colgroup>
+            <tbody>
+                @for (var i = 0; i < _top.Count; i++)
+                {
+                    var item = _top[i];
+                    <tr @key="(item.Id, item.Name)">
+                        <td class="num muted">@(i + 1)</td>
+                        <td class="cover-col">@if (_view != "artists") { <Cover Url="@item.CoverUrl" /> }</td>
+                        <td>
+                            <div class="ellipsis">
+                                @switch (_view)
+                                {
+                                    case "songs":
+                                        if (TopSongHref(item) is { } song) { <a class="plain" href="@song">@item.Name</a> } else { @item.Name }
+                                        break;
+                                    case "albums":
+                                        if (AlbumHref(item.AlbumId, item.Local) is { } album) { <a class="plain" href="@album"><strong>@item.Name</strong></a> }
+                                        else { <strong>@item.Name</strong> }
+                                        break;
+                                    default:
+                                        @Artist(item.ArtistId, item.Name, item.Local)
+                                        break;
+                                }
+                            </div>
+                            @if (_view != "artists")
+                            {
+                                <div class="muted small ellipsis">@Artist(item.ArtistId, item.ArtistCredit ?? "", item.Local)</div>
+                            }
+                        </td>
+                        <td class="muted small hide-narrow" title="Last played @item.LastPlayedAt.ToLocalTime().ToString("f")">
+                            @Format.Count(item.Plays, "play", "plays")
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    private static readonly IReadOnlyList<(string Value, string Label, string? Hint)> Views =
+    [
+        ("recent", "Recent", "What you played, the latest first"), ("songs", "Songs", "Your most played songs"),
+        ("albums", "Albums", "Your most played albums"), ("artists", "Artists", "Your most played artists"),
+    ];
+
+    private const string ViewKey = "history.view", PeriodKey = "history.period";
+    private const int Page = 100;
+
+    private string _view = "recent";
+    private PlayPeriod _period = PlayPeriod.Month;
+    private bool _loading = true;
+    private bool _more;
+    private string? _error;
+    private List<PlayRecord> _plays = [];
+    private int _total;
+    private IReadOnlyList<TopItem> _top = [];
+
+    private string PeriodWords => _period switch
+    {
+        PlayPeriod.Week => "this week",
+        PlayPeriod.Month => "this month",
+        PlayPeriod.Year => "this year",
+        _ => "yet",
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        Events.Received += OnEvent;
+        _view = await Prefs.GetAsync(ViewKey, "recent");
+        if (!Views.Any(v => v.Value == _view))
+            _view = "recent";
+        _period = await Prefs.GetAsync(PeriodKey, PlayPeriod.Month);
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _error = null;
+        try
+        {
+            if (_view == "recent")
+            {
+                // As many as are showing, so a reload as plays come in doesn't take away what was shown more of.
+                var page = await Api.ListPlaysAsync(0, Math.Max(_plays.Count, Page));
+                (_plays, _total) = (page.Items.ToList(), page.Total);
+            }
+            else
+                _top = await Api.ListMostPlayedAsync(_view switch { "songs" => TopKind.Song, "albums" => TopKind.Album, _ => TopKind.Artist }, _period, 100);
+        }
+        catch (Exception e) when (e is HttpRequestException or MelodexApiException)
+        {
+            _error = e.Message;
+        }
+        _loading = false;
+    }
+
+    private async Task ShowAsync(string view)
+    {
+        if (view == _view)
+            return;
+        _view = view;
+        _loading = true;
+        await Prefs.SetAsync(ViewKey, view);
+        await LoadAsync();
+    }
+
+    private async Task PeriodAsync(PlayPeriod period)
+    {
+        _period = period;
+        await Prefs.SetAsync(PeriodKey, period);
+        await LoadAsync();
+    }
+
+    private async Task MoreAsync()
+    {
+        _more = true;
+        try
+        {
+            var page = await Api.ListPlaysAsync(_plays.Count, Page);
+            _plays.AddRange(page.Items.Where(p => _plays.All(q => q.Id != p.Id)));
+            _total = page.Total;
+        }
+        catch (Exception e) when (e is HttpRequestException or MelodexApiException)
+        {
+            _error = e.Message;
+        }
+        _more = false;
+    }
+
+    private async Task DeleteAsync(PlayRecord play)
+    {
+        _error = null;
+        try
+        {
+            await Api.DeletePlayAsync(play.Id);
+            _plays.Remove(play);
+            _total--;
+        }
+        catch (Exception e) when (e is HttpRequestException or MelodexApiException)
+        {
+            _error = e.Message;
+        }
+    }
+
+    private static string? SongHref(PlayRecord play) => play.Local ? AlbumHref(play.AlbumId, true) : $"tracks/{play.TrackId}";
+
+    private static string? TopSongHref(TopItem item) => item.Local ? AlbumHref(item.AlbumId, true) : $"tracks/{item.Id}";
+
+    private static string? AlbumHref(Guid? album, bool local) => album is { } id ? $"{(local ? "local/albums" : "albums")}/{id}" : null;
+
+    private static RenderFragment Artist(Guid? id, string name, bool local) =>
+        id is { } artist ? @<a href="@($"{(local ? "local/artists" : "artists")}/{artist}")">@name</a> : @<span>@name</span>;
+
+    private static string? From(PlayRecord play) => play.Source switch
+    {
+        { Kind: PlaySourceKind.Playlist, Name: { } name } => $"from the playlist {name}",
+        { Kind: PlaySourceKind.Radio, Name: { } name } => $"on {name} radio",
+        { Kind: PlaySourceKind.Artist, Name: { } name } => $"from {name}",
+        _ => null,
+    };
+
+    private void OnEvent(string type)
+    {
+        if (type is "plays")
+            _ = InvokeAsync(async () =>
+            {
+                await LoadAsync();
+                StateHasChanged();
+            });
+    }
+
+    public void Dispose() => Events.Received -= OnEvent;
+}

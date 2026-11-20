@@ -34,6 +34,9 @@ public sealed class PlayerEntry
 
     public ListenNowState? ListenState { get; set; }
 
+    /// <summary>What it was played from, for listening history.</summary>
+    public PlaySource? From { get; set; }
+
     /// <summary>Why it can't be played, or what's happening to it.</summary>
     public string? Detail { get; set; }
 
@@ -283,7 +286,7 @@ public sealed class Player : IAsyncDisposable
         if (await _api.GetAlbumAsync(albumId) is { } album)
             await QueueAlbumAsync(album, next);
         else if (await _api.GetLocalAlbumAsync(albumId) is { } own)
-            await AddAsync(own.Tracks.Select(t => PlayerEntry.Owned(t, own)).ToList(), next);
+            await AddAsync(own.Tracks.Select(t => PlayerEntry.Owned(t, own)).ToList(), next, new PlaySource(PlaySourceKind.Album, own.Id, own.Title));
     }
 
     /// <summary>
@@ -304,6 +307,7 @@ public sealed class Player : IAsyncDisposable
                 ? PlayerEntry.ToFetch(track, album.Album, album.ShownEditionId)
                 : PlayerEntry.Owned(track, album.Album, album.ShownEditionId));
         }
+        Tag(entries, new PlaySource(PlaySourceKind.Album, album.Album.Id, album.Album.Title));
         return Task.FromResult((entries, start));
     }
 
@@ -384,7 +388,7 @@ public sealed class Player : IAsyncDisposable
         if (await _api.GetAlbumAsync(albumId) is { } album)
             await PlayAlbumAsync(album);
         else if (await _api.GetLocalAlbumAsync(albumId) is { } own)
-            await PlayAsync(own.Tracks.Select(t => PlayerEntry.Owned(t, own)).ToList());
+            await PlayAsync(own.Tracks.Select(t => PlayerEntry.Owned(t, own)).ToList(), from: new PlaySource(PlaySourceKind.Album, own.Id, own.Title));
     }
 
     /// <summary>Fetches a track you don't have to listen to, and plays it now or after the queue.</summary>
@@ -424,9 +428,10 @@ public sealed class Player : IAsyncDisposable
     /// Replaces the queue and starts playing it. When shuffling, the song started from comes first and the rest follow
     /// in a random order; started from the beginning, all of it is in a random order.
     /// </summary>
-    public async Task PlayAsync(IReadOnlyList<PlayerEntry> entries, int start = 0)
+    public async Task PlayAsync(IReadOnlyList<PlayerEntry> entries, int start = 0, PlaySource? from = null)
     {
         await LoadModesAsync();
+        Tag(entries, from);
         _queue.Clear();
         _queue.AddRange(entries);
         Current = entries.Count == 0 ? -1 : Math.Clamp(start, 0, entries.Count - 1);
@@ -447,9 +452,10 @@ public sealed class Player : IAsyncDisposable
     }
 
     /// <summary>Adds to the end of the queue, or after what's playing, starting it if nothing's playing.</summary>
-    public async Task AddAsync(IReadOnlyList<PlayerEntry> entries, bool next = false)
+    public async Task AddAsync(IReadOnlyList<PlayerEntry> entries, bool next = false, PlaySource? from = null)
     {
         await LoadModesAsync();
+        Tag(entries, from);
         if (next && Now is { } now)
         {
             _queue.InsertRange(Current + 1, entries);
@@ -466,6 +472,15 @@ public sealed class Player : IAsyncDisposable
             return;
         }
         Changed?.Invoke();
+    }
+
+    // Where the songs were played from, for those that don't already say.
+    private static void Tag(IReadOnlyList<PlayerEntry> entries, PlaySource? from)
+    {
+        if (from is null)
+            return;
+        foreach (var entry in entries)
+            entry.From ??= from;
     }
 
     /// <summary>
@@ -752,6 +767,7 @@ public sealed class Player : IAsyncDisposable
                     Duration = length ?? entry.DurationSeconds ?? 0;
                     // Loaded ahead again as it plays: a start of the next song that this overtook took the spare with it.
                     _prepared = null;
+                    Begin(entry, _resumeAt ?? 0);
                     await audio.InvokeVoidAsync("load", url, new { title = entry.Title, artist = entry.ArtistCredit, album = entry.AlbumTitle, cover = entry.CoverUrl }, length);
                     if (_visualising)
                         _ = WarmNextAsync();
@@ -964,6 +980,7 @@ public sealed class Player : IAsyncDisposable
         else if (duration > 0)
             Duration = duration;
         TimeChanged?.Invoke();
+        Hear(position);
         // Where it's got to is kept every so often, to pick up from after a reload or on a phone.
         if ((int)position / 15 != _savedSecond)
         {
@@ -985,6 +1002,58 @@ public sealed class Player : IAsyncDisposable
         "repeat" => CycleRepeatAsync(),
         _ => Task.CompletedTask,
     };
+
+    // ---- Listening history (#2) ----
+
+    // The song being listened to, how much of it has been heard, and where it had got to; and whether it's been recorded.
+    private PlayerEntry? _hearing;
+    private double _heard;
+    private double _heardTo;
+    private bool _recorded;
+
+    /// <summary>A song started, from the start or picked up part way: it's playing now, and counts once enough is heard.</summary>
+    private void Begin(PlayerEntry entry, double at)
+    {
+        (_hearing, _heard, _heardTo, _recorded) = (entry, 0, at, false);
+        if (_owner is not null)
+            _ = TellAsync(() => _api.SetNowPlayingAsync(PlayOf(entry, DateTime.UtcNow)));
+    }
+
+    /// <summary>
+    /// Counts what's been heard, not where it's got to, so a seek doesn't make a play; once it's half the song or four
+    /// minutes, it's a play.
+    /// </summary>
+    private void Hear(double position)
+    {
+        if (_hearing is not { } entry || !ReferenceEquals(entry, Now))
+            return;
+        var step = position - _heardTo;
+        _heardTo = position;
+        // A jump either way is a seek; the time comes about four times a second as it plays.
+        if (step is > 0 and < 2 && Playing)
+            _heard += step;
+        if (_recorded || _owner is null || Duration <= 0 || _heard < Math.Min(Duration / 2, 240))
+            return;
+        _recorded = true;
+        var started = DateTime.UtcNow.AddSeconds(-position);
+        _ = TellAsync(() => _api.RecordPlayAsync(PlayOf(entry, started)));
+    }
+
+    private RecordPlay PlayOf(PlayerEntry e, DateTime at) => new(
+        e.TrackId, e.FileId, e.Title, e.ArtistCredit, e.ArtistId, e.AlbumId, e.AlbumTitle, e.CoverUrl, e.DurationSeconds ?? (Duration > 0 ? Duration : null),
+        at, e.From);
+
+    private static async Task TellAsync(Func<Task> call)
+    {
+        try
+        {
+            await call();
+        }
+        catch (Exception e) when (e is HttpRequestException or MelodexApiException)
+        {
+            // Someone who may not listen keeps no history; and one lost play isn't worth bothering anyone with.
+        }
+    }
 
     // ---- Kept per person, on the server ----
 
@@ -1095,12 +1164,14 @@ public sealed class Player : IAsyncDisposable
     }
 
     private static PlayQueueItem Item(PlayerEntry e) => new(
-        e.TrackId, e.Title, e.ArtistCredit, e.FileId, e.EditionId, e.ArtistId, e.AlbumId, e.AlbumTitle, e.CoverUrl, e.DurationSeconds, e.Missing, e.ListenId);
+        e.TrackId, e.Title, e.ArtistCredit, e.FileId, e.EditionId, e.ArtistId, e.AlbumId, e.AlbumTitle, e.CoverUrl, e.DurationSeconds, e.Missing, e.ListenId,
+        e.From);
 
     private static PlayerEntry Entry(PlayQueueItem i) => new()
     {
         TrackId = i.TrackId, Title = i.Title, ArtistCredit = i.ArtistCredit, FileId = i.FileId, EditionId = i.EditionId, ArtistId = i.ArtistId,
         AlbumId = i.AlbumId, AlbumTitle = i.AlbumTitle, CoverUrl = i.CoverUrl, DurationSeconds = i.DurationSeconds, Missing = i.Missing, ListenId = i.ListenId,
+        From = i.From,
     };
 
     // A queue as it's kept, to tell whether it's changed: where in a song is to the second.
@@ -1170,6 +1241,7 @@ public sealed class Player : IAsyncDisposable
         Position = 0;
         _length = _preparedLength;
         Duration = _preparedLength ?? entry.DurationSeconds ?? 0;
+        Begin(entry, 0);
         Changed?.Invoke();
         return Task.CompletedTask;
     }

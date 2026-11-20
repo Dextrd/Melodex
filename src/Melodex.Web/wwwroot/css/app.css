@@ -933,6 +933,12 @@ tr.playing td:nth-child(2) { color: var(--accent); font-weight: 600; }
 .track-list col.left-col { width: 9.5rem; }
 .listen-table td:nth-child(5) { white-space: nowrap; }
 .wishlist-table td:nth-child(4) { white-space: nowrap; }
+.history-table td:last-child { white-space: nowrap; }
+
+/* Linked scrobbling accounts on Your account (#2). */
+.scrobble-links { display: grid; gap: 1rem; }
+.scrobble-link .row { margin-top: .5rem; gap: .5rem; flex-wrap: wrap; }
+.scrobble-link input { flex: 1 1 14rem; min-width: 0; }
 /* The fold column comes first, so a playing song's title is the third cell. */
 .listen-table tr.playing td:nth-child(2) { color: inherit; font-weight: inherit; }
 .listen-table tr.playing td:nth-child(3) { color: var(--accent); font-weight: 600; }

@@ -18,6 +18,21 @@ Star a song, album or artist you have from its page, or from **⋯** wherever it
 what you've starred, in each view, and **Your rating** sorts albums and tracks by your ratings. Everyone has their
 own, and they're the same in [Subsonic players](subsonic-players.md).
 
+## History
+
+The Library's **History** tab lists the songs you've played, the latest first, with where you played them from: an
+album, a playlist, or a [Subsonic player](subsonic-players.md). A song counts once it's played for half its length or
+four minutes, whichever comes first, however much you skip about in it. **Songs**, **Albums** and **Artists** list what
+you've played most this week, this month, this year or all time. Take a play out with its **×**. Everyone has their
+own history.
+
+To send your plays to [ListenBrainz](https://listenbrainz.org) or [Last.fm](https://www.last.fm) too, link them under
+**Scrobbling** on your account page. ListenBrainz takes the user token from your ListenBrainz settings. Last.fm asks you
+to allow Melodex and sends you back; it needs an API key the admin makes once at
+[last.fm/api/account/create](https://www.last.fm/api/account/create) and enters under **Settings → Playback**. Plays
+that can't be sent, because the service is down or the link no longer works, wait and are sent once it's back or
+linked again. Only plays from after linking are sent.
+
 ## Quality
 
 Melodex knows each file's quality, written as it usually is: **FLAC 16/44.1** (lossless, 16 bits at 44.1 kHz, as a CD

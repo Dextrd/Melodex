@@ -94,6 +94,9 @@ public partial class MelodexDbContext(DbContextOptions<MelodexDbContext> options
     public DbSet<WishlistEntry> WishlistEntries => Set<WishlistEntry>();
     public DbSet<Mark> Marks => Set<Mark>();
     public DbSet<SavedPlayQueue> PlayQueues => Set<SavedPlayQueue>();
+    public DbSet<Play> Plays => Set<Play>();
+    public DbSet<ScrobbleAccount> ScrobbleAccounts => Set<ScrobbleAccount>();
+    public DbSet<ScrobbleSend> ScrobbleSends => Set<ScrobbleSend>();
     public DbSet<ListImport> Imports => Set<ListImport>();
     public DbSet<ImportLine> ImportLines => Set<ImportLine>();
 
@@ -233,6 +236,27 @@ public partial class MelodexDbContext(DbContextOptions<MelodexDbContext> options
         {
             e.HasKey(q => q.UserId);
             e.HasOne<User>().WithMany().HasForeignKey(q => q.UserId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<Play>(e =>
+        {
+            e.HasOne<User>().WithMany().HasForeignKey(p => p.UserId).OnDelete(DeleteBehavior.Cascade);
+            e.HasIndex(p => new { p.UserId, p.PlayedAt });
+            e.HasIndex(p => new { p.UserId, p.TrackId });
+            e.HasIndex(p => p.Announced);
+        });
+
+        modelBuilder.Entity<ScrobbleAccount>(e =>
+        {
+            e.HasOne<User>().WithMany().HasForeignKey(a => a.UserId).OnDelete(DeleteBehavior.Cascade);
+            e.HasIndex(a => new { a.UserId, a.Service }).IsUnique();
+        });
+
+        modelBuilder.Entity<ScrobbleSend>(e =>
+        {
+            e.HasOne(s => s.Play).WithMany().HasForeignKey(s => s.PlayId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(s => s.Account).WithMany().HasForeignKey(s => s.AccountId).OnDelete(DeleteBehavior.Cascade);
+            e.HasIndex(s => s.NextAttemptAt);
         });
 
         modelBuilder.Entity<PlaylistEntry>(e =>

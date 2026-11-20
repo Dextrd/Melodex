@@ -21,6 +21,14 @@ What changed in each release of Melodex. Versions follow [semantic versioning](h
   (`getPlayQueue` and `savePlayQueue`, and by index): carry on in a player that keeps its queue on the server, such as
   Feishin, from where the browser left off, and back. A browser that isn't playing picks up a queue changed elsewhere at once. The API has `GET` and
   `PUT /player/queue` (#7).
+- **Listening history**: every song you play, in the web player or a Subsonic player, is kept once it's played for
+  half its length or four minutes, with what it was played from. The Library's new **History** tab lists them, and what
+  you've played most this week, month, year or all time; Subsonic players get play counts, the most and recently played
+  album lists, `scrobble` and now playing. The API has `POST`, `GET` and `DELETE /plays`, `GET /plays/top/{kind}` and
+  `PUT /plays/now`, and webhooks a `play.recorded` event (#2).
+- **Scrobbling to ListenBrainz and Last.fm**: link your accounts under **Scrobbling** on your account page and your plays
+  are sent there too, with what's playing now; plays that can't be sent wait until they can. Last.fm needs an API key
+  the admin enters under **Settings → Playback** (#2).
 - Melodex's own Subsonic extension, `melodex`: each song's ID in the API, and whether you have all of an album (#7).
 - **Settings → Scheduled tasks**: daily, weekly and monthly windows, each with its own times (running past midnight
   if it ends earlier than it starts), the weekly one on a day you pick and the monthly one on a day of the month (in a

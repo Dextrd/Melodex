@@ -984,6 +984,71 @@ public sealed class MelodexClient(HttpClient http)
         return response.StatusCode == System.Net.HttpStatusCode.NoContent ? null : await response.Content.ReadFromJsonAsync<PlayQueue>(MelodexJson.Options, ct);
     }
 
+    // ---- Listening history (#2) ----
+
+    /// <summary>Your plays, the latest first.</summary>
+    public async Task<PlayPage> ListPlaysAsync(int skip = 0, int take = 50, CancellationToken ct = default) =>
+        (await http.GetFromJsonAsync<PlayPage>($"{Api}/plays?skip={skip}&take={take}", MelodexJson.Options, ct))!;
+
+    /// <summary>Your most played songs, albums or artists over a period, the most first.</summary>
+    public async Task<IReadOnlyList<TopItem>> ListMostPlayedAsync(TopKind kind, PlayPeriod period = PlayPeriod.All, int take = 50, CancellationToken ct = default) =>
+        await http.GetFromJsonAsync<List<TopItem>>($"{Api}/plays/top/{kind.ToString().ToLowerInvariant()}s?period={period}&take={take}", MelodexJson.Options, ct) ?? [];
+
+    /// <summary>Records a song you played; the play already recorded if it's the same one again.</summary>
+    public async Task<PlayRecord> RecordPlayAsync(RecordPlay play, CancellationToken ct = default)
+    {
+        using var response = await http.PostAsJsonAsync($"{Api}/plays", play, MelodexJson.Options, ct);
+        await EnsureAsync(response, ct);
+        return (await response.Content.ReadFromJsonAsync<PlayRecord>(MelodexJson.Options, ct))!;
+    }
+
+    /// <summary>Says what you've started playing.</summary>
+    public async Task SetNowPlayingAsync(RecordPlay play, CancellationToken ct = default)
+    {
+        using var response = await http.PutAsJsonAsync($"{Api}/plays/now", play, MelodexJson.Options, ct);
+        await EnsureAsync(response, ct);
+    }
+
+    /// <summary>Takes a play out of your history.</summary>
+    public async Task DeletePlayAsync(Guid id, CancellationToken ct = default)
+    {
+        using var response = await http.DeleteAsync($"{Api}/plays/{id}", ct);
+        await EnsureAsync(response, ct);
+    }
+
+    /// <summary>Your linked ListenBrainz and Last.fm accounts.</summary>
+    public async Task<ScrobbleStatus> GetScrobblingAsync(CancellationToken ct = default) =>
+        (await http.GetFromJsonAsync<ScrobbleStatus>($"{Api}/account/scrobbling", MelodexJson.Options, ct))!;
+
+    public async Task<ScrobbleLink> LinkListenBrainzAsync(string token, CancellationToken ct = default)
+    {
+        using var response = await http.PutAsJsonAsync($"{Api}/account/scrobbling/listenbrainz", new LinkListenBrainz(token), MelodexJson.Options, ct);
+        await EnsureAsync(response, ct);
+        return (await response.Content.ReadFromJsonAsync<ScrobbleLink>(MelodexJson.Options, ct))!;
+    }
+
+    public async Task<ScrobbleLink> LinkLastFmAsync(string token, CancellationToken ct = default)
+    {
+        using var response = await http.PutAsJsonAsync($"{Api}/account/scrobbling/lastfm", new LinkLastFm(token), MelodexJson.Options, ct);
+        await EnsureAsync(response, ct);
+        return (await response.Content.ReadFromJsonAsync<ScrobbleLink>(MelodexJson.Options, ct))!;
+    }
+
+    public async Task UnlinkScrobblingAsync(ScrobbleService service, CancellationToken ct = default)
+    {
+        using var response = await http.DeleteAsync($"{Api}/account/scrobbling/{service.ToString().ToLowerInvariant()}", ct);
+        await EnsureAsync(response, ct);
+    }
+
+    public async Task<ScrobbleSettingsInfo> GetScrobblingSettingsAsync(CancellationToken ct = default) =>
+        (await http.GetFromJsonAsync<ScrobbleSettingsInfo>($"{Api}/settings/scrobbling", MelodexJson.Options, ct))!;
+
+    public async Task SaveScrobblingSettingsAsync(SaveScrobbleSettings settings, CancellationToken ct = default)
+    {
+        using var response = await http.PutAsJsonAsync($"{Api}/settings/scrobbling", settings, MelodexJson.Options, ct);
+        await EnsureAsync(response, ct);
+    }
+
     public async Task<IReadOnlyList<PlaylistSummary>> ListPlaylistsAsync(CancellationToken ct = default) =>
         await http.GetFromJsonAsync<List<PlaylistSummary>>($"{Api}/playlists", MelodexJson.Options, ct) ?? [];
 

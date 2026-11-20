@@ -69,7 +69,7 @@ public sealed class NavSections : IDisposable
 
     private static NavSection? SectionOf(string path) => Bare(path) switch
     {
-        "" or "playlists" or "listen-now" or "wishlist" => NavSection.Library,
+        "" or "playlists" or "listen-now" or "wishlist" or "history" => NavSection.Library,
         "search" => NavSection.Search,
         var bare when bare == "tools" || bare.StartsWith("tools/") => NavSection.Tools,
         _ => null,

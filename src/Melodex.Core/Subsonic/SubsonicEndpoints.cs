@@ -66,7 +66,8 @@ public static partial class SubsonicEndpoints
         ["getTopSongs"] = _ => Empty("topSongs"),
         ["getSimilarSongs"] = _ => Empty("similarSongs"),
         ["getSimilarSongs2"] = _ => Empty("similarSongs2"),
-        ["getNowPlaying"] = _ => Empty("nowPlaying"),
+        ["getNowPlaying"] = GetNowPlayingAsync,
+        ["scrobble"] = ScrobbleAsync,
         ["stream"] = StreamAsync,
         ["download"] = DownloadAsync,
         ["getCoverArt"] = GetCoverArtAsync,
@@ -376,8 +377,8 @@ public static partial class SubsonicEndpoints
                 .OrderBy(a => a.Name, StringComparer.CurrentCultureIgnoreCase),
             "starred" => await MarkedAlbumsAsync(c, library, starred: true),
             "highest" => await MarkedAlbumsAsync(c, library, starred: false),
-            // Plays aren't kept yet.
-            "frequent" or "recent" => [],
+            "frequent" => await PlayedAlbumsAsync(c, library, frequent: true),
+            "recent" => await PlayedAlbumsAsync(c, library, frequent: false),
             _ => throw new SubsonicException(SubsonicErrors.Generic, $"There's no list of albums called {type}."),
         };
         return SubsonicResponse.Ok().With(name, new JsonObject
