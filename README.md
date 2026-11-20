@@ -45,9 +45,9 @@ Coming from Navidex? It upgrades in place: see [upgrading](docs/guide/upgrading.
 
 ## Plugins and sources
 
-Melodex ships no media sources. Retrieval plugins are separate services that speak an HTTP contract; the two in
-`plugins/` (YouTube Music through yt-dlp, and an inbox folder) live here for now. You're responsible for the plugins
-you run and for complying with each source's terms.
+Melodex ships no media sources. Retrieval plugins are separate services that speak an HTTP contract, each in a
+repository of its own with its own image: see [the guide's Plugins page](docs/guide/plugins.md#retrieval-plugins) for
+the list. You're responsible for the plugins you run and for complying with each source's terms.
 
 ## Licence
 

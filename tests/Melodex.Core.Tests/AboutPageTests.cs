@@ -18,9 +18,12 @@ public sealed class AboutPageTests
     {
         var root = TestLibrary.RepositoryRoot;
         var page = File.ReadAllText(Path.Combine(root, "src", "Melodex.Web", "Pages", "About.razor"));
+        // The retrieval plugins have repositories of their own; the Plugins page offers each as a template.
+        var templates = File.ReadAllText(Path.Combine(root, "src", "Melodex.Web", "Pages", "Plugins.razor"));
         var plugins = Directory.GetDirectories(Path.Combine(root, "src"), "Melodex.Plugins.*").Select(d => Path.GetFileName(d)["Melodex.Plugins.".Length..])
-            .Concat(Directory.GetDirectories(Path.Combine(root, "plugins"), "retriever-*").Select(d => Path.GetFileName(d)["retriever-".Length..]))
+            .Concat(System.Text.RegularExpressions.Regex.Matches(templates, @"new\(""([a-z]+)"", ""[^""]+"", ""[^""]+"", PluginType\.Retrieval").Select(m => m.Groups[1].Value))
             .ToList();
+        Assert.Contains("ytdlp", plugins);
         Assert.NotEmpty(plugins);
         Assert.All(plugins, plugin => Assert.Contains(Named.GetValueOrDefault(plugin, plugin), page, StringComparison.OrdinalIgnoreCase));
     }

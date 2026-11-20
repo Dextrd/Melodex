@@ -6,16 +6,13 @@
 #   PUID, PGID        the user and group that own it, as `id` shows them (default 1000)
 #   MELODEX_PORT      the port the web app is on (default 8787)
 #   MELODEX_VERSION   the release, such as 1.0.0; latest follows each one
-#   INBOX_PATH        a folder to drop music into for the inbox plugin (default ./inbox)
-#   COMPOSE_PROFILES  more retrieval plugins, comma-separated: archive, prowlarr, qobuz, tidal, bandcamp, soulseek
-#   DOWNLOADS_PATH    qBittorrent's downloads folder, for prowlarr
-#   SLSKD_DOWNLOADS_PATH  slskd's downloads folder, for soulseek
 #
-# Open http://your-server:8787 and setup walks you through the rest, Navidrome and the plugins included.
+# Retrieval plugins, which fetch music, are added beside these: each plugin's README, linked from the guide's Plugins
+# page, has the lines to paste under services. Then open http://your-server:8787 and setup walks you through the rest.
 # To build from source instead: docker compose -f docker-compose.yml -f docker-compose.build.yml up --build
 #
 # On SELinux hosts with podman, files carry the categories of the container that wrote them, and downloads pass from
-# a plugin through beets to the core and Navidrome. Give every container here, and Navidrome, the same
+# a plugin through beets to the core and Navidrome. Give every container here, the plugins and Navidrome the same
 # `security_opt: ["label=level:s0:c100,c200"]` so they can read each other's files.
 
 x-plugin: &plugin
@@ -47,79 +44,7 @@ services:
       - ${MUSIC_PATH:?Set MUSIC_PATH to the folder Navidrome reads}:/music
       - staging:/staging
 
-  # Retrieval plugins, one container each. Add each under Settings → Plugins, where they're among the templates.
-  retriever-ytdlp:
-    <<: *plugin
-    image: ghcr.io/dextrd/melodex-retriever-ytdlp:${MELODEX_VERSION:-latest}
-    container_name: melodex-retriever-ytdlp
-    volumes:
-      - staging:/staging
-
-  retriever-inbox:
-    <<: *plugin
-    image: ghcr.io/dextrd/melodex-retriever-inbox:${MELODEX_VERSION:-latest}
-    container_name: melodex-retriever-inbox
-    volumes:
-      - ${INBOX_PATH:-./inbox}:/inbox
-      - staging:/staging
-
-  # The rest only run when named in COMPOSE_PROFILES.
-  retriever-archive:
-    <<: *plugin
-    profiles: [archive]
-    image: ghcr.io/dextrd/melodex-retriever-archive:${MELODEX_VERSION:-latest}
-    container_name: melodex-retriever-archive
-    volumes:
-      - staging:/staging
-
-  # Reads what your qBittorrent downloads, so it mounts the same folder, as qBittorrent sees it at /downloads.
-  retriever-prowlarr:
-    <<: *plugin
-    profiles: [prowlarr]
-    image: ghcr.io/dextrd/melodex-retriever-prowlarr:${MELODEX_VERSION:-latest}
-    container_name: melodex-retriever-prowlarr
-    volumes:
-      - staging:/staging
-      - ${DOWNLOADS_PATH:-./downloads}:/downloads:ro
-
-  retriever-qobuz:
-    <<: *plugin
-    profiles: [qobuz]
-    image: ghcr.io/dextrd/melodex-retriever-qobuz:${MELODEX_VERSION:-latest}
-    container_name: melodex-retriever-qobuz
-    volumes:
-      - staging:/staging
-
-  # Keeps its Tidal sign-in in /data.
-  retriever-tidal:
-    <<: *plugin
-    profiles: [tidal]
-    image: ghcr.io/dextrd/melodex-retriever-tidal:${MELODEX_VERSION:-latest}
-    container_name: melodex-retriever-tidal
-    volumes:
-      - staging:/staging
-      - tidal:/data
-
-  retriever-bandcamp:
-    <<: *plugin
-    profiles: [bandcamp]
-    image: ghcr.io/dextrd/melodex-retriever-bandcamp:${MELODEX_VERSION:-latest}
-    container_name: melodex-retriever-bandcamp
-    volumes:
-      - staging:/staging
-
-  # Moves what your slskd downloads into staging, so it mounts the same folder, writable.
-  retriever-soulseek:
-    <<: *plugin
-    profiles: [soulseek]
-    image: ghcr.io/dextrd/melodex-retriever-soulseek:${MELODEX_VERSION:-latest}
-    container_name: melodex-retriever-soulseek
-    volumes:
-      - staging:/staging
-      - ${SLSKD_DOWNLOADS_PATH:-./slskd-downloads}:/downloads
-
 volumes:
   config:
   staging:
   listen-now:
-  tidal:

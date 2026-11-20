@@ -42,30 +42,6 @@ jobs:
           - image: melodex-beets-worker
             context: beets-worker
             file: beets-worker/Dockerfile
-          - image: melodex-retriever-ytdlp
-            context: plugins/retriever-ytdlp
-            file: plugins/retriever-ytdlp/Dockerfile
-          - image: melodex-retriever-inbox
-            context: plugins/retriever-inbox
-            file: plugins/retriever-inbox/Dockerfile
-          - image: melodex-retriever-archive
-            context: plugins/retriever-archive
-            file: plugins/retriever-archive/Dockerfile
-          - image: melodex-retriever-prowlarr
-            context: plugins/retriever-prowlarr
-            file: plugins/retriever-prowlarr/Dockerfile
-          - image: melodex-retriever-qobuz
-            context: plugins/retriever-qobuz
-            file: plugins/retriever-qobuz/Dockerfile
-          - image: melodex-retriever-tidal
-            context: plugins/retriever-tidal
-            file: plugins/retriever-tidal/Dockerfile
-          - image: melodex-retriever-bandcamp
-            context: plugins/retriever-bandcamp
-            file: plugins/retriever-bandcamp/Dockerfile
-          - image: melodex-retriever-soulseek
-            context: plugins/retriever-soulseek
-            file: plugins/retriever-soulseek/Dockerfile
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-qemu-action@v3
@@ -75,10 +51,13 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      # Image names are lowercase, whatever the organisation's name looks like.
+      - id: owner
+        run: echo "name=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
       - id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}
+          images: ghcr.io/${{ steps.owner.outputs.name }}/${{ matrix.image }}
           # latest only for releases, not pre-releases such as 1.1.0-beta.1.
           tags: |
             type=semver,pattern={{version}}
