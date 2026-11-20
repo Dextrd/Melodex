@@ -33,6 +33,12 @@ to allow Melodex and sends you back; it needs an API key the admin makes once at
 that can't be sent, because the service is down or the link no longer works, wait and are sent once it's back or
 linked again. Only plays from after linking are sent.
 
+## Similar music
+
+An artist's page ends with **Similar artists**, and a song's page has **Similar songs**, from the
+[discovery plugins](plugins.md#discovery): ListenBrainz to start with. Open one to go to its page, or, for one the
+catalogue doesn't have, to search for it. Hover over one to see how alike it is and which plugins found it.
+
 ## Quality
 
 Melodex knows each file's quality, written as it usually is: **FLAC 16/44.1** (lossless, 16 bits at 44.1 kHz, as a CD

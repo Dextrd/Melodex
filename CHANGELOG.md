@@ -29,6 +29,12 @@ What changed in each release of Melodex. Versions follow [semantic versioning](h
 - **Scrobbling to ListenBrainz and Last.fm**: link your accounts under **Scrobbling** on your account page and your plays
   are sent there too, with what's playing now; plays that can't be sent wait until they can. Last.fm needs an API key
   the admin enters under **Settings → Playback** (#2).
+- **Discovery plugins**, a sixth kind: similar artists, similar songs and recommendations, in the order you choose
+  under **Settings → Plugins → Discovery**, with what they agree on first. An artist's page shows **Similar artists**
+  and a song's page **Similar songs**, matched to the catalogue where they can be. **ListenBrainz** is set up from the
+  start and needs no account; it also recommends songs for you once your ListenBrainz account is linked. **Last.fm**
+  needs an API key of your own. The API has `GET /artists/{id}/similar`, `GET /tracks/{id}/similar`,
+  `GET /discovery/recommendations` and `GET /discovery`, and plugins at an address can be discovery plugins (#3).
 - Melodex's own Subsonic extension, `melodex`: each song's ID in the API, and whether you have all of an album (#7).
 - **Settings → Scheduled tasks**: daily, weekly and monthly windows, each with its own times (running past midnight
   if it ends earlier than it starts), the weekly one on a day you pick and the monthly one on a day of the month (in a

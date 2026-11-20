@@ -145,6 +145,7 @@ else
         <p class="muted small">Music no catalogue knows, which you excluded from matching, shown as its tags say.</p>
         <AlbumTable Albums="_artist.Albums.Where(a => a.Local).ToList()" OnIgnore="ToggleIgnoreAsync" />
     }
+    <SimilarArtists ArtistId="_artist.Id" />
 }
 
 @if (_formatting && _artist is not null)

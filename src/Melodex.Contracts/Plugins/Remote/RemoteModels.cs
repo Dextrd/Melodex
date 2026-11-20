@@ -1,11 +1,12 @@
 using System.Text.Json;
 using Melodex.Contracts.Plugins.Connectors;
+using Melodex.Contracts.Plugins.Discovery;
 using Melodex.Contracts.Plugins.Retrieval;
 
 namespace Melodex.Contracts.Plugins.Remote;
 
 /// <summary>
-/// The body of every call to a catalogue, artwork, lyrics or media-server plugin reached at an address
+/// The body of every call to a catalogue, artwork, lyrics, discovery or media-server plugin reached at an address
 /// (docs/contracts/remote-plugins.md): the instance's settings, sent each time so the plugin keeps no setup of its
 /// own, and the call's input. Plugins built into Melodex, or loaded from its plugins folder, are called in process
 /// instead.
@@ -49,6 +50,15 @@ public sealed record PlaylistContentInput(ServerLogin Login, PlaylistContent Con
 
 /// <summary>A playlist's new cover, or none to remove it.</summary>
 public sealed record PlaylistCoverInput(ServerLogin Login, string PlaylistId, PlaylistCover? Cover);
+
+/// <summary>An artist to find others like, and how many.</summary>
+public sealed record SimilarArtistsInput(DiscoveryArtist Artist, int Count);
+
+/// <summary>A song to find others like, and how many.</summary>
+public sealed record SimilarRecordingsInput(DiscoveryRecording Recording, int Count);
+
+/// <summary>Someone to recommend songs to, and how many.</summary>
+public sealed record RecommendationsInput(DiscoveryListener Listener, int Count);
 
 /// <summary>The wire format, the same as the retrieval contract's: camelCase, enums as camelCase strings, nulls left out.</summary>
 public static class RemoteJson

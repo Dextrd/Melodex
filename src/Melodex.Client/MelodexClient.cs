@@ -1049,6 +1049,22 @@ public sealed class MelodexClient(HttpClient http)
         await EnsureAsync(response, ct);
     }
 
+    /// <summary>What the discovery plugins that are on can find.</summary>
+    public async Task<DiscoveryStatus> GetDiscoveryAsync(CancellationToken ct = default) =>
+        (await http.GetFromJsonAsync<DiscoveryStatus>($"{Api}/discovery", MelodexJson.Options, ct))!;
+
+    /// <summary>Artists like this one, the closest first.</summary>
+    public async Task<IReadOnlyList<SimilarArtist>> ListSimilarArtistsAsync(Guid artistId, int take = 20, CancellationToken ct = default) =>
+        await http.GetFromJsonAsync<List<SimilarArtist>>($"{Api}/artists/{artistId}/similar?take={take}", MelodexJson.Options, ct) ?? [];
+
+    /// <summary>Songs like this one, the closest first.</summary>
+    public async Task<IReadOnlyList<DiscoveredSong>> ListSimilarSongsAsync(Guid trackId, int take = 20, CancellationToken ct = default) =>
+        await http.GetFromJsonAsync<List<DiscoveredSong>>($"{Api}/tracks/{trackId}/similar?take={take}", MelodexJson.Options, ct) ?? [];
+
+    /// <summary>Songs recommended for you, the best first.</summary>
+    public async Task<IReadOnlyList<DiscoveredSong>> ListRecommendationsAsync(int take = 50, CancellationToken ct = default) =>
+        await http.GetFromJsonAsync<List<DiscoveredSong>>($"{Api}/discovery/recommendations?take={take}", MelodexJson.Options, ct) ?? [];
+
     public async Task<IReadOnlyList<PlaylistSummary>> ListPlaylistsAsync(CancellationToken ct = default) =>
         await http.GetFromJsonAsync<List<PlaylistSummary>>($"{Api}/playlists", MelodexJson.Options, ct) ?? [];
 

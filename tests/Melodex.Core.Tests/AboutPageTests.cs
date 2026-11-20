@@ -9,6 +9,7 @@ public sealed class AboutPageTests
     private static readonly Dictionary<string, string> Named = new(StringComparer.OrdinalIgnoreCase)
     {
         ["FanartTv"] = "fanart.tv",
+        ["LastFm"] = "Last.fm",
         ["archive"] = "Internet Archive",
         ["ytdlp"] = "yt-dlp",
     };

@@ -272,6 +272,7 @@ public static class PluginEndpoints
         PluginType.Connector => "a media server",
         PluginType.Index => "a catalogue",
         PluginType.Lyrics => "a lyrics plugin",
+        PluginType.Discovery => "a discovery plugin",
         _ => "an artwork plugin",
     };
 

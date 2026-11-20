@@ -23,6 +23,7 @@ guide covers what the reference can't: how the pieces fit together.
 - [The Subsonic API](#the-subsonic-api)
 - [Stars, ratings and the play queue](#stars-ratings-and-the-play-queue)
 - [Listening history](#listening-history)
+- [Similar music and recommendations](#similar-music-and-recommendations)
 - [The API reference](#the-api-reference)
 
 ## Getting a key
@@ -448,6 +449,21 @@ Each person's own, from the web player and Subsonic players alike:
 
 Linking accounts is for a signed-in person, in the web app (`/account/scrobbling`); the admin sets the Last.fm API
 key and secret with `PUT /settings/scrobbling`.
+
+## Similar music and recommendations
+
+From the discovery plugins, combined, with the `read` scope:
+
+- `GET /discovery` says what the plugins that are on can find: `similarArtists`, `similarSongs`, `recommendations`.
+- `GET /artists/{id}/similar` lists artists like a catalogue artist, closest first, with `take` (20 by default, at most
+  100). Each has a `score` from 0 to 1 and the plugins it's `from`; those matched to the catalogue have its `id` and
+  whether they're `inLibrary`, and the rest only their `name`.
+- `GET /tracks/{id}/similar` lists songs like a song, the same way: those matched have a `trackId`, whether they're
+  `owned`, and an album with its cover.
+- `GET /discovery/recommendations` lists songs recommended for the key's user, best first (50 by default): from what
+  the plugins know of them through their linked ListenBrainz and Last.fm accounts, and what they've played lately.
+
+Answers are kept a while (a day, or six hours for recommendations), so asking again is cheap.
 
 ## The API reference
 

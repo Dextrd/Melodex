@@ -142,6 +142,8 @@ else
         </div>
     }
 
+    <SimilarSongs TrackId="track.Id" />
+
     @if (owned)
     {
         <TrackLyricsPanel TrackId="track.Id" Title="@track.Title" OnChanged="LoadAsync" />

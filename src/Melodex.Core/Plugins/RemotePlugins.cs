@@ -5,6 +5,7 @@ using Melodex.Contracts.Catalogue;
 using Melodex.Contracts.Plugins;
 using Melodex.Contracts.Plugins.Artwork;
 using Melodex.Contracts.Plugins.Connectors;
+using Melodex.Contracts.Plugins.Discovery;
 using Melodex.Contracts.Plugins.Index;
 using Melodex.Contracts.Plugins.Lyrics;
 using Melodex.Contracts.Plugins.Remote;
@@ -12,7 +13,7 @@ using Melodex.Contracts.Plugins.Remote;
 namespace Melodex.Core.Plugins;
 
 /// <summary>
-/// A catalogue, artwork, lyrics or media-server plugin that isn't loaded into Melodex but reached at an address, over
+/// A catalogue, artwork, lyrics, discovery or media-server plugin that isn't loaded into Melodex but reached at an address, over
 /// the HTTP contract for its kind (docs/contracts/remote-plugins.md). It's used just as one loaded in process is.
 /// </summary>
 public abstract class RemotePlugin(HttpClient http, JsonElement settings, PluginManifest manifest) : IPlugin
@@ -25,6 +26,7 @@ public abstract class RemotePlugin(HttpClient http, JsonElement settings, Plugin
         PluginType.Index => new RemoteIndexPlugin(http, settings, manifest),
         PluginType.Artwork => new RemoteArtworkPlugin(http, settings, manifest),
         PluginType.Lyrics => new RemoteLyricsPlugin(http, settings, manifest),
+        PluginType.Discovery => new RemoteDiscoveryPlugin(http, settings, manifest),
         PluginType.Connector => RemoteConnector.Create(http, settings, manifest),
         _ => throw new InvalidOperationException($"{type} plugins aren't reached this way."),
     };
@@ -143,6 +145,25 @@ public sealed class RemoteLyricsPlugin(HttpClient http, JsonElement settings, Pl
         Declares(LyricsCapabilities.Search)
             ? ListAsync<LyricsSearch, LyricsResult>("v1/search", query, cancellationToken)
             : Task.FromResult<IReadOnlyList<LyricsResult>>([]);
+}
+
+public sealed class RemoteDiscoveryPlugin(HttpClient http, JsonElement settings, PluginManifest manifest)
+    : RemotePlugin(http, settings, manifest), IDiscoveryPlugin
+{
+    public Task<IReadOnlyList<DiscoveredArtist>> SimilarArtistsAsync(DiscoveryArtist artist, int count, CancellationToken cancellationToken) =>
+        Declares(DiscoveryCapabilities.SimilarArtists)
+            ? ListAsync<SimilarArtistsInput, DiscoveredArtist>("v1/similar-artists", new(artist, count), cancellationToken)
+            : Task.FromResult<IReadOnlyList<DiscoveredArtist>>([]);
+
+    public Task<IReadOnlyList<DiscoveredRecording>> SimilarRecordingsAsync(DiscoveryRecording recording, int count, CancellationToken cancellationToken) =>
+        Declares(DiscoveryCapabilities.SimilarRecordings)
+            ? ListAsync<SimilarRecordingsInput, DiscoveredRecording>("v1/similar-recordings", new(recording, count), cancellationToken)
+            : Task.FromResult<IReadOnlyList<DiscoveredRecording>>([]);
+
+    public Task<IReadOnlyList<DiscoveredRecording>> RecommendAsync(DiscoveryListener listener, int count, CancellationToken cancellationToken) =>
+        Declares(DiscoveryCapabilities.Recommendations)
+            ? ListAsync<RecommendationsInput, DiscoveredRecording>("v1/recommendations", new(listener, count), cancellationToken)
+            : Task.FromResult<IReadOnlyList<DiscoveredRecording>>([]);
 }
 
 /// <summary>

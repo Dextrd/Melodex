@@ -6,11 +6,13 @@ using Microsoft.Extensions.Options;
 using Melodex.Contracts.Plugins;
 using Melodex.Contracts.Plugins.Artwork;
 using Melodex.Contracts.Plugins.Connectors;
+using Melodex.Contracts.Plugins.Discovery;
 using Melodex.Contracts.Plugins.Index;
 using Melodex.Contracts.Plugins.Lyrics;
 using Melodex.Contracts.Plugins.Remote;
 using Melodex.Core.Data;
 using Melodex.Plugins.Deezer;
+using Melodex.Plugins.ListenBrainz;
 using Melodex.Plugins.Lrclib;
 using Melodex.Plugins.MusicBrainz;
 using Melodex.Plugins.Wikimedia;
@@ -333,6 +335,47 @@ public sealed class LyricsPlugins(MelodexDbContext db, PluginHost host)
             });
         }
         db.Settings.Add(new Setting { Key = DefaultsSetting, ValueJson = JsonSerializer.Serialize(new[] { LrclibFactory.PluginId }) });
+        await db.SaveChangesAsync();
+    }
+}
+
+/// <summary>The enabled discovery plugins, in the user's order.</summary>
+public sealed class DiscoveryPlugins(MelodexDbContext db, PluginHost host)
+{
+    public const string DefaultsSetting = "discovery.defaults";
+
+    public async Task<IReadOnlyList<(PluginInstance Instance, IDiscoveryPlugin Plugin, PluginManifest Manifest)>> GetAsync(CancellationToken ct)
+    {
+        var instances = await db.PluginInstances.Where(p => p.Type == PluginType.Discovery && p.Enabled).OrderBy(p => p.Priority).ToListAsync(ct);
+        var plugins = new List<(PluginInstance, IDiscoveryPlugin, PluginManifest)>();
+        foreach (var instance in instances)
+        {
+            if (host.ManifestOf(instance) is not { } manifest)
+                continue;
+            if (await host.ResolveAsync(db, instance, ct) is { } running)
+                plugins.Add((instance, host.Get<IDiscoveryPlugin>(running), manifest));
+        }
+        return plugins;
+    }
+
+    /// <summary>Sets up ListenBrainz once, as it needs no account, so similar music shows out of the box. Removing it sticks.</summary>
+    public static async Task EnsureDefaultAsync(MelodexDbContext db, PluginCatalog catalog)
+    {
+        if (await db.Settings.FindAsync(DefaultsSetting) is not null)
+            return;
+        if (catalog.Find(ListenBrainzFactory.PluginId) is { } found && !await db.PluginInstances.AnyAsync(p => p.Type == PluginType.Discovery))
+        {
+            db.PluginInstances.Add(new PluginInstance
+            {
+                PluginId = found.Manifest.Id,
+                Type = PluginType.Discovery,
+                Name = found.Manifest.Name,
+                Priority = 0,
+                ContractVersion = found.Manifest.ContractVersion,
+                SettingsJson = SettingsSchema.Defaults(found.Manifest.SettingsSchema).ToJsonString(),
+            });
+        }
+        db.Settings.Add(new Setting { Key = DefaultsSetting, ValueJson = JsonSerializer.Serialize(new[] { ListenBrainzFactory.PluginId }) });
         await db.SaveChangesAsync();
     }
 }
