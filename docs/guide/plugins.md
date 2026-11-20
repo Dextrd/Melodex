@@ -28,7 +28,7 @@ when opened. Melodex asks every discovery plugin at once and puts first what the
 order most, so drag the one you trust most to the top. Answers are kept a day.
 
 - **ListenBrainz** is set up from the start and needs no account. It knows artists and songs by their MusicBrainz IDs,
-  so music no MusicBrainz ID is known for gets nothing from it. Once you link your ListenBrainz account for
+  so an artist no MusicBrainz ID is known for gets nothing from it. Songs it also finds by title and artist. Once you link your ListenBrainz account for
   [scrobbling](library.md#history), it can also recommend songs for you, from the listens sent there, once ListenBrainz
   has made them.
 - **Last.fm** needs an API key, free from [last.fm/api/account/create](https://www.last.fm/api/account/create); it can

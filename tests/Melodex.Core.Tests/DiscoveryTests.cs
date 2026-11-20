@@ -27,6 +27,9 @@ public sealed class DiscoveryTests : IDisposable
     private const string GloryBox = "3a1c8f6e-21b5-4d43-9a0c-1a1a1a1a1a01";
     private const string Teardrop = "3a1c8f6e-21b5-4d43-9a0c-1a1a1a1a1a02";
     private const string Overcome = "3a1c8f6e-21b5-4d43-9a0c-1a1a1a1a1a03";
+    // Roads as the catalogue has it, on a single, and the recording ListenBrainz keeps its listens on.
+    private const string RoadsSingle = "3a1c8f6e-21b5-4d43-9a0c-1a1a1a1a1a04";
+    private const string RoadsMain = "3a1c8f6e-21b5-4d43-9a0c-1a1a1a1a1a05";
 
     private readonly string _dataPath = Path.Combine(Path.GetTempPath(), "melodex-tests", Guid.NewGuid().ToString("N"));
     private readonly WebApplicationFactory<Program> _factory;
@@ -176,6 +179,31 @@ public sealed class DiscoveryTests : IDisposable
     }
 
     [Fact]
+    public async Task A_song_listenbrainz_knows_by_another_recording_finds_similar_songs_through_it()
+    {
+        Assert.Equal(RoadsMain, ListenBrainz.ReadLookup(JsonDocument.Parse($$"""[{ "recording_mbid": "{{RoadsMain}}", "recording_name": "Roads" }]""").RootElement));
+        Assert.Null(ListenBrainz.ReadLookup(JsonDocument.Parse("[]").RootElement));
+
+        await SeedAsync();
+        Guid roads;
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<MelodexDbContext>();
+            var portishead = db.Artists.Single(a => a.Name == "Portishead");
+            var track = new Track { ArtistId = portishead.Id, Title = "Roads", ArtistCredit = "Portishead" };
+            db.Tracks.Add(track);
+            db.Crosswalk.Add(new ProviderIdMapping { EntityKind = EntityKind.Track, EntityId = track.Id, Provider = Providers.MusicBrainz, Value = RoadsSingle });
+            await db.SaveChangesAsync();
+            roads = track.Id;
+        }
+
+        var songs = await _api.ListSimilarSongsAsync(roads);
+        Assert.Equal(["Teardrop", "Overcome"], songs.Select(s => s.Title));
+        Assert.Contains(_services.Asked, u => u.Contains("acr-lookup") && u.Contains("recording_name=Roads"));
+        Assert.Contains(_services.Asked, u => u.Contains("similar-recordings") && u.Contains(RoadsMain));
+    }
+
+    [Fact]
     public async Task Recommendations_come_from_a_linked_listenbrainz_account()
     {
         var (_, _, _, teardrop) = await SeedAsync();
@@ -234,6 +262,8 @@ public sealed class DiscoveryTests : IDisposable
                     new { artist_mbid = MassiveAttack, name = "Massive Attack", comment = "UK trip hop group", score = 11000 },
                     new { artist_mbid = Tricky, name = "Tricky", comment = "", score = 9000 },
                 },
+                ("labs.api.listenbrainz.org", "/acr-lookup/json") => new object[] { new { recording_mbid = RoadsMain, recording_name = "Roads" } },
+                ("labs.api.listenbrainz.org", "/similar-recordings/json") when query["recording_mbids"] == RoadsSingle => Array.Empty<object>(),
                 ("labs.api.listenbrainz.org", "/similar-recordings/json") => new object[]
                 {
                     new { recording_mbid = Teardrop, recording_name = "Teardrop", artist_credit_name = "Massive Attack", score = 200 },

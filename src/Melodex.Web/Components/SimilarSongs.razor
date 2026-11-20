@@ -3,17 +3,24 @@
 @*
     Songs like this one (#3), from the discovery plugins, on a song's page. Those the catalogue knows open their page, and
     say whether you have them; the rest search for their title and artist. Nothing shows when no discovery plugin finds
-    songs, or none found any.
+    songs; when none found any, the section says so.
 *@
 @if (_similar is null)
 {
     <h2 class="section">Similar songs</h2>
     <Loading Inline="true" Text="Asking the discovery plugins…" />
 }
-else if (_similar.Count > 0)
+else if (_offered)
 {
     <h2 class="section">Similar songs</h2>
-    <SongList Songs="_similar" />
+    @if (_similar.Count > 0)
+    {
+        <SongList Songs="_similar" />
+    }
+    else if (_error is null)
+    {
+        <div class="muted small">No similar songs found: the discovery plugins don't know this one well enough yet.</div>
+    }
 }
 @if (_error is not null) { <div class="muted small" role="status">Couldn't find similar songs: @_error</div> }
 
@@ -25,6 +32,7 @@ else if (_similar.Count > 0)
 
     private IReadOnlyList<DiscoveredSong>? _similar;
     private Guid _loaded;
+    private bool _offered;
     private string? _error;
 
     protected override async Task OnParametersSetAsync()
@@ -34,7 +42,8 @@ else if (_similar.Count > 0)
         (_loaded, _similar, _error) = (TrackId, null, null);
         try
         {
-            if (!(await Api.GetDiscoveryAsync()).SimilarSongs)
+            _offered = (await Api.GetDiscoveryAsync()).SimilarSongs;
+            if (!_offered)
             {
                 _similar = [];
                 return;

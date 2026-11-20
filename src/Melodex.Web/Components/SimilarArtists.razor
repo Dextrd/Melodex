@@ -2,12 +2,21 @@
 
 @*
     Artists like this one (#3), from the discovery plugins, on an artist's page. Those the catalogue knows open their page;
-    the rest search for their name. Nothing shows when no discovery plugin finds artists, or none found any.
+    the rest search for their name. Nothing shows when no discovery plugin finds artists; when none found any, the
+    section says so.
 *@
 @if (_similar is null)
 {
     <h2 class="section">Similar artists</h2>
     <Loading Inline="true" Text="Asking the discovery plugins…" />
+}
+else if (_offered && _similar.Count == 0)
+{
+    <h2 class="section">Similar artists</h2>
+    @if (_error is null)
+    {
+        <div class="muted small">No similar artists found: the discovery plugins don't know this one well enough yet.</div>
+    }
 }
 else if (_similar.Count > 0)
 {
@@ -34,6 +43,7 @@ else if (_similar.Count > 0)
 
     private IReadOnlyList<SimilarArtist>? _similar;
     private Guid _loaded;
+    private bool _offered;
     private string? _error;
 
     protected override async Task OnParametersSetAsync()
@@ -43,7 +53,8 @@ else if (_similar.Count > 0)
         (_loaded, _similar, _error) = (ArtistId, null, null);
         try
         {
-            if (!(await Api.GetDiscoveryAsync()).SimilarArtists)
+            _offered = (await Api.GetDiscoveryAsync()).SimilarArtists;
+            if (!_offered)
             {
                 _similar = [];
                 return;
