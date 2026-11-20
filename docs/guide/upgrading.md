@@ -24,6 +24,19 @@ OpenMediaVault's, edit the stack's compose there), or take the new
 [`docker-compose.yml`](https://github.com/dextrd/Melodex/blob/main/docker-compose.yml) and keep your `.env`. Then pull
 and start it as above. Nothing else changes: your settings, library and data carry on.
 
+## To 2.0.0: retrieval plugins on their own
+
+The retrieval plugins have moved to repositories of their own (see [plugins](plugins.md#retrieval-plugins)), and
+Melodex's compose file no longer has them. Their images keep their names, so a compose file from before carries on
+as it is. Two things change:
+
+- **Versions.** Each plugin now has releases of its own, starting at 2.0.0. If your plugin services use
+  `${MELODEX_VERSION}`, it works for 2.0.0, but later Melodex versions won't have plugin images of the same number:
+  give each plugin `latest`, or a version of its own such as `2`, instead.
+- **A new compose file.** If you take the new `docker-compose.yml`, it has only the core and the beets worker, and
+  `COMPOSE_PROFILES` does nothing. Paste back the plugins you use from their READMEs, where the lines are the same as
+  before. Your plugins' settings are kept in Melodex, so nothing needs adding again under **Settings → Plugins**.
+
 ## To 1.7.0: scheduled tasks
 
 Scans, catalogue updates, lossless checks, lyrics, the visualiser's bars, failed downloads, wishlists and upgrades can

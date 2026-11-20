@@ -2,7 +2,7 @@
 # A throwaway Navidrome + Melodex stack over a copy of the generated test library, so nothing touches a real library.
 #
 #   sandbox/sandbox.sh up       copy the test library, build what's missing, start everything, configure Melodex, scan
-#   sandbox/sandbox.sh build    rebuild the Melodex images
+#   sandbox/sandbox.sh build    rebuild the Melodex images, and pull or rebuild the plugins'
 #   sandbox/sandbox.sh status   show what Navidrome has indexed and how Melodex's plugins are doing
 #   sandbox/sandbox.sh scan     ask Navidrome to rescan and wait for it
 #   sandbox/sandbox.sh down     stop and remove the containers and their data
@@ -44,15 +44,21 @@ VOLUMES=(melodex-sandbox-navidrome melodex-sandbox-config melodex-sandbox-stagin
 IMAGES=(
   "localhost/melodex/core:dev|$ROOT|$ROOT/docker/core.Dockerfile"
   "localhost/melodex/beets-worker:dev|$ROOT/beets-worker|$ROOT/beets-worker/Dockerfile"
-  "localhost/melodex/retriever-ytdlp:dev|$ROOT/plugins/retriever-ytdlp|$ROOT/plugins/retriever-ytdlp/Dockerfile"
-  "localhost/melodex/retriever-inbox:dev|$ROOT/plugins/retriever-inbox|$ROOT/plugins/retriever-inbox/Dockerfile"
-  "localhost/melodex/retriever-archive:dev|$ROOT/plugins/retriever-archive|$ROOT/plugins/retriever-archive/Dockerfile"
-  "localhost/melodex/retriever-prowlarr:dev|$ROOT/plugins/retriever-prowlarr|$ROOT/plugins/retriever-prowlarr/Dockerfile"
-  "localhost/melodex/retriever-qobuz:dev|$ROOT/plugins/retriever-qobuz|$ROOT/plugins/retriever-qobuz/Dockerfile"
-  "localhost/melodex/retriever-tidal:dev|$ROOT/plugins/retriever-tidal|$ROOT/plugins/retriever-tidal/Dockerfile"
-  "localhost/melodex/retriever-bandcamp:dev|$ROOT/plugins/retriever-bandcamp|$ROOT/plugins/retriever-bandcamp/Dockerfile"
-  "localhost/melodex/retriever-soulseek:dev|$ROOT/plugins/retriever-soulseek|$ROOT/plugins/retriever-soulseek/Dockerfile"
 )
+
+# The retrieval plugins have repositories of their own. Their published images are used, or one built from a checkout
+# of the plugin's repository (melodex-retriever-<name>) where PLUGINS_DIR has one: by default, beside this repository.
+PLUGINS=(ytdlp inbox archive prowlarr qobuz tidal bandcamp soulseek)
+PLUGINS_DIR="${PLUGINS_DIR:-$(dirname "$ROOT")}"
+PLUGIN_TAG="${PLUGIN_TAG:-latest}"
+
+plugin_image() {
+  if [[ -f "$PLUGINS_DIR/melodex-retriever-$1/Dockerfile" ]]; then
+    echo "localhost/melodex/retriever-$1:dev"
+  else
+    echo "ghcr.io/dextrd/melodex-retriever-$1:$PLUGIN_TAG"
+  fi
+}
 
 ENGINE="$(command -v podman || command -v docker || true)"
 [[ -n "$ENGINE" ]] || { echo "needs podman or docker" >&2; exit 1; }
@@ -128,6 +134,18 @@ build() {
     if [[ -n "$only_missing" ]] && "$ENGINE" image inspect "$image" >/dev/null 2>&1; then continue; fi
     echo "Building $image..."
     "$ENGINE" build -q -f "$file" -t "$image" "$context" >/dev/null
+  done
+  local name
+  for name in "${PLUGINS[@]}"; do
+    image="$(plugin_image "$name")"
+    if [[ -n "$only_missing" ]] && "$ENGINE" image inspect "$image" >/dev/null 2>&1; then continue; fi
+    if [[ "$image" == localhost/* ]]; then
+      echo "Building $image from $PLUGINS_DIR/melodex-retriever-$name..."
+      "$ENGINE" build -q -t "$image" "$PLUGINS_DIR/melodex-retriever-$name" >/dev/null
+    else
+      echo "Pulling $image..."
+      "$ENGINE" pull -q "$image" >/dev/null
+    fi
   done
 }
 
@@ -260,13 +278,13 @@ up() {
     localhost/melodex/beets-worker:dev >/dev/null
   "$ENGINE" run -d --name melodex-sandbox-ytdlp "${SHARED[@]}" --network-alias retriever-ytdlp "${AS_YOU[@]}" \
     -v melodex-sandbox-staging:/staging \
-    localhost/melodex/retriever-ytdlp:dev >/dev/null
+    "$(plugin_image ytdlp)" >/dev/null
   "$ENGINE" run -d --name melodex-sandbox-inbox "${SHARED[@]}" --network-alias retriever-inbox "${AS_YOU[@]}" \
     -v "$INBOX:/inbox:z" -v melodex-sandbox-staging:/staging \
-    localhost/melodex/retriever-inbox:dev >/dev/null
+    "$(plugin_image inbox)" >/dev/null
   "$ENGINE" run -d --name melodex-sandbox-archive "${SHARED[@]}" --network-alias retriever-archive "${AS_YOU[@]}" \
     -v melodex-sandbox-staging:/staging \
-    localhost/melodex/retriever-archive:dev >/dev/null
+    "$(plugin_image archive)" >/dev/null
 
   # qBittorrent lets anyone it can reach in without a login: its port is only open to this computer, and the
   # plugin reaches it inside the sandbox network.
@@ -288,7 +306,7 @@ up() {
     "$PROWLARR_IMAGE" >/dev/null
   "$ENGINE" run -d --name melodex-sandbox-torrents "${SHARED[@]}" --network-alias retriever-prowlarr "${AS_YOU[@]}" \
     -v melodex-sandbox-staging:/staging -v melodex-sandbox-downloads:/downloads:ro \
-    localhost/melodex/retriever-prowlarr:dev >/dev/null
+    "$(plugin_image prowlarr)" >/dev/null
 
   # Stand-ins for Qobuz, Tidal, Bandcamp and slskd, run with the Tidal plugin's image, which has ffmpeg to make their
   # tones. slskd's downloads folder is shared with the Soulseek plugin, which moves them into staging.
@@ -296,22 +314,22 @@ up() {
     -p "127.0.0.1:$STANDIN_PORT:8080" -e PUBLIC_URL="http://localhost:$STANDIN_PORT" \
     -e INTERNAL_URL=http://streaming-standin:8080 -v "$SANDBOX/standins:/standin:ro,z" \
     -v melodex-sandbox-slskd:/slskd-downloads \
-    localhost/melodex/retriever-tidal:dev uvicorn streaming:app --app-dir /standin --host 0.0.0.0 --port 8080 >/dev/null
+    "$(plugin_image tidal)" uvicorn streaming:app --app-dir /standin --host 0.0.0.0 --port 8080 >/dev/null
   # slskd's downloads folder starts out root's, and the stand-in and the Soulseek plugin run as other users.
   "$ENGINE" exec --user 0 melodex-sandbox-standin chmod 1777 /slskd-downloads
   "$ENGINE" run -d --name melodex-sandbox-qobuz "${SHARED[@]}" --network-alias retriever-qobuz "${AS_YOU[@]}" \
     -v melodex-sandbox-staging:/staging -e QOBUZ_API=http://streaming-standin:8080/qobuz/api.json/0.2 \
-    localhost/melodex/retriever-qobuz:dev >/dev/null
+    "$(plugin_image qobuz)" >/dev/null
   "$ENGINE" run -d --name melodex-sandbox-tidal "${SHARED[@]}" --network-alias retriever-tidal "${AS_YOU[@]}" \
     -v melodex-sandbox-staging:/staging -v melodex-sandbox-tidal:/data \
     -e TIDAL_API=http://streaming-standin:8080/tidal/v1 -e TIDAL_AUTH=http://streaming-standin:8080/tidal/oauth2 \
-    localhost/melodex/retriever-tidal:dev >/dev/null
+    "$(plugin_image tidal)" >/dev/null
   "$ENGINE" run -d --name melodex-sandbox-bandcamp "${SHARED[@]}" --network-alias retriever-bandcamp "${AS_YOU[@]}" \
     -v melodex-sandbox-staging:/staging -e BANDCAMP_URL=http://streaming-standin:8080/bandcamp \
-    localhost/melodex/retriever-bandcamp:dev >/dev/null
+    "$(plugin_image bandcamp)" >/dev/null
   "$ENGINE" run -d --name melodex-sandbox-soulseek "${SHARED[@]}" --network-alias retriever-soulseek "${AS_YOU[@]}" \
     -v melodex-sandbox-staging:/staging -v melodex-sandbox-slskd:/downloads \
-    localhost/melodex/retriever-soulseek:dev >/dev/null
+    "$(plugin_image soulseek)" >/dev/null
 
   wait_for Navidrome "$navidrome_url/ping"
   # First run only: Navidrome accepts creating the admin while it has no users.

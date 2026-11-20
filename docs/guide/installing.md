@@ -1,7 +1,7 @@
 # Installing
 
 Melodex runs as a few containers: the core (the web app and API), the beets worker (the only thing that writes your
-music folder), and one container per retrieval plugin. Navidrome isn't part of the stack: Melodex joins the one you
+music folder), and one container for each retrieval plugin you choose, which fetch music. Navidrome isn't part of the stack: Melodex joins the one you
 have.
 
 ## With Docker Compose
@@ -30,40 +30,38 @@ the first scan.
 | `PUID`, `PGID` | The user and group that own the music folder, as `id` shows them. The beets worker and plugins run as them. | `1000` |
 | `MELODEX_PORT` | The port the web app listens on | `8787` |
 | `MELODEX_VERSION` | Which release to run, such as `1.0.0`; `latest` follows each release | `latest` |
-| `INBOX_PATH` | The folder the inbox plugin watches for files you drop in | `./inbox` |
-| `COMPOSE_PROFILES` | More retrieval plugins to run, comma-separated: `archive`, `prowlarr`, `qobuz`, `tidal`, `bandcamp`, `soulseek` | none |
-| `DOWNLOADS_PATH` | qBittorrent's downloads folder, for the `prowlarr` plugin | `./downloads` |
-| `SLSKD_DOWNLOADS_PATH` | slskd's downloads folder, for the `soulseek` plugin, which moves what it downloads into staging | `./slskd-downloads` |
 
 ### In a compose dashboard
 
 Server dashboards that run compose files, such as OpenMediaVault's (**Services → Compose → Files**), Portainer's
 stacks or Dockge, take the same file. Paste `docker-compose.yml` in as a new file or stack, put the settings above in
-its environment box (one `NAME=value` a line), and start it. Use full paths for `MUSIC_PATH`, `INBOX_PATH` and
-`DOWNLOADS_PATH` and `SLSKD_DOWNLOADS_PATH`, as the dashboard's working folder may not be where you expect.
+its environment box (one `NAME=value` a line), and start it. Use full paths for `MUSIC_PATH` and any folder a plugin
+needs, as the dashboard's working folder may not be where you expect.
 
 ### Retrieval plugins
 
-yt-dlp (YouTube Music) and the inbox folder always run. The others start only when named in `COMPOSE_PROFILES`, so
-the install stays small until you want them:
+The compose file has none: Melodex can't fetch anything until you add one. Each has a repository of its own, whose
+README has the lines to paste under `services:` in the same file, so it shares Melodex's `staging` volume:
 
-| Profile | Plugin | Needs |
+| Plugin | Fetches | Needs |
 | --- | --- | --- |
-| `archive` | Internet Archive: concerts from the Live Music Archive and netlabel releases | Nothing |
-| `prowlarr` | Prowlarr and qBittorrent | Your own Prowlarr and qBittorrent, and `DOWNLOADS_PATH` set to qBittorrent's downloads folder |
-| `qobuz` | Qobuz | Your own subscription |
-| `tidal` | Tidal | Your own subscription |
-| `bandcamp` | Albums and songs you've bought on Bandcamp | Your Bandcamp account |
-| `soulseek` | What Soulseek's users share, through slskd | Your own [slskd](https://github.com/slskd/slskd), and `SLSKD_DOWNLOADS_PATH` set to its downloads folder |
+| [YouTube (yt-dlp)](https://github.com/dextrd/melodex-retriever-ytdlp) | Songs and albums from YouTube Music | Nothing |
+| [Inbox folder](https://github.com/dextrd/melodex-retriever-inbox) | Files you drop into a folder, matched to requests by their tags | A folder |
+| [Internet Archive](https://github.com/dextrd/melodex-retriever-archive) | Concerts from the Live Music Archive and netlabel releases | Nothing |
+| [Prowlarr](https://github.com/dextrd/melodex-retriever-prowlarr) | What your torrent indexers offer, with your qBittorrent | Your own Prowlarr and qBittorrent |
+| [Qobuz](https://github.com/dextrd/melodex-retriever-qobuz) | Qobuz, in FLAC | Your own subscription |
+| [Tidal](https://github.com/dextrd/melodex-retriever-tidal) | Tidal, in FLAC | Your own subscription |
+| [Bandcamp](https://github.com/dextrd/melodex-retriever-bandcamp) | Albums and songs you've bought on Bandcamp | Your Bandcamp account |
+| [Soulseek](https://github.com/dextrd/melodex-retriever-soulseek) | What Soulseek's users share, through slskd | Your own [slskd](https://github.com/slskd/slskd) |
 
-For example `COMPOSE_PROFILES=archive,bandcamp`. Once it's running, add it under **Settings → Plugins**, where it's
-among the templates under **Add**: see [plugins](plugins.md).
+Then `docker compose up -d` again, and add it under **Settings → Plugins**, where it's among the templates under
+**Add**: see [plugins](plugins.md#retrieval-plugins).
 
 ### Prowlarr's save folder, from both sides
 
 qBittorrent and the Prowlarr plugin each see qBittorrent's downloads at their own path, and the plugin's settings take
 both. Say qBittorrent's container mounts your pool at `/data` (as the TRaSH guides lay it out), and Melodex's
-`DOWNLOADS_PATH` is that pool's torrents folder, mounted in the plugin at `/downloads`:
+`DOWNLOADS_PATH` in the plugin's compose lines is that pool's torrents folder, mounted in the plugin at `/downloads`:
 
 | Setting | Is | As seen by |
 | --- | --- | --- |
@@ -78,7 +76,7 @@ path, and names that path; a failed fetch says what to change.
 
 Soulseek is a network of people sharing their music with each other, and slskd is a client for it you run yourself.
 The plugin asks your slskd to search and download, then moves what it downloaded into Melodex's staging, so both
-must see slskd's downloads folder: set `SLSKD_DOWNLOADS_PATH` to that folder as your server sees it, writable. Give
+must see slskd's downloads folder: set `SLSKD_DOWNLOADS_PATH` in the plugin's compose lines to that folder as your server sees it, writable. Give
 the plugin one of the API keys in slskd's settings (`web.authentication.api_keys`).
 
 slskd expects you to share too, and some people won't send to those who share nothing; the plugin's health says when

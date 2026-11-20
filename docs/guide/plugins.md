@@ -7,7 +7,7 @@ Melodex is pluggable in five ways. Manage them under **Settings → Plugins**, w
 | --- | --- | --- |
 | **Catalogue** | Where artists, albums and songs come from | MusicBrainz (its public server, or your own mirror), Deezer |
 | **Media server** | Told to scan when music arrives; can sync playlists | Navidrome, Jellyfin, Plex |
-| **Retrieval** | Fetches music | YouTube Music (yt-dlp) and the inbox folder; Internet Archive, Prowlarr, Qobuz, Tidal, Bandcamp and Soulseek when you turn them on |
+| **Retrieval** | Fetches music | None built in: each is a container you add, from [the list below](#retrieval-plugins) |
 | **Artwork** | Covers and artist pictures | Cover Art Archive, Deezer, Wikimedia Commons, fanart.tv (with your own key) |
 | **Lyrics** | The words of songs, synced where they can be | LRCLIB |
 
@@ -19,11 +19,27 @@ fetch, and search finds only what you have. Add a catalogue whenever you like, a
 against it. Files matched before it was removed stay as they are. Beets doesn't need MusicBrainz either: music fetched
 through a catalogue that isn't MusicBrainz, such as Deezer, is filed as it's tagged.
 
-Each retrieval plugin runs as a container of its own, from the same compose file: yt-dlp and the inbox always, the
-others when named in `COMPOSE_PROFILES` (see [installing](installing.md#retrieval-plugins)). Add one under **Add**,
-where each is a template with its **plugin address** filled in, and fill in its settings. That's the address of the
-plugin's own container, such as `http://retriever-soulseek:8080`, not of the service it uses: slskd's, Prowlarr's or
-qBittorrent's address goes in the plugin's settings once it's added.
+## Retrieval plugins
+
+Each retrieval plugin runs as a container of its own, from a repository of its own. Its README has the lines to paste
+under `services:` in the compose file you run Melodex with, and what else it needs; then `docker compose up -d`
+starts it.
+
+| Plugin | Fetches | Needs |
+| --- | --- | --- |
+| [YouTube (yt-dlp)](https://github.com/dextrd/melodex-retriever-ytdlp) | Songs and albums from YouTube Music | Nothing |
+| [Inbox folder](https://github.com/dextrd/melodex-retriever-inbox) | Files you drop into a folder, matched to requests by their tags | A folder |
+| [Internet Archive](https://github.com/dextrd/melodex-retriever-archive) | Concerts from the Live Music Archive and netlabel releases | Nothing |
+| [Prowlarr](https://github.com/dextrd/melodex-retriever-prowlarr) | What your torrent indexers offer, with your qBittorrent | Your own Prowlarr and qBittorrent |
+| [Qobuz](https://github.com/dextrd/melodex-retriever-qobuz) | Qobuz, in FLAC | Your own subscription |
+| [Tidal](https://github.com/dextrd/melodex-retriever-tidal) | Tidal, in FLAC | Your own subscription |
+| [Bandcamp](https://github.com/dextrd/melodex-retriever-bandcamp) | Albums and songs you've bought on Bandcamp | Your Bandcamp account |
+| [Soulseek](https://github.com/dextrd/melodex-retriever-soulseek) | What Soulseek's users share, through slskd | Your own [slskd](https://github.com/slskd/slskd) |
+
+Once it's running, add it under **Add**, where each is a template with its **plugin address** filled in, and fill in
+its settings. That's the address of the plugin's own container, such as `http://retriever-soulseek:8080`, not of the
+service it uses: slskd's, Prowlarr's or qBittorrent's address goes in the plugin's settings once it's added. Each
+plugin has its own releases: `latest` follows them, or name a version such as `2` to choose when it changes.
 
 ## One media server at a time
 
@@ -92,7 +108,7 @@ Navidrome's alone for now:
 
 ## The inbox
 
-The inbox plugin fetches nothing itself: it offers whatever you drop into its folder (`INBOX_PATH`). Drop in the files
+The inbox plugin fetches nothing itself: it offers whatever you drop into its folder (`INBOX_PATH` in its compose lines). Drop in the files
 for a request, then press **Retry** on it.
 
 ## Your own plugins

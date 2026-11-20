@@ -42,30 +42,6 @@ jobs:
           - image: melodex-beets-worker
             context: beets-worker
             file: beets-worker/Dockerfile
-          - image: melodex-retriever-ytdlp
-            context: plugins/retriever-ytdlp
-            file: plugins/retriever-ytdlp/Dockerfile
-          - image: melodex-retriever-inbox
-            context: plugins/retriever-inbox
-            file: plugins/retriever-inbox/Dockerfile
-          - image: melodex-retriever-archive
-            context: plugins/retriever-archive
-            file: plugins/retriever-archive/Dockerfile
-          - image: melodex-retriever-prowlarr
-            context: plugins/retriever-prowlarr
-            file: plugins/retriever-prowlarr/Dockerfile
-          - image: melodex-retriever-qobuz
-            context: plugins/retriever-qobuz
-            file: plugins/retriever-qobuz/Dockerfile
-          - image: melodex-retriever-tidal
-            context: plugins/retriever-tidal
-            file: plugins/retriever-tidal/Dockerfile
-          - image: melodex-retriever-bandcamp
-            context: plugins/retriever-bandcamp
-            file: plugins/retriever-bandcamp/Dockerfile
-          - image: melodex-retriever-soulseek
-            context: plugins/retriever-soulseek
-            file: plugins/retriever-soulseek/Dockerfile
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-qemu-action@v3

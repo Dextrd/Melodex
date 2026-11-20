@@ -16,13 +16,14 @@
 | `src/Melodex.Web` | The web app (Blazor WebAssembly), served by the core and talking only to the public API |
 | `tests/Melodex.Core.Tests` | Tests, including the gate test against the test library |
 | `beets-worker` | The import engine: files staged downloads into the library with beets ([docs](import-worker.md)) |
-| `plugins/retriever-ytdlp` | Retrieval plugin: YouTube Music through yt-dlp |
-| `plugins/retriever-inbox` | Retrieval plugin: a folder you drop files into |
 | `tests/fixtures/musicbrainz` | Recorded MusicBrainz responses the gate test replays |
 | `docs/guide` | The user guide, also shown in the web app under Settings → Help |
 | `docs/contracts` | The plugin contracts, written down, including the retrieval OpenAPI spec |
 | `tools/testlib` | Generates a test music library from real MusicBrainz data, with an answer key |
-| `sandbox` | A throwaway stack (Navidrome, Melodex, the beets worker and both plugins) over a copy of the test library |
+| `sandbox` | A throwaway stack (Navidrome, Melodex, the beets worker and the retrieval plugins) over a copy of the test library |
+
+The retrieval plugins live in repositories of their own, `dextrd/melodex-retriever-<name>`. The sandbox runs their
+published images, or builds one from a checkout of its repository beside this one (or in `PLUGINS_DIR`).
 
 ## Building and testing
 

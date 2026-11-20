@@ -43,6 +43,10 @@ What changed in each release of Melodex. Versions follow [semantic versioning](h
 
 ### Changed
 
+- **Retrieval plugins have repositories of their own**, `dextrd/melodex-retriever-<name>`, each with its own releases
+  and image, which keeps its name. Each README has the lines to add to your compose file. Melodex's own compose file
+  is just Melodex now: the core and the beets worker, with no plugins and no `COMPOSE_PROFILES`. The guide's Plugins
+  page lists them, and upgrading says what to change (#219).
 - The visualiser's bars reach 16 kHz, where they stopped at 10 kHz, and a song's spectrum is version 2 of its format.
   `.bars` files beside songs are made again in it as the visualiser's bars are next made when matching, and take
   about a third more room. `/bars` still gives version 1, for apps written for it (#102).

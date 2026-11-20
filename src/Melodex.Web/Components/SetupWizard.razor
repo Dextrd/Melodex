@@ -154,7 +154,8 @@
             await OfferYtdlpAsync();
     }
 
-    // yt-dlp comes with Melodex's compose file, so it's added the first time the plugins are shown, unless a source already is.
+    // yt-dlp is the plugin most installs start with, so where it's running it's added the first time the plugins are
+    // shown, unless a source already is.
     private async Task OfferYtdlpAsync()
     {
         if (!_offeredYtdlp)
@@ -171,7 +172,8 @@
             }
             catch (Exception e) when (e is HttpRequestException or MelodexApiException)
             {
-                _ytdlpNote = $"YouTube (yt-dlp) didn't answer at {ytdlp.Endpoint}, so it isn't added. If it runs elsewhere, or once it's running, add it under Sources.";
+                _ytdlpNote = $"No retrieval plugin answered, so Melodex can't fetch music yet. Each runs as a container beside Melodex, from its own "
+                             + $"repository: the guide's Plugins page lists them, with the lines for your compose file. Once one's running, add it under Sources.";
             }
         }
         _plugins = true;
