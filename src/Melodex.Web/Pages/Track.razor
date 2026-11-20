@@ -5,6 +5,7 @@
 @inject RequestTracker Tracker
 @inject Player Player
 @inject Glimpses Glimpses
+@inject Preferences Prefs
 
 <PageTitle>@(_track?.Title ?? _glimpse?.Title ?? "Track") · Melodex</PageTitle>
 
@@ -98,55 +99,57 @@ else
         </div>
     </div>
 
-    <h2 class="section">On @Format.Count(track.Appearances.Select(a => a.AlbumId).Distinct().Count(), "album", "albums")</h2>
-    @if (track.Appearances.Count == 0)
-    {
-        <div class="empty card">No albums in the catalogue list this song yet.</div>
-    }
-    else
-    {
-        <div class="card">
-            <table class="table">
-                <thead>
-                    <tr>
-                        <th>Album</th>
-                        <th class="hide-narrow">Edition</th>
-                        <th class="num">#</th>
-                        <th class="hide-narrow">First released</th>
-                        <th></th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @* One row an album: the edition you have it on, or the first, standing for the rest. *@
-                    @foreach (var album in track.Appearances.GroupBy(a => a.AlbumId))
-                    {
-                        var on = album.FirstOrDefault(a => a.InLibrary) ?? album.First();
-                        var others = album.Count() - 1;
+    <h2 class="section">
+        <SectionToggle Open="IsOpen(Albums)" OnToggle="() => ToggleAsync(Albums)">On @Format.Count(track.Appearances.Select(a => a.AlbumId).Distinct().Count(), "album", "albums")</SectionToggle>
+    </h2>
+    <Collapsible Open="IsOpen(Albums)">
+        @if (track.Appearances.Count == 0)
+        {
+            <div class="empty card">No albums in the catalogue list this song yet.</div>
+        }
+        else
+        {
+            <div class="card">
+                <table class="table">
+                    <thead>
                         <tr>
-                            <td>
-                                <a href="albums/@on.AlbumId">@on.AlbumTitle</a>
-                                <span class="muted small"> · @Format.TypeLabel(on.AlbumType)</span>
-                                @if (on.Title != track.Title) { <div class="muted small">as “@on.Title”</div> }
-                            </td>
-                            <td class="hide-narrow muted small">
-                                @on.EditionTitle@(on.Country is null ? "" : $" ({on.Country})")
-                                @if (others > 0) { <span> and @Format.Count(others, "other", "others")</span> }
-                            </td>
-                            <td class="num muted nowrap">@(on.Disc > 1 ? $"{on.Disc}-" : "")@on.Number</td>
-                            <td class="hide-narrow muted">@album.Select(a => a.ReleaseDate).Where(d => d is not null).Order().FirstOrDefault()</td>
-                            <td><StatusBadge Album="on.AlbumStatus" PartlyCovered="on.PartlyCovered" /></td>
+                            <th>Album</th>
+                            <th class="hide-narrow">Edition</th>
+                            <th class="num">#</th>
+                            <th class="hide-narrow">First released</th>
+                            <th></th>
                         </tr>
-                    }
-                </tbody>
-            </table>
-        </div>
-    }
-
-    <SimilarSongs TrackId="track.Id" />
+                    </thead>
+                    <tbody>
+                        @* One row an album: the edition you have it on, or the first, standing for the rest. *@
+                        @foreach (var album in track.Appearances.GroupBy(a => a.AlbumId))
+                        {
+                            var on = album.FirstOrDefault(a => a.InLibrary) ?? album.First();
+                            var others = album.Count() - 1;
+                            <tr>
+                                <td>
+                                    <a href="albums/@on.AlbumId">@on.AlbumTitle</a>
+                                    <span class="muted small"> · @Format.TypeLabel(on.AlbumType)</span>
+                                    @if (on.Title != track.Title) { <div class="muted small">as “@on.Title”</div> }
+                                </td>
+                                <td class="hide-narrow muted small">
+                                    @on.EditionTitle@(on.Country is null ? "" : $" ({on.Country})")
+                                    @if (others > 0) { <span> and @Format.Count(others, "other", "others")</span> }
+                                </td>
+                                <td class="num muted nowrap">@(on.Disc > 1 ? $"{on.Disc}-" : "")@on.Number</td>
+                                <td class="hide-narrow muted">@album.Select(a => a.ReleaseDate).Where(d => d is not null).Order().FirstOrDefault()</td>
+                                <td><StatusBadge Album="on.AlbumStatus" PartlyCovered="on.PartlyCovered" /></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </Collapsible>
 
     @if (owned)
     {
-        <TrackLyricsPanel TrackId="track.Id" Title="@track.Title" OnChanged="LoadAsync" />
+        <TrackLyricsPanel TrackId="track.Id" Title="@track.Title" OnChanged="LoadAsync" Open="IsOpen(Lyrics)" OnToggle="() => ToggleAsync(Lyrics)" />
 
         @*
             The files' quality and what's done to all of them are on the section's title row, as the lyrics' are, and so
@@ -155,9 +158,9 @@ else
         var single = track.Files.Count == 1;
         var qualities = track.Files.Select(f => f.Quality).OfType<FileQuality>().ToList();
         <div class="section-head">
-            <h2>@(single ? "File" : $"{track.Files.Count} files")</h2>
+            <h2><SectionToggle Open="IsOpen(Files)" OnToggle="() => ToggleAsync(Files)">@(single ? "File" : $"{track.Files.Count} files")</SectionToggle></h2>
             <QualityBadge Quality="FileQuality.Lowest(qualities)" Mixed="FileQuality.Mixed(qualities)" />
-            <div class="row lyrics-actions">
+            <div class="row lyrics-actions @(IsOpen(Files) ? "" : "section-actions-shut")">
                 <IconButton Icon="format" Requires="@UserPermissions.Format" Label="Format" Title="Rewrite this song's files: their tags, cover and where they live" OnClick="() => _formatting = true" />
                 <IconButton Icon="image" Requires="@UserPermissions.Format" Label="Cover" Title="Choose this song's cover, from any release it's on or a picture of your own" OnClick="() => _choosingCover = true" />
                 <QualityButton Kind="tracks" Id="track.Id" Name="@track.Title" />
@@ -167,65 +170,71 @@ else
                 }
             </div>
         </div>
-        @foreach (var file in track.Files)
-        {
-            <div class="card track-file">
-                @if (single)
-                {
-                    <code>@file.Path</code>
-                }
-                else
-                {
-                    <div class="row track-file-head">
+        <Collapsible Open="IsOpen(Files)">
+            @foreach (var file in track.Files)
+            {
+                <div class="card track-file">
+                    @if (single)
+                    {
                         <code>@file.Path</code>
-                        @FileButtons((track, file))
-                    </div>
-                }
-                @if (_replaceError is { } error && _replacing is null)
-                {
-                    <p class="error small">@error</p>
-                }
-                @* What the file is, then what its tags say, all as one list. *@
-                <dl class="file-tags">
-                    @if (file.Quality is { Codec: not null } quality)
-                    {
-                        <dt>Format</dt>
-                        <dd>@quality.Label (@quality.Details)</dd>
                     }
-                    else if (file.Format is not null)
+                    else
                     {
-                        <dt>Format</dt>
-                        <dd>@file.Format.ToUpperInvariant()</dd>
+                        <div class="row track-file-head">
+                            <code>@file.Path</code>
+                            @FileButtons((track, file))
+                        </div>
                     }
-                    @if (file.DurationSeconds is not null)
+                    @if (_replaceError is { } error && _replacing is null)
                     {
-                        <dt>Length</dt>
-                        <dd>@Format.Duration(file.DurationSeconds)</dd>
+                        <p class="error small">@error</p>
                     }
-                    <dt>Size</dt>
-                    <dd>@Format.Size(file.Size)</dd>
-                    @if (file.FormattedAt is { } formatted)
-                    {
-                        <dt>Last formatted</dt>
-                        <dd title="@formatted.ToLocalTime().ToString("f")">@Format.Ago(formatted)</dd>
-                    }
-                    @foreach (var tag in file.Tags)
-                    {
-                        <dt>@tag.Name</dt>
-                        <dd>@tag.Value</dd>
-                    }
-                </dl>
-            </div>
-        }
+                    @* What the file is, then what its tags say, all as one list. *@
+                    <dl class="file-tags">
+                        @if (file.Quality is { Codec: not null } quality)
+                        {
+                            <dt>Format</dt>
+                            <dd>@quality.Label (@quality.Details)</dd>
+                        }
+                        else if (file.Format is not null)
+                        {
+                            <dt>Format</dt>
+                            <dd>@file.Format.ToUpperInvariant()</dd>
+                        }
+                        @if (file.DurationSeconds is not null)
+                        {
+                            <dt>Length</dt>
+                            <dd>@Format.Duration(file.DurationSeconds)</dd>
+                        }
+                        <dt>Size</dt>
+                        <dd>@Format.Size(file.Size)</dd>
+                        @if (file.FormattedAt is { } formatted)
+                        {
+                            <dt>Last formatted</dt>
+                            <dd title="@formatted.ToLocalTime().ToString("f")">@Format.Ago(formatted)</dd>
+                        }
+                        @foreach (var tag in file.Tags)
+                        {
+                            <dt>@tag.Name</dt>
+                            <dd>@tag.Value</dd>
+                        }
+                    </dl>
+                </div>
+            }
+        </Collapsible>
         @if (_held.Count > 0)
         {
-            <h2 class="section">Replaced by an upgrade</h2>
-            <p class="muted small">
-                Held outside the music folder until it's deleted. Rolling back deletes the copy that replaced it and puts this one back; a later upgrade may replace it again, unless it's never to be upgraded.
-            </p>
-            <div class="card"><HeldFiles Files="_held" ShowTitle="false" Changed="LoadAsync" /></div>
+            <h2 class="section"><SectionToggle Open="IsOpen(Upgrades)" OnToggle="() => ToggleAsync(Upgrades)">Replaced by an upgrade</SectionToggle></h2>
+            <Collapsible Open="IsOpen(Upgrades)">
+                <p class="muted small">
+                    Held outside the music folder until it's deleted. Rolling back deletes the copy that replaced it and puts this one back; a later upgrade may replace it again, unless it's never to be upgraded.
+                </p>
+                <div class="card"><HeldFiles Files="_held" ShowTitle="false" Changed="LoadAsync" /></div>
+            </Collapsible>
         }
     }
+
+    <SimilarSongs TrackId="track.Id" Open="IsOpen(Similar)" OnToggle="() => ToggleAsync(Similar)" />
 }
 
 @if (_choosingCover && _track is not null)
@@ -331,8 +340,28 @@ else
     }
     private bool _choosingCover;
     private (string Name, IReadOnlyList<PlaylistItem> Songs)? _adding;
+
+    // Which of the page's sections are open, kept between visits: the albums it's on, its lyrics and its files are open
+    // until shut; what upgrades replaced and similar songs are shut until opened.
+    private const string SectionsKey = "trackSections", Albums = "albums", Lyrics = "lyrics", Files = "files", Upgrades = "upgrades", Similar = "similar";
+    private Dictionary<string, bool> _sections = [];
+    private bool _sectionsLoaded;
+
+    private bool IsOpen(string section) => _sections.TryGetValue(section, out var open) ? open : section is Albums or Lyrics or Files;
+
+    private Task ToggleAsync(string section)
+    {
+        _sections[section] = !IsOpen(section);
+        return Prefs.SetAsync(SectionsKey, _sections);
+    }
+
     protected override async Task OnParametersSetAsync()
     {
+        if (!_sectionsLoaded)
+        {
+            _sections = await Prefs.GetAsync<Dictionary<string, bool>>(SectionsKey, []);
+            _sectionsLoaded = true;
+        }
         ScanStatus.LibraryChanged -= Reload;
         ScanStatus.LibraryChanged += Reload;
         Tracker.Changed -= Redraw;

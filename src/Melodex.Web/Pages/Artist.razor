@@ -82,15 +82,13 @@ else
     {
         var open = IsOpen(group.Key);
         <h2 class="section">
-            <button class="section-toggle" aria-expanded="@(open ? "true" : "false")" @onclick="() => ToggleAsync(group.Key)">
-                <span class="chevron @(open ? "open" : "")" aria-hidden="true"></span>
+            <SectionToggle Open="open" OnToggle="() => ToggleAsync(group.Key)">
                 @Format.TypeName(group.Key) <span class="muted small">@group.Count()</span>
-            </button>
+            </SectionToggle>
         </h2>
-        @if (open)
-        {
+        <Collapsible Open="open">
             <AlbumTable Albums="group.ToList()" OnIgnore="ToggleIgnoreAsync" />
-        }
+        </Collapsible>
     }
 
     @if (_glimpsed)

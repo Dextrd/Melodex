@@ -76,7 +76,7 @@ public sealed class DiscoveryService(MelodexDbContext db, DiscoveryPlugins plugi
         var query = new DiscoveryRecording(track.Title, track.ArtistCredit, await catalogue.ProviderIdsAsync(EntityKind.Track, trackId, ct),
             [await ArtistOfAsync(track.ArtistId, ct)], track.Duration);
         var answers = await AskAsync(DiscoveryCapabilities.SimilarRecordings, $"track|{trackId}", SimilarFor,
-            (plugin, ct2) => plugin.SimilarRecordingsAsync(query, take + 5, ct2), ct);
+            (plugin, ct2) => plugin.SimilarRecordingsAsync(query, Ask(take), ct2), ct);
         return await SongsAsync(answers, take, [trackId], ct);
     }
 
@@ -107,9 +107,12 @@ public sealed class DiscoveryService(MelodexDbContext db, DiscoveryPlugins plugi
         }
         var listener = new DiscoveryListener(accounts, topArtists, topSongs);
         var answers = await AskAsync(DiscoveryCapabilities.Recommendations, $"user|{userId}|{string.Join(',', accounts.OrderBy(a => a.Key))}", RecommendedFor,
-            (plugin, ct2) => plugin.RecommendAsync(listener, take, ct2), ct);
+            (plugin, ct2) => plugin.RecommendAsync(listener, Ask(take), ct2), ct);
         return await SongsAsync(answers, take, [], ct);
     }
+
+    /// <summary>How many songs to ask each plugin for: more than are listed, as only those the catalogue has are.</summary>
+    private static int Ask(int take) => Math.Min(take * 3, MaxTake);
 
     /// <summary>
     /// Asks every plugin that declares the capability, at once, keeping each one's answer a while. A plugin that fails is
@@ -198,8 +201,8 @@ public sealed class DiscoveryService(MelodexDbContext db, DiscoveryPlugins plugi
                 break;
             var artist = best.Artists.FirstOrDefault() ?? new DiscoveryArtist(best.Artist, []);
             var artistId = await MatchArtistAsync(artist.Name, artist.Ids, null, ct);
-            var trackId = await MatchTrackAsync(best, artistId, ct);
-            if (trackId is { } id && (leaveOut.Contains(id) || found.Any(f => f.TrackId == id)))
+            // Only songs the catalogue has are listed: they're the ones that can be played, fetched or opened.
+            if (await MatchTrackAsync(best, artistId, ct) is not { } trackId || leaveOut.Contains(trackId) || found.Any(f => f.TrackId == trackId))
                 continue;
             found.Add(new DiscoveredSong(trackId, best.Title, best.Artist, artistId, null, best.Album, null, best.Duration?.TotalSeconds, false, score, from));
         }
@@ -250,7 +253,7 @@ public sealed class DiscoveryService(MelodexDbContext db, DiscoveryPlugins plugi
     /// </summary>
     private async Task<IReadOnlyList<DiscoveredSong>> WithAlbumsAsync(List<DiscoveredSong> found, CancellationToken ct)
     {
-        var ids = found.Select(f => f.TrackId).OfType<Guid>().ToList();
+        var ids = found.Select(f => f.TrackId).ToList();
         var owned = (await db.LibraryFiles.Where(f => f.TrackId != null && ids.Contains(f.TrackId.Value))
             .Select(f => new { TrackId = f.TrackId!.Value, f.EditionId }).ToListAsync(ct)).ToLookup(f => f.TrackId, f => f.EditionId);
         var appearances = (await db.EditionTracks.Where(et => ids.Contains(et.TrackId))
@@ -260,8 +263,7 @@ public sealed class DiscoveryService(MelodexDbContext db, DiscoveryPlugins plugi
             .ToLookup(et => et.TrackId);
         return found.Select(f =>
         {
-            if (f.TrackId is not { } id)
-                return f;
+            var id = f.TrackId;
             var mine = owned[id].ToList();
             var named = TextMatch.NormaliseTitle(f.AlbumTitle);
             var on = appearances[id].OrderByDescending(a => mine.Contains(a.EditionId))

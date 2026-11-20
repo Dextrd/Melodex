@@ -59,16 +59,37 @@ public sealed class ListenBrainz(PluginContext context) : IDiscoveryPlugin
 
     public async Task<IReadOnlyList<DiscoveredRecording>> SimilarRecordingsAsync(DiscoveryRecording recording, int count, CancellationToken cancellationToken)
     {
-        if (Mbid(recording.Ids) is not { } mbid)
+        IReadOnlyList<DiscoveredRecording> found = Mbid(recording.Ids) is { } mbid ? await SimilarToAsync(mbid, count, cancellationToken) : [];
+        // ListenBrainz keeps what's played together on one recording of a song, which often isn't the one the catalogue
+        // has, such as the album's when the catalogue has a single's. Its own for the title and artist is tried then.
+        if (found.Count == 0 && await MainRecordingAsync(recording, cancellationToken) is { } main && main != Mbid(recording.Ids))
+            found = await SimilarToAsync(main, count, cancellationToken);
+        if (found.Count == 0)
             return [];
-        var results = await GetAsync($"{Labs}similar-recordings/json?recording_mbids={mbid}&algorithm={RecordingAlgorithm}", cancellationToken);
-        if (results is not { ValueKind: JsonValueKind.Array } list)
-            return [];
-        var found = ReadRecordings(list, mbid, count);
         // The labs API leaves out who the artists are; the metadata has their IDs, which match them in the catalogue.
         var metadata = await MetadataAsync(found.Select(r => Mbid(r.Ids)!).ToList(), cancellationToken);
         return found.Select(r => metadata.TryGetValue(Mbid(r.Ids)!, out var known) ? known with { Score = r.Score, Album = r.Album ?? known.Album } : r).ToList();
     }
+
+    private async Task<IReadOnlyList<DiscoveredRecording>> SimilarToAsync(string mbid, int count, CancellationToken ct) =>
+        await GetAsync($"{Labs}similar-recordings/json?recording_mbids={mbid}&algorithm={RecordingAlgorithm}", ct) is { ValueKind: JsonValueKind.Array } list
+            ? ReadRecordings(list, mbid, count)
+            : [];
+
+    /// <summary>The recording ListenBrainz files listens of this title by this artist under, if it knows one.</summary>
+    private async Task<string?> MainRecordingAsync(DiscoveryRecording recording, CancellationToken ct)
+    {
+        var artist = recording.Artist.Length > 0 ? recording.Artist : recording.Artists.FirstOrDefault()?.Name;
+        if (string.IsNullOrWhiteSpace(artist) || string.IsNullOrWhiteSpace(recording.Title))
+            return null;
+        var answer = await GetAsync($"{Labs}acr-lookup/json?artist_credit_name={Uri.EscapeDataString(artist)}&recording_name={Uri.EscapeDataString(recording.Title)}", ct);
+        return answer is { ValueKind: JsonValueKind.Array } list ? ReadLookup(list) : null;
+    }
+
+    /// <summary>The recording MBID the labs API's artist and title lookup found, if any.</summary>
+    public static string? ReadLookup(JsonElement list) => list.EnumerateArray()
+        .Select(r => Text(r, "recording_mbid"))
+        .FirstOrDefault(m => m is not null && Guid.TryParse(m, out _));
 
     public async Task<IReadOnlyList<DiscoveredRecording>> RecommendAsync(DiscoveryListener listener, int count, CancellationToken cancellationToken)
     {

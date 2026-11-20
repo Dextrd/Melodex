@@ -476,14 +476,22 @@ p.error { max-width: none; white-space: normal; }
 .page-head + .card, .page-head + .notice + .card, .page-head + .error + .card { margin-top: 1rem; }
 .crumbs { margin-bottom: .35rem; }
 
-/* Collapsible sections on the artist page. */
+/* Collapsible sections on the artist and song pages. */
 h2.section { margin: 1.5rem 0 .5rem; }
 .section-toggle {
     font: inherit; font-weight: 700; border: none; background: none; padding: 0; color: var(--text);
-    display: inline-flex; align-items: center; gap: .5rem;
+    display: inline-flex; align-items: center; gap: .75rem;
 }
 .chevron { width: .5rem; height: .5rem; border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted); transform: rotate(-45deg); transition: transform .15s; }
 .chevron.open { transform: rotate(45deg); }
+/* A section sliding open and shut: its rows grow from nothing as it fades in. */
+.collapsible { display: grid; grid-template-rows: 0fr; opacity: 0; transition: grid-template-rows .2s ease-out, opacity .2s ease-out; }
+.collapsible.open { grid-template-rows: 1fr; opacity: 1; }
+.collapsible-inner { min-height: 0; overflow: hidden; }
+/* Buttons on a section's title row fade with it. */
+.section-actions-shut { opacity: 0; visibility: hidden; }
+.lyrics-actions { transition: opacity .2s ease-out, visibility .2s; }
+@media (prefers-reduced-motion: reduce) { .collapsible, .lyrics-actions { transition: none; } }
 
 /* Album lists start with a small cover. */
 .table .cover-col { width: 3.5rem; padding-right: 0; }
@@ -1932,6 +1940,6 @@ a.toast-body:hover .toast-title { text-decoration: underline; }
 .notice.upgrade-run > span:nth-child(2) { flex: 1; }
 .track-file-head { align-items: center; gap: .5rem; margin-bottom: .3rem; flex-wrap: wrap; }
 /* The first file a little below the title row, as h2.section leaves. */
-.section-head + .track-file { margin-top: .5rem; }
+.section-head + .track-file, .section-head + .collapsible > .collapsible-inner > .track-file:first-child { margin-top: .5rem; }
 /* The path takes the room the buttons leave. */
 .track-file-head > code { overflow-wrap: anywhere; min-width: 0; flex: 1 1 16rem; }

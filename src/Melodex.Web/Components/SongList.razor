@@ -1,28 +1,54 @@
+@inject Player Player
+
 @*
-    Songs the discovery plugins found (#3): like a song, or recommended. Each opens its page when the catalogue knows it,
-    else searches for it.
+    Songs the discovery plugins found (#3): like a song, or recommended. Listed as search lists tracks, with what can be
+    done with each: play one you have, or listen to, get or wish for one you don't. Only songs the catalogue has are
+    listed.
 *@
 <div class="card">
-    <table class="table track-list discovered-songs">
-        <colgroup><col class="cover-col" /><col /><col class="status-col hide-narrow" /></colgroup>
+    <table class="table track-list narrow-status discovered-songs">
+        <colgroup><col class="cover-col" /><col /><col class="length-col hide-narrow" /><col class="status-col" /><col class="wide-action-col" /></colgroup>
         <tbody>
             @foreach (var song in Songs)
             {
-                <tr class="arrives" @key="(song.TrackId, song.Title, song.ArtistCredit)">
-                    <td class="cover-col"><Cover Url="@song.CoverUrl" /></td>
+                var track = AsTrack(song);
+                <tr class="arrives" @key="song.TrackId">
+                    <td class="cover-col">
+                        @if (song.AlbumId is { } albumId) { <a href="albums/@albumId" tabindex="-1"><Cover Url="@song.CoverUrl" /></a> }
+                        else { <Cover Url="@song.CoverUrl" /> }
+                    </td>
                     <td class="track-main">
-                        <div class="ellipsis"><a href="@Href(song)" title="@Title(song)">@song.Title</a></div>
+                        <div class="ellipsis">
+                            <a href="tracks/@track.Id" class="plain" title="@Title(song)">@song.Title</a>@if (!song.Owned) { <FetchNote Id="track.Id" /> }
+                        </div>
                         <div class="muted small ellipsis">
-                            @if (song.ArtistId is { } artist) { <a href="artists/@artist">@song.ArtistCredit</a> } else { @song.ArtistCredit }
+                            <span class="show-narrow"><StatusBadge Track="song.Owned ? TrackStatus.Owned : TrackStatus.Missing" /></span>
+                            @if (song.ArtistId is { } artistId) { <a href="artists/@artistId">@song.ArtistCredit</a> } else { @song.ArtistCredit }
                             @if (song.AlbumTitle is { } album)
                             {
                                 <span> · </span>
-                                @if (song.AlbumId is { } albumId) { <a href="albums/@albumId">@album</a> } else { @album }
+                                @if (song.AlbumId is { } id) { <a href="albums/@id">@album</a> } else { @album }
                             }
-                            @if (song.Owned) { <span class="show-narrow"> · <span class="badge owned">Owned</span></span> }
                         </div>
                     </td>
-                    <td class="num hide-narrow">@if (song.Owned) { <span class="badge owned">Owned</span> }</td>
+                    <td class="num muted hide-narrow">@Format.Duration(song.DurationSeconds)</td>
+                    <td class="num hide-narrow"><StatusBadge Track="song.Owned ? TrackStatus.Owned : TrackStatus.Missing" /></td>
+                    <td class="num actions">
+                        @if (song.Owned)
+                        {
+                            <IconButton Icon="play" Requires="@UserPermissions.Listen" Title="Play" OnClick="() => Player.PlayAsync([PlayerEntry.Owned(track)])" />@* no space: buttons line up from row to row *@<ItemMenu Entry="PlayerEntry.Owned(track)" Keep="[new PlaylistItem(track.Id)]" Name="@track.Title" UpgradeTrackId="track.Id"
+                                      AlbumHref="@(track.AlbumId is { } a ? $"albums/{a}" : null)" ArtistHref="@(track.ArtistId is { } r ? $"artists/{r}" : null)" />
+                        }
+                        else
+                        {
+                            <FetchButton Kind="RequestKind.Track" Id="track.Id" Button="false">
+                                <WishButton Kind="RequestKind.Track" Id="track.Id">
+                                    <IconButton Icon="listen" Requires="@UserPermissions.Listen" Title="Listen: fetch it to play now, without adding it to your library" OnClick="() => Player.ListenAsync(track.Id)" />
+                                </WishButton>@* no space: it lines up with an owned song's play button *@<ItemMenu ListenTrackId="track.Id" Name="@track.Title" Get="(RequestKind.Track, track.Id)" Wish="(RequestKind.Track, track.Id)"
+                                          AlbumHref="@(track.AlbumId is { } a ? $"albums/{a}" : null)" ArtistHref="@(track.ArtistId is { } r ? $"artists/{r}" : null)" />
+                            </FetchButton>
+                        }
+                    </td>
                 </tr>
             }
         </tbody>
@@ -32,8 +58,9 @@
 @code {
     [Parameter, EditorRequired] public IReadOnlyList<DiscoveredSong> Songs { get; set; } = [];
 
-    private static string Href(DiscoveredSong song) =>
-        song.TrackId is { } id ? $"tracks/{id}" : $"search?q={Uri.EscapeDataString($"{song.Title} {song.ArtistCredit}")}";
+    /// <summary>The song as search would list it.</summary>
+    private static SearchTrack AsTrack(DiscoveredSong song) =>
+        new(song.TrackId, song.Title, song.ArtistCredit, song.DurationSeconds, song.Owned, [], song.ArtistId, song.AlbumId, song.AlbumTitle, song.CoverUrl);
 
-    private static string Title(DiscoveredSong song) => $"{Math.Round(song.Score * 100)}% from {string.Join(" and ", song.From)}";
+    private static string Title(DiscoveredSong song) => $"{Math.Round(song.Score * 100)}% alike, from {string.Join(" and ", song.From)}";
 }

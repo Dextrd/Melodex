@@ -17,7 +17,8 @@ recommend to a listener, each with a score. They sit under Discovery in Settings
 4. What they find is matched to the catalogue: by an ID it already has; for an artist with a MusicBrainz ID while a
    catalogue uses them, by adding them to the catalogue as a search would; else by name, only when one artist the
    catalogue holds has it (or one in the library does). A song is matched by its IDs, else by its title among its
-   artist's. What isn't matched is still listed, by name, and searched for when opened.
+   artist's. Artists that aren't matched are still listed, by name, and searched for when opened; songs that aren't
+   are left out, so plugins are asked for more than are listed.
 5. A plugin that throws is left out of that answer, logged, and asked again next time.
 
 ## `IDiscoveryPlugin`
@@ -58,5 +59,5 @@ best.
 
 | Plugin | Notes |
 | --- | --- |
-| ListenBrainz | Set up by default; no account. Similar artists and songs from [ListenBrainz](https://listenbrainz.org)'s labs API, worked out from which ones its listeners play in the same sessions; it knows them only by MusicBrainz ID, so it finds nothing for those without one. Recommendations are its collaborative filtering's songs for the person's linked ListenBrainz account, made from the listens sent to it, once ListenBrainz has made them. Kept to one call a second, as ListenBrainz asks. |
+| ListenBrainz | Set up by default; no account. Similar artists and songs from [ListenBrainz](https://listenbrainz.org)'s labs API, worked out from which ones its listeners play in the same sessions; it knows them by MusicBrainz ID. It keeps a song's listens on one of its recordings, so when the song's own recording has nothing, it looks up the one it uses for that title and artist and asks about that instead. Recommendations are its collaborative filtering's songs for the person's linked ListenBrainz account, made from the listens sent to it, once ListenBrainz has made them. Kept to one call a second, as ListenBrainz asks. |
 | Last.fm | Needs an API key of your own, free from [last.fm/api/account/create](https://www.last.fm/api/account/create); it can be the one for scrobbling. Similar artists and songs from [Last.fm](https://www.last.fm)'s `artist.getSimilar` and `track.getSimilar`, asked by MusicBrainz ID, then by name if Last.fm doesn't know the ID. |

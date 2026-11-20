@@ -27,6 +27,9 @@ public sealed class DiscoveryTests : IDisposable
     private const string GloryBox = "3a1c8f6e-21b5-4d43-9a0c-1a1a1a1a1a01";
     private const string Teardrop = "3a1c8f6e-21b5-4d43-9a0c-1a1a1a1a1a02";
     private const string Overcome = "3a1c8f6e-21b5-4d43-9a0c-1a1a1a1a1a03";
+    // Roads as the catalogue has it, on a single, and the recording ListenBrainz keeps its listens on.
+    private const string RoadsSingle = "3a1c8f6e-21b5-4d43-9a0c-1a1a1a1a1a04";
+    private const string RoadsMain = "3a1c8f6e-21b5-4d43-9a0c-1a1a1a1a1a05";
 
     private readonly string _dataPath = Path.Combine(Path.GetTempPath(), "melodex-tests", Guid.NewGuid().ToString("N"));
     private readonly WebApplicationFactory<Program> _factory;
@@ -168,11 +171,36 @@ public sealed class DiscoveryTests : IDisposable
         Assert.Equal(("Teardrop", teardrop, massive, true), (song.Title, song.TrackId, song.ArtistId, song.Owned));
         Assert.Equal(["ListenBrainz", "Last.fm"], song.From);
         Assert.DoesNotContain(songs, s => s.TrackId == gloryBox);
-        // A song the catalogue doesn't have is shown by its name.
-        Assert.Contains(songs, s => s is { Title: "Overcome", TrackId: null });
+        // A song the catalogue doesn't have isn't listed.
+        Assert.DoesNotContain(songs, s => s.Title == "Overcome");
 
         Assert.Equal(System.Net.HttpStatusCode.NotFound,
             (await Assert.ThrowsAsync<HttpRequestException>(() => _api.ListSimilarArtistsAsync(Guid.NewGuid()))).StatusCode);
+    }
+
+    [Fact]
+    public async Task A_song_listenbrainz_knows_by_another_recording_finds_similar_songs_through_it()
+    {
+        Assert.Equal(RoadsMain, ListenBrainz.ReadLookup(JsonDocument.Parse($$"""[{ "recording_mbid": "{{RoadsMain}}", "recording_name": "Roads" }]""").RootElement));
+        Assert.Null(ListenBrainz.ReadLookup(JsonDocument.Parse("[]").RootElement));
+
+        await SeedAsync();
+        Guid roads;
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<MelodexDbContext>();
+            var portishead = db.Artists.Single(a => a.Name == "Portishead");
+            var track = new Track { ArtistId = portishead.Id, Title = "Roads", ArtistCredit = "Portishead" };
+            db.Tracks.Add(track);
+            db.Crosswalk.Add(new ProviderIdMapping { EntityKind = EntityKind.Track, EntityId = track.Id, Provider = Providers.MusicBrainz, Value = RoadsSingle });
+            await db.SaveChangesAsync();
+            roads = track.Id;
+        }
+
+        var songs = await _api.ListSimilarSongsAsync(roads);
+        Assert.Equal(["Teardrop"], songs.Select(s => s.Title));
+        Assert.Contains(_services.Asked, u => u.Contains("acr-lookup") && u.Contains("recording_name=Roads"));
+        Assert.Contains(_services.Asked, u => u.Contains("similar-recordings") && u.Contains(RoadsMain));
     }
 
     [Fact]
@@ -190,7 +218,7 @@ public sealed class DiscoveryTests : IDisposable
         }
         DiscoveryCache.Clear();
         var recommended = await _api.ListRecommendationsAsync();
-        Assert.Equal([("Teardrop", (Guid?)teardrop), ("Overcome", null)], recommended.Select(r => (r.Title, r.TrackId)));
+        Assert.Equal([("Teardrop", teardrop)], recommended.Select(r => (r.Title, r.TrackId)));
         Assert.Equal(1, recommended[0].Score);
         Assert.Contains(_services.Asked, u => u.Contains("cf/recommendation/user/someone/recording"));
     }
@@ -234,6 +262,8 @@ public sealed class DiscoveryTests : IDisposable
                     new { artist_mbid = MassiveAttack, name = "Massive Attack", comment = "UK trip hop group", score = 11000 },
                     new { artist_mbid = Tricky, name = "Tricky", comment = "", score = 9000 },
                 },
+                ("labs.api.listenbrainz.org", "/acr-lookup/json") => new object[] { new { recording_mbid = RoadsMain, recording_name = "Roads" } },
+                ("labs.api.listenbrainz.org", "/similar-recordings/json") when query["recording_mbids"] == RoadsSingle => Array.Empty<object>(),
                 ("labs.api.listenbrainz.org", "/similar-recordings/json") => new object[]
                 {
                     new { recording_mbid = Teardrop, recording_name = "Teardrop", artist_credit_name = "Massive Attack", score = 200 },
