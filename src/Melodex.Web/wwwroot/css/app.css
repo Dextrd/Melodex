@@ -464,6 +464,8 @@ p.error { max-width: none; white-space: normal; }
 /* The cover's foot level with the buttons' under the title. */
 .page-head { display: flex; gap: 1rem; align-items: flex-end; }
 .page-head > .cover { width: 96px; flex: none; }
+/* Its details take the rest of the row, so a rating pushed right reaches the edge of the page. */
+.page-head > div:last-child { flex: 1; min-width: 0; }
 /* On a phone, the artwork beside the title and what's under it, and the buttons across the page below. */
 @media (max-width: 640px) {
     .page-head { display: grid; grid-template-columns: 88px minmax(0, 1fr); column-gap: .9rem; row-gap: .25rem; align-items: center; }

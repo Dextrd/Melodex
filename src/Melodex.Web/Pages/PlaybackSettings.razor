@@ -96,6 +96,30 @@ else
         </div>
     </div>
 
+    <h2 id="radio">Radio</h2>
+    <p class="muted small">
+        Start a radio from a song, album, artist or playlist, and it plays songs like it without end: none twice, not one played in the last two days
+        while there's enough else, and not the same artist too often. Starred songs bring more like them; a song skipped in its first half minute isn't
+        played to that person by any radio for 90 days, and its artist comes up less.
+    </p>
+    <div class="card settings-card">
+        <div class="setting-line">
+            Aim for
+            <NumberField Min="0" Max="100" Step="5" Label="Percent" Value="_fetch.RadioMissingPercent" ValueChanged="n => { _fetch = _fetch with { RadioMissingPercent = n }; _saver?.Changed(); }" />
+            % of the songs a radio plays to be ones not in the library
+        </div>
+        <div class="muted small">
+            For everyone's radios. Those songs are fetched to listen to as they come near, without adding them to the library. A radio keeps to
+            this over the songs it plays: when it finds too few of one kind, it makes up for it later. 0 plays only songs you have, 100 only ones
+            you don't.
+        </div>
+        <label class="check">
+            <input type="checkbox" checked="@_fetch.RadioAutoplay" @onchange="e => { _fetch = _fetch with { RadioAutoplay = e.Value is true }; _saver?.Changed(); }" />
+            Autoplay: when the queue runs out, carry on with a radio from the last song
+        </label>
+        <div class="muted small">For everyone, in the web player, unless the queue is repeating.</div>
+    </div>
+
     <AutoSave @ref="_saver" Save="SaveAsync" />
 
     @if (_warning)
@@ -202,6 +226,7 @@ else
         await Api.SavePlaybackSettingsAsync(new SavePlayback(_visualiser, _deleteBarsFiles, _gapless));
         _deleteBarsFiles = false;
         await Api.SaveFetchSettingsAsync(_fetch!);
+        Player.RadioSettingsChanged(new RadioSettings(_fetch!.RadioMissingPercent, _fetch.RadioAutoplay));
         _status = await Api.GetPlaybackSettingsAsync();
     }
 
