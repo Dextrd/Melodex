@@ -2,8 +2,9 @@
 
 @*
     Songs like this one (#3), from the discovery plugins, on a song's page: only those the catalogue has, each saying
-    whether you have it. The section is shut until it's opened, and only then are the plugins asked; it slides open and shut. Nothing shows when no
-    discovery plugin finds songs; when none found any, the section says so.
+    whether you have it. The section is shut until it's opened, and slides open and shut; the plugins are asked with the
+    page either way, so it opens on what they found. Nothing shows when no discovery plugin finds songs; when none found
+    any, the section says so.
 *@
 @if (_offered)
 {
@@ -31,7 +32,7 @@
     /// <summary>How many to show.</summary>
     [Parameter] public int Take { get; set; } = 15;
 
-    /// <summary>Whether the section is open, so its songs are looked for and shown.</summary>
+    /// <summary>Whether the section is open, showing its songs.</summary>
     [Parameter] public bool Open { get; set; }
 
     [Parameter] public EventCallback OnToggle { get; set; }
@@ -51,7 +52,7 @@
                 _offered = (await Api.GetDiscoveryAsync()).SimilarSongs;
                 _checked = true;
             }
-            if (!_offered || !Open || TrackId == _loaded)
+            if (!_offered || TrackId == _loaded)
                 return;
             (_loaded, _similar, _error) = (TrackId, null, null);
             var similar = await Api.ListSimilarSongsAsync(TrackId, Take);

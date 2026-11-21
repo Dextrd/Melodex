@@ -47,6 +47,12 @@ public sealed class ListenBrainz(PluginContext context) : IDiscoveryPlugin
     /// <summary>How many recordings to ask the metadata of at once.</summary>
     private const int MetadataBatch = 50;
 
+    /// <summary>
+    /// How long the metadata is waited for. It only adds the artists' IDs to what the labs API already named, so when it's
+    /// slow, as it can be for a minute at a time, the songs go without them rather than keep anyone waiting.
+    /// </summary>
+    public static readonly TimeSpan MetadataWait = TimeSpan.FromSeconds(6);
+
     private readonly HttpClient _http = context.HttpClient;
 
     public async Task<IReadOnlyList<DiscoveredArtist>> SimilarArtistsAsync(DiscoveryArtist artist, int count, CancellationToken cancellationToken)
@@ -66,7 +72,8 @@ public sealed class ListenBrainz(PluginContext context) : IDiscoveryPlugin
             found = await SimilarToAsync(main, count, cancellationToken);
         if (found.Count == 0)
             return [];
-        // The labs API leaves out who the artists are; the metadata has their IDs, which match them in the catalogue.
+        // The labs API leaves out who the artists are; the metadata has their IDs, which match them in the catalogue. Without
+        // it they're matched by name.
         var metadata = await MetadataAsync(found.Select(r => Mbid(r.Ids)!).ToList(), cancellationToken);
         return found.Select(r => metadata.TryGetValue(Mbid(r.Ids)!, out var known) ? known with { Score = r.Score, Album = r.Album ?? known.Album } : r).ToList();
     }
@@ -186,10 +193,19 @@ public sealed class ListenBrainz(PluginContext context) : IDiscoveryPlugin
     private async Task<Dictionary<string, DiscoveredRecording>> MetadataAsync(IReadOnlyList<string> mbids, CancellationToken ct)
     {
         var found = new Dictionary<string, DiscoveredRecording>(StringComparer.OrdinalIgnoreCase);
-        foreach (var batch in mbids.Distinct(StringComparer.OrdinalIgnoreCase).Chunk(MetadataBatch))
-            if (await GetAsync($"{Api}metadata/recording/?recording_mbids={string.Join(',', batch)}&inc=artist%20release", ct) is { } body)
-                foreach (var (mbid, recording) in ReadMetadata(body))
-                    found[mbid] = recording;
+        using var wait = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        wait.CancelAfter(MetadataWait);
+        try
+        {
+            foreach (var batch in mbids.Distinct(StringComparer.OrdinalIgnoreCase).Chunk(MetadataBatch))
+                if (await GetAsync($"{Api}metadata/recording/?recording_mbids={string.Join(',', batch)}&inc=artist%20release", wait.Token) is { } body)
+                    foreach (var (mbid, recording) in ReadMetadata(body))
+                        found[mbid] = recording;
+        }
+        catch (Exception e) when (e is HttpRequestException or OperationCanceledException && !ct.IsCancellationRequested)
+        {
+            // What it gave before it stopped answering, if anything.
+        }
         return found;
     }
 

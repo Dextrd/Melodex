@@ -204,6 +204,20 @@ public sealed class DiscoveryTests : IDisposable
     }
 
     [Fact]
+    public async Task Similar_songs_dont_wait_on_listenbrainzs_metadata_when_it_hangs()
+    {
+        var (_, massive, gloryBox, teardrop) = await SeedAsync();
+        _services.MetadataHangs = true;
+
+        var took = System.Diagnostics.Stopwatch.StartNew();
+        var songs = await _api.ListSimilarSongsAsync(gloryBox);
+        Assert.InRange(took.Elapsed, TimeSpan.Zero, ListenBrainz.MetadataWait + TimeSpan.FromSeconds(5));
+        // Named as the labs API named it, and matched without the metadata's artist IDs.
+        Assert.Equal([("Teardrop", teardrop, massive)], songs.Select(s => (s.Title, s.TrackId, s.ArtistId)));
+        Assert.Contains(_services.Asked, u => u.Contains("metadata/recording"));
+    }
+
+    [Fact]
     public async Task Recommendations_come_from_a_linked_listenbrainz_account()
     {
         var (_, _, _, teardrop) = await SeedAsync();
@@ -248,11 +262,16 @@ public sealed class DiscoveryTests : IDisposable
     {
         public List<string> Asked { get; } = [];
 
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        /// <summary>The metadata doesn't answer, as ListenBrainz's sometimes doesn't for a minute at a time.</summary>
+        public bool MetadataHangs { get; set; }
+
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             var url = request.RequestUri!;
             lock (Asked)
                 Asked.Add(url.ToString());
+            if (MetadataHangs && url.AbsolutePath == "/1/metadata/recording/")
+                await Task.Delay(Timeout.Infinite, cancellationToken);
             var query = HttpUtility.ParseQueryString(url.Query);
             object? answer = (url.Host, url.AbsolutePath) switch
             {
@@ -296,12 +315,12 @@ public sealed class DiscoveryTests : IDisposable
                 },
                 _ => null,
             };
-            return Task.FromResult(answer is null
+            return answer is null
                 ? new HttpResponseMessage(HttpStatusCode.NotFound)
                 : new HttpResponseMessage(HttpStatusCode.OK)
                 {
                     Content = new StringContent(JsonSerializer.Serialize(answer), System.Text.Encoding.UTF8, "application/json"),
-                });
+                };
         }
     }
 }

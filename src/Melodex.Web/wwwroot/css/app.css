@@ -1677,6 +1677,22 @@ input[type=search]:disabled { opacity: .6; }
 .playlist-row:hover .row-pin, .row-pin:focus-visible { opacity: 1; }
 .pinned-row { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: minmax(150px, 180px); overflow-x: auto; padding-bottom: .25rem; }
 .tiles .playlist-mosaic, .tiles .cover { width: 100%; }
+
+/* One row of tiles that scrolls sideways (Carousel.razor), with arrows either side while there's more than fits. */
+.carousel { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: .4rem; }
+.carousel-track {
+    display: flex; gap: 1rem; overflow-x: auto; scroll-snap-type: x proximity; scrollbar-width: none; overscroll-behavior-x: contain;
+    padding: .1rem 0;
+}
+.carousel-track::-webkit-scrollbar { display: none; }
+.carousel-track > * { flex: 0 0 150px; scroll-snap-align: start; }
+.carousel-track .cover { width: 100%; }
+.carousel-fits > .carousel-back, .carousel-fits > .carousel-on { visibility: hidden; }
+@media (max-width: 640px) {
+    .carousel { grid-template-columns: minmax(0, 1fr); }
+    .carousel > .carousel-back, .carousel > .carousel-on { display: none; }
+    .carousel-track > * { flex-basis: 130px; }
+}
 .playlist-cover-preview { width: min(14rem, 100%); margin: 0 auto 1rem; }
 .playlist-cover-preview img.cover { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 8px; }
 
