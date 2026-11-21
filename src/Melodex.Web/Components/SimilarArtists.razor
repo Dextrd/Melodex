@@ -8,7 +8,8 @@
     it was left; they're asked for with the page either way, so it opens on them. Nothing shows when no discovery plugin
     finds artists; when none found any, the section says so.
 *@
-@if (_offered)
+@* Shown while it's still being checked whether any plugin finds artists, so it's there, saying so, from the start. *@
+@if (_offered || _checked is null)
 {
     <h2 class="section"><SectionToggle Open="_open" OnToggle="ToggleAsync">Similar artists</SectionToggle></h2>
     <Collapsible Open="_open">
@@ -73,6 +74,8 @@
             }
             if (!_offered)
                 return;
+            // Drawn as it's asked for, saying so, not only once the artists come.
+            StateHasChanged();
             var similar = await Api.ListSimilarArtistsAsync(ArtistId, Take);
             if (ArtistId == _loaded)
                 _similar = similar;

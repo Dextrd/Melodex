@@ -6,7 +6,8 @@
     page either way, so it opens on what they found. Nothing shows when no discovery plugin finds songs; when none found
     any, the section says so.
 *@
-@if (_offered)
+@* Shown while it's still being checked whether any plugin finds songs, so it's there, saying so, from the start. *@
+@if (_offered || _checked is null)
 {
     <h2 class="section"><SectionToggle Open="Open" OnToggle="OnToggle">Similar songs</SectionToggle></h2>
     <Collapsible Open="Open">
@@ -55,6 +56,8 @@
             if (!_offered || TrackId == _loaded)
                 return;
             (_loaded, _similar, _error) = (TrackId, null, null);
+            // Drawn as it's asked for, saying so, not only once the songs come.
+            StateHasChanged();
             var similar = await Api.ListSimilarSongsAsync(TrackId, Take);
             if (TrackId == _loaded)
                 _similar = similar;
