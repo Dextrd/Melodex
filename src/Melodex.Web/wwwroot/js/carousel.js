@@ -1,0 +1,25 @@
+// A row of tiles that scrolls sideways (Carousel.razor): the arrows move it a screenful at a time, and are greyed at
+// either end; on a phone it's swiped.
+window.melodexCarousel = {
+    update: box => {
+        if (!box)
+            return;
+        const track = box.querySelector('.carousel-track');
+        const back = box.querySelector('.carousel-back');
+        const on = box.querySelector('.carousel-on');
+        const show = () => {
+            back.disabled = track.scrollLeft <= 1;
+            on.disabled = track.scrollLeft + track.clientWidth >= track.scrollWidth - 1;
+            box.classList.toggle('carousel-fits', back.disabled && on.disabled);
+        };
+        if (!box.dataset.ready) {
+            box.dataset.ready = '1';
+            const go = way => track.scrollBy({ left: way * Math.max(track.clientWidth * 0.8, 100), behavior: 'smooth' });
+            back.addEventListener('click', () => go(-1));
+            on.addEventListener('click', () => go(1));
+            track.addEventListener('scroll', show, { passive: true });
+            new ResizeObserver(show).observe(track);
+        }
+        show();
+    },
+};

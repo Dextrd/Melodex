@@ -1,0 +1,31 @@
+@using Microsoft.JSInterop
+@inject IJSRuntime Js
+
+@*
+    One row of tiles that scrolls sideways, with arrows either side to step through it on a computer (carousel.js).
+    The arrows go when everything fits.
+*@
+<div class="carousel @Class" @ref="_box">
+    <IconButton Icon="back" Class="small carousel-back" Title="Back" />
+    <div class="carousel-track">@ChildContent</div>
+    <IconButton Icon="forward" Class="small carousel-on" Title="More" />
+</div>
+
+@code {
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    [Parameter] public string? Class { get; set; }
+
+    private ElementReference _box;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        try
+        {
+            await Js.InvokeVoidAsync("melodexCarousel.update", _box);
+        }
+        catch (JSDisconnectedException)
+        {
+        }
+    }
+}

@@ -1,39 +1,43 @@
 @inject MelodexClient Api
 
+@inject Preferences Prefs
+
 @*
-    Artists like this one (#3), from the discovery plugins, on an artist's page. Those the catalogue knows open their page;
-    the rest search for their name. Nothing shows when no discovery plugin finds artists; when none found any, the
-    section says so.
+    Artists like this one (#3), from the discovery plugins, on an artist's page, in one row that scrolls sideways. Those
+    the catalogue knows open their page; the rest search for their name. The section is shut until opened, and stays as
+    it was left; they're asked for with the page either way, so it opens on them. Nothing shows when no discovery plugin
+    finds artists; when none found any, the section says so.
 *@
-@if (_similar is null)
+@* Shown while it's still being checked whether any plugin finds artists, so it's there, saying so, from the start. *@
+@if (_offered || _checked is null)
 {
-    <h2 class="section">Similar artists</h2>
-    <Loading Inline="true" Text="Asking the discovery plugins…" />
-}
-else if (_offered && _similar.Count == 0)
-{
-    <h2 class="section">Similar artists</h2>
-    @if (_error is null)
-    {
-        <div class="muted small">No similar artists found: the discovery plugins don't know this one well enough yet.</div>
-    }
-}
-else if (_similar.Count > 0)
-{
-    <h2 class="section">Similar artists</h2>
-    <div class="tiles similar-artists">
-        @foreach (var artist in _similar)
+    <h2 class="section"><SectionToggle Open="_open" OnToggle="ToggleAsync">Similar artists</SectionToggle></h2>
+    <Collapsible Open="_open">
+        @if (_similar is null)
         {
-            <a class="tile arrives" href="@Href(artist)" title="@Title(artist)">
-                <Cover Url="@artist.ImageUrl" Artist="true" />
-                <div class="tile-name">@artist.Name</div>
-                @if (artist.Disambiguation is not null) { <div class="muted small tile-sub">@artist.Disambiguation</div> }
-                @if (artist.InLibrary) { <div><span class="badge owned">In library</span></div> }
-            </a>
+            <Loading Inline="true" Text="Asking the discovery plugins…" />
         }
-    </div>
+        else if (_similar.Count > 0)
+        {
+            <Carousel Class="similar-artists">
+                @foreach (var artist in _similar)
+                {
+                    <a class="tile arrives" href="@Href(artist)" title="@Title(artist)">
+                        <Cover Url="@artist.ImageUrl" Artist="true" />
+                        <div class="tile-name">@artist.Name</div>
+                        @if (artist.Disambiguation is not null) { <div class="muted small tile-sub">@artist.Disambiguation</div> }
+                        @if (artist.InLibrary) { <div><span class="badge owned">In library</span></div> }
+                    </a>
+                }
+            </Carousel>
+        }
+        else if (_error is null)
+        {
+            <div class="muted small">No similar artists found: the discovery plugins don't know this one well enough yet.</div>
+        }
+        @if (_error is not null) { <div class="muted small" role="status">Couldn't find similar artists: @_error</div> }
+    </Collapsible>
 }
-@if (_error is not null) { <div class="muted small" role="status">Couldn't find similar artists: @_error</div> }
 
 @code {
     [Parameter, EditorRequired] public Guid ArtistId { get; set; }
@@ -41,10 +45,19 @@ else if (_similar.Count > 0)
     /// <summary>How many to show.</summary>
     [Parameter] public int Take { get; set; } = 12;
 
+    private const string OpenKey = "similarArtistsOpen";
+
     private IReadOnlyList<SimilarArtist>? _similar;
     private Guid _loaded;
-    private bool _offered;
+    private bool _offered, _open;
+    private bool? _checked;
     private string? _error;
+
+    private Task ToggleAsync()
+    {
+        _open = !_open;
+        return Prefs.SetAsync(OpenKey, _open);
+    }
 
     protected override async Task OnParametersSetAsync()
     {
@@ -53,19 +66,23 @@ else if (_similar.Count > 0)
         (_loaded, _similar, _error) = (ArtistId, null, null);
         try
         {
-            _offered = (await Api.GetDiscoveryAsync()).SimilarArtists;
-            if (!_offered)
+            if (_checked is null)
             {
-                _similar = [];
-                return;
+                _open = await Prefs.GetAsync(OpenKey, false);
+                _offered = (await Api.GetDiscoveryAsync()).SimilarArtists;
+                _checked = true;
             }
+            if (!_offered)
+                return;
+            // Drawn as it's asked for, saying so, not only once the artists come.
+            StateHasChanged();
             var similar = await Api.ListSimilarArtistsAsync(ArtistId, Take);
             if (ArtistId == _loaded)
                 _similar = similar;
         }
         catch (Exception e) when (e is HttpRequestException or MelodexApiException)
         {
-            (_similar, _error) = ([], e.Message);
+            (_offered, _similar, _error) = (true, [], e.Message);
         }
     }
 

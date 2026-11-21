@@ -28,6 +28,9 @@ public sealed class DiscoveryService(MelodexDbContext db, DiscoveryPlugins plugi
     /// <summary>The most a list can be.</summary>
     public const int MaxTake = 100;
 
+    /// <summary>How long a plugin is waited for: one that's slow is left out, so the others' answers aren't kept waiting.</summary>
+    public static TimeSpan PluginWait { get; set; } = TimeSpan.FromSeconds(15);
+
     /// <summary>How far back what someone has played counts toward what they're recommended.</summary>
     public static readonly TimeSpan Lately = TimeSpan.FromDays(90);
 
@@ -126,11 +129,13 @@ public sealed class DiscoveryService(MelodexDbContext db, DiscoveryPlugins plugi
         PluginHttp.Interactive.Value = true;
         var answers = await Task.WhenAll(asked.Select(async p =>
         {
+            using var wait = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            wait.CancelAfter(PluginWait);
             try
             {
                 // New settings, such as another API key, are asked afresh.
                 var items = await DiscoveryCache.GetOrAddAsync($"{p.Instance.Id}|{p.Instance.SettingsJson.GetHashCode()}|{capability}|{subject}", keep,
-                    () => ask(p.Plugin, ct));
+                    () => ask(p.Plugin, wait.Token));
                 return (Source: p.Instance.Name, Items: items);
             }
             catch (Exception e) when (e is not OperationCanceledException || !ct.IsCancellationRequested)

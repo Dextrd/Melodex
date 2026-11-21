@@ -2,10 +2,12 @@
 
 @*
     Songs like this one (#3), from the discovery plugins, on a song's page: only those the catalogue has, each saying
-    whether you have it. The section is shut until it's opened, and only then are the plugins asked; it slides open and shut. Nothing shows when no
-    discovery plugin finds songs; when none found any, the section says so.
+    whether you have it. The section is shut until it's opened, and slides open and shut; the plugins are asked with the
+    page either way, so it opens on what they found. Nothing shows when no discovery plugin finds songs; when none found
+    any, the section says so.
 *@
-@if (_offered)
+@* Shown while it's still being checked whether any plugin finds songs, so it's there, saying so, from the start. *@
+@if (_offered || _checked is null)
 {
     <h2 class="section"><SectionToggle Open="Open" OnToggle="OnToggle">Similar songs</SectionToggle></h2>
     <Collapsible Open="Open">
@@ -31,7 +33,7 @@
     /// <summary>How many to show.</summary>
     [Parameter] public int Take { get; set; } = 15;
 
-    /// <summary>Whether the section is open, so its songs are looked for and shown.</summary>
+    /// <summary>Whether the section is open, showing its songs.</summary>
     [Parameter] public bool Open { get; set; }
 
     [Parameter] public EventCallback OnToggle { get; set; }
@@ -51,9 +53,11 @@
                 _offered = (await Api.GetDiscoveryAsync()).SimilarSongs;
                 _checked = true;
             }
-            if (!_offered || !Open || TrackId == _loaded)
+            if (!_offered || TrackId == _loaded)
                 return;
             (_loaded, _similar, _error) = (TrackId, null, null);
+            // Drawn as it's asked for, saying so, not only once the songs come.
+            StateHasChanged();
             var similar = await Api.ListSimilarSongsAsync(TrackId, Take);
             if (TrackId == _loaded)
                 _similar = similar;
