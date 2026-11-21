@@ -44,6 +44,7 @@ is and which plugins found it.
 
 No plugin suggests albums, so similar albums are found through what they do suggest: the albums that songs like a few
 of the album's songs come from, and, counting a little less, albums by artists like its artist, those you have first.
+Only albums proper are listed, not live recordings or compilations, and no more than two by any one artist.
 The album's artist's other albums are left out; they're on the artist's page.
 
 Each section of a song's page opens and closes from its title. The albums it's on, its lyrics and its files start open;

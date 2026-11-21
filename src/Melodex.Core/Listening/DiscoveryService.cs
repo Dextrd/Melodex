@@ -41,6 +41,7 @@ public sealed class DiscoveryService(MelodexDbContext db, DiscoveryPlugins plugi
     // against one songs like its songs come from.
     private const int AlbumSeeds = 3;
     private const double ArtistsAlbums = 0.5;
+    private const int PerArtist = 2;
 
     public async Task<DiscoveryStatus> StatusAsync(CancellationToken ct)
     {
@@ -137,8 +138,13 @@ public sealed class DiscoveryService(MelodexDbContext db, DiscoveryPlugins plugi
                 Add(their.Id, ArtistsAlbums * artist.Score, artist.From);
         }
 
-        var same = (await db.Albums.Where(a => a.ArtistId == album.ArtistId).Select(a => a.Id).ToListAsync(ct)).ToHashSet();
-        var ranked = found.Where(f => !same.Contains(f.Key)).OrderByDescending(f => f.Value.Score).Take(take).ToList();
+        // Only albums proper, not live recordings, compilations and the like a song also turns up on; none of its artist's,
+        // and no more than two of any one artist, so one artist like it doesn't fill the row.
+        var ids = found.Keys.ToList();
+        var albums = (await db.Albums.AsNoTracking().Where(a => ids.Contains(a.Id) && a.ArtistId != album.ArtistId && a.Type == AlbumType.Album && !a.Ignored)
+            .Select(a => new { a.Id, a.ArtistId, a.SecondaryTypes }).ToListAsync(ct)).Where(a => a.SecondaryTypes.Count == 0).ToDictionary(a => a.Id, a => a.ArtistId);
+        var ranked = found.Where(f => albums.ContainsKey(f.Key)).OrderByDescending(f => f.Value.Score)
+            .GroupBy(f => albums[f.Key]).SelectMany(g => g.Take(PerArtist)).OrderByDescending(f => f.Value.Score).Take(take).ToList();
         var best = ranked.Count > 0 ? ranked[0].Value.Score : 1;
         return ranked.Select(f => (f.Key, f.Value.Score / best, (IReadOnlyList<string>)f.Value.From.ToList())).ToList();
     }
