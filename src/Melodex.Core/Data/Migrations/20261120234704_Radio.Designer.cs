@@ -11,7 +11,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Melodex.Core.Data.Migrations
 {
     [DbContext(typeof(MelodexDbContext))]
-    [Migration("20261120232427_Radio")]
+    [Migration("20261120234704_Radio")]
     partial class Radio
     {
         /// <inheritdoc />
@@ -1389,9 +1389,6 @@ namespace Melodex.Core.Data.Migrations
 
                     b.Property<string>("Appearance")
                         .HasColumnType("TEXT");
-
-                    b.Property<bool>("Autoplay")
-                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("TEXT");

@@ -202,4 +202,7 @@ public sealed record FetchSettings
     /// percent. A target, kept to over the radio as it plays: a batch short of them, when too few are found, is made up later.
     /// </summary>
     public int RadioMissingPercent { get; init; } = 25;
+
+    /// <summary>When a queue runs out, the web player carries on with a radio from its last song, for every account.</summary>
+    public bool RadioAutoplay { get; init; } = true;
 }

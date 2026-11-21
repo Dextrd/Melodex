@@ -480,8 +480,9 @@ Songs like a song, album, artist or playlist, without end, with the `listen` sco
   so a batch makes up for those before it. `ownedOnly` leaves them out, whatever the share. A seed that isn't there is a 404.
 - `POST /radio/skips` with a `trackId` says a radio's song was skipped in its first half minute: radios leave it out,
   and play its artist less, for 90 days.
-- `GET /radio/settings` and `PUT /radio/settings` are the user's: `autoplay`, whether a player carries on with a radio
-  when its queue runs out.
+- `GET /radio/settings` gives the server's radio settings, for any player to follow: `missingPercent`, and `autoplay`,
+  whether a player carries on with a radio when its queue runs out. An admin changes them with the fetch settings, as
+  `radioMissingPercent` and `radioAutoplay`.
 
 ## The API reference
 

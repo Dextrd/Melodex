@@ -56,8 +56,7 @@ public sealed class RadioTests : IDisposable
     public async Task A_radio_from_a_song_plays_it_then_songs_like_it_with_your_share_of_ones_you_dont_have()
     {
         var s = await SeedAsync();
-        Assert.Equal(25, (await _api.GetFetchSettingsAsync()).RadioMissingPercent);
-        Assert.Equal(new RadioSettings(true), await _api.GetRadioSettingsAsync());
+        Assert.Equal(new RadioSettings(25, true), await _api.GetRadioSettingsAsync());
 
         // Only songs you have: Glory Box first, as it was started from, then Massive Attack's, found like it or by an artist like Portishead.
         await ShareAsync(0);
@@ -86,8 +85,8 @@ public sealed class RadioTests : IDisposable
             MelodexJson.Options);
         Assert.Equal(HttpStatusCode.BadRequest, invalid.StatusCode);
 
-        await _api.SaveRadioSettingsAsync(new RadioSettings(false));
-        Assert.Equal(new RadioSettings(false), await _api.GetRadioSettingsAsync());
+        await _api.SaveFetchSettingsAsync(await _api.GetFetchSettingsAsync() with { RadioMissingPercent = 10, RadioAutoplay = false });
+        Assert.Equal(new RadioSettings(10, false), await _api.GetRadioSettingsAsync());
     }
 
     [Fact]

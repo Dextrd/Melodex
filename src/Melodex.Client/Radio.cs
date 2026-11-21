@@ -22,9 +22,13 @@ public sealed record RadioNext(Guid SeedId, IReadOnlyList<Guid>? Recent = null, 
 /// </param>
 public sealed record RadioBatch(string Name, RadioSeedKind Kind, IReadOnlyList<DiscoveredSong> Songs);
 
-/// <summary>Someone's radio settings (#4).</summary>
+/// <summary>
+/// The server's radio settings (#4), for any player to read; an admin changes them with the fetch settings, as
+/// <c>radioMissingPercent</c> and <c>radioAutoplay</c>.
+/// </summary>
+/// <param name="MissingPercent">The share of a radio's songs that are ones not in the library, from 0 to 100 percent.</param>
 /// <param name="Autoplay">When the queue runs out, carry on with a radio from the last song.</param>
-public sealed record RadioSettings(bool Autoplay = true);
+public sealed record RadioSettings(int MissingPercent = 25, bool Autoplay = true);
 
 /// <summary>Body of <c>POST /radio/skips</c>: a song a radio played that was skipped within its first half minute.</summary>
 public sealed record RadioSkipped(Guid TrackId);

@@ -34,24 +34,11 @@ public static class RadioEndpoints
             .WithSummary("A song a radio played was skipped within its first half minute: radios leave it out, and play its artist less, for 90 days.")
             .Produces(StatusCodes.Status204NoContent);
 
-        radio.MapGet("/settings", async (HttpContext http, RadioService service, CancellationToken ct) =>
-                Owner(http) is { } user ? Results.Ok(await service.SettingsAsync(user, ct)) : NoOwner())
+        radio.MapGet("/settings", async (RadioService service, CancellationToken ct) => await service.SettingsAsync(ct))
             .RequireScope(Scopes.Listen)
             .WithName("GetRadioSettings")
-            .WithSummary("Your radio settings: whether the player carries on with a radio when the queue runs out. How much of a radio is songs you don't have is the server's, in GET /settings/fetch.")
-            .Produces<RadioSettings>();
-
-        radio.MapPut("/settings", async (RadioSettings body, HttpContext http, RadioService service, CancellationToken ct) =>
-            {
-                if (Owner(http) is not { } user)
-                    return NoOwner();
-                await service.SaveSettingsAsync(user, body, ct);
-                return Results.NoContent();
-            })
-            .RequireScope(Scopes.Listen)
-            .WithName("SaveRadioSettings")
-            .WithSummary("Changes your radio settings.")
-            .Produces(StatusCodes.Status204NoContent);
+            .WithSummary("The server's radio settings, for every account: how much of a radio is songs you don't have, and whether a player carries on with a radio when its queue runs out. "
+                + "Changed with the fetch settings.");
 
         return api;
     }

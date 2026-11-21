@@ -11,13 +11,6 @@ namespace Melodex.Core.Data.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.AddColumn<bool>(
-                name: "Autoplay",
-                table: "Users",
-                type: "INTEGER",
-                nullable: false,
-                defaultValue: true);
-
             migrationBuilder.CreateTable(
                 name: "RadioSkips",
                 columns: table => new
@@ -50,10 +43,6 @@ namespace Melodex.Core.Data.Migrations
         {
             migrationBuilder.DropTable(
                 name: "RadioSkips");
-
-            migrationBuilder.DropColumn(
-                name: "Autoplay",
-                table: "Users");
         }
     }
 }

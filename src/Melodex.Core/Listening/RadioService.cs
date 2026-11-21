@@ -190,11 +190,11 @@ public sealed partial class RadioService(MelodexDbContext db, DiscoveryService d
         await db.SaveChangesAsync(ct);
     }
 
-    public async Task<RadioSettings> SettingsAsync(Guid userId, CancellationToken ct) =>
-        await db.Users.Where(u => u.Id == userId).Select(u => new RadioSettings(u.Autoplay)).FirstAsync(ct);
-
-    public async Task SaveSettingsAsync(Guid userId, RadioSettings value, CancellationToken ct) =>
-        await db.Users.Where(u => u.Id == userId).ExecuteUpdateAsync(u => u.SetProperty(x => x.Autoplay, value.Autoplay), ct);
+    public async Task<RadioSettings> SettingsAsync(CancellationToken ct)
+    {
+        var fetch = await settings.GetFetchAsync(ct);
+        return new RadioSettings(fetch.RadioMissingPercent, fetch.RadioAutoplay);
+    }
 
     /// <summary>What a radio was started from: a song, album, artist, or one of their own playlists.</summary>
     private async Task<Seed?> SeedAsync(Guid userId, Guid id, CancellationToken ct)

@@ -1077,12 +1077,6 @@ public sealed class MelodexClient(HttpClient http)
     public async Task<RadioSettings> GetRadioSettingsAsync(CancellationToken ct = default) =>
         (await http.GetFromJsonAsync<RadioSettings>($"{Api}/radio/settings", MelodexJson.Options, ct))!;
 
-    public async Task SaveRadioSettingsAsync(RadioSettings settings, CancellationToken ct = default)
-    {
-        using var response = await http.PutAsJsonAsync($"{Api}/radio/settings", settings, MelodexJson.Options, ct);
-        await EnsureAsync(response, ct);
-    }
-
     /// <summary>Songs like this one, the closest first.</summary>
     public async Task<IReadOnlyList<DiscoveredSong>> ListSimilarSongsAsync(Guid trackId, int take = 20, CancellationToken ct = default) =>
         await http.GetFromJsonAsync<List<DiscoveredSong>>($"{Api}/tracks/{trackId}/similar?take={take}", MelodexJson.Options, ct) ?? [];

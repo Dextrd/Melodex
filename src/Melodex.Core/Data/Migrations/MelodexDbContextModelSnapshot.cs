@@ -1387,9 +1387,6 @@ namespace Melodex.Core.Data.Migrations
                     b.Property<string>("Appearance")
                         .HasColumnType("TEXT");
 
-                    b.Property<bool>("Autoplay")
-                        .HasColumnType("INTEGER");
-
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("TEXT");
 

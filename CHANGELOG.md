@@ -43,10 +43,10 @@ What changed in each release of Melodex. Versions follow [semantic versioning](h
   under **Radio** on the Playback settings page, and a radio keeps to it over the songs it plays. Nothing comes twice, not even live or remixed, nothing you played in the last two days while there's
   enough else, and the same artist not within three songs while there's someone else. Star what you like and it plays more like it; skip a song in its first half minute
   and no radio plays it to you for 90 days, and its artist comes up less. With **Autoplay** on, as it is to start with,
-  the player carries on with a radio from the last song when the queue runs out; each user can turn it off on their
-  account page. Subsonic players' instant mix
+  the player carries on with a radio from the last song when the queue runs out; it's turned off for everyone in the
+  same **Radio** section. Subsonic players' instant mix
   (`getSimilarSongs`, `getSimilarSongs2`) is a radio of songs you have. The API has `POST /radio`,
-  `POST /radio/skips` and `GET`/`PUT /radio/settings`, and `radioMissingPercent` in the fetch settings (#4).
+  `POST /radio/skips` and `GET /radio/settings`, and `radioMissingPercent` and `radioAutoplay` in the fetch settings (#4).
 - Melodex's own Subsonic extension, `melodex`: each song's ID in the API, and whether you have all of an album (#7).
 - **Settings → Scheduled tasks**: daily, weekly and monthly windows, each with its own times (running past midnight
   if it ends earlier than it starts), the weekly one on a day you pick and the monthly one on a day of the month (in a

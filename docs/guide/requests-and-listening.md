@@ -214,7 +214,7 @@ Liked something it played that you don't have? Its **⋯** menu in the queue can
 your wishlist, or add it to a playlist once it's yours.
 
 **Autoplay**, on to start with, carries on with a radio from the last song when the queue runs out, unless it's
-repeating. Turn it off under **Radio** on your account page.
+repeating. It's for everyone: turn it off under **Radio** on the Playback settings page.
 
 ### Gapless playback
 
