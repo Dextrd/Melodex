@@ -196,4 +196,13 @@ public sealed record FetchSettings
 
     /// <summary>How many songs before the one playing are fetched to listen to, for going back, from 0 to 20.</summary>
     public int ListenNowBehind { get; init; } = 2;
+
+    /// <summary>
+    /// What share of a radio's songs, for every account, are ones not in the library, fetched to listen to: from 0 to 100
+    /// percent. A target, kept to over the radio as it plays: a batch short of them, when too few are found, is made up later.
+    /// </summary>
+    public int RadioMissingPercent { get; init; } = 25;
+
+    /// <summary>When a queue runs out, the web player carries on with a radio from its last song, for every account.</summary>
+    public bool RadioAutoplay { get; init; } = true;
 }
