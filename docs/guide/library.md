@@ -35,15 +35,21 @@ linked again. Only plays from after linking are sent.
 
 ## Similar music
 
-An artist's page ends with **Similar artists**, and a song's page with **Similar songs**, from the
-[discovery plugins](plugins.md#discovery): ListenBrainz to start with. Open an artist to go to their page, or, for one
-the catalogue doesn't have, to search for them. Similar songs are only those the catalogue has, listed as search lists
-songs: play one you have, or listen to, get or wish for one you don't. Hover over one to see how alike it is and which
-plugins found it.
+An artist's page ends with **Similar artists**, an album's with **Similar albums**, and a song's page with **Similar
+songs**, from the [discovery plugins](plugins.md#discovery): ListenBrainz to start with. Similar artists and albums are
+one row of tiles you scroll sideways, with arrows either side on a computer. Open an artist to go to their page, or, for
+one the catalogue doesn't have, to search for them. Similar songs are only those the catalogue has, listed as search
+lists songs: play one you have, or listen to, get or wish for one you don't. Hover over any of them to see how alike it
+is and which plugins found it.
+
+No plugin suggests albums, so similar albums are found through what they do suggest: the albums that songs like a few
+of the album's songs come from, and, counting a little less, albums by artists like its artist, those you have first.
+The album's artist's other albums are left out; they're on the artist's page.
 
 Each section of a song's page opens and closes from its title. The albums it's on, its lyrics and its files start open;
-**Similar songs** and **Replaced by an upgrade** start shut, and the plugins are only asked for similar songs once you
-open it. What you open or shut is remembered in that browser.
+**Similar songs** and **Replaced by an upgrade** start shut. Similar artists and similar albums start shut too. Whether
+open or shut, the plugins are asked as the page loads, so a section opens straight onto what they found, and says it's
+asking until then. What you open or shut is remembered in that browser.
 
 ## Quality
 

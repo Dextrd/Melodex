@@ -218,6 +218,42 @@ public sealed class DiscoveryTests : IDisposable
     }
 
     [Fact]
+    public async Task Similar_albums_come_through_similar_songs_and_artists()
+    {
+        var (portishead, massive, gloryBox, teardrop) = await SeedAsync();
+        Guid dummy, third, mezzanine, protection;
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<MelodexDbContext>();
+            Album AlbumOf(Guid artist, string title, string credit, string year, params (Guid Track, string Title)[] tracks)
+            {
+                var album = new Album { ArtistId = artist, Title = title, ArtistCredit = credit, Type = AlbumType.Album, FirstReleaseDate = year };
+                var edition = new Edition { Album = album, Title = title };
+                db.AddRange(album, edition);
+                db.EditionTracks.AddRange(tracks.Select((t, i) => new EditionTrack { Edition = edition, TrackId = t.Track, Number = $"{i + 1}", Position = i + 1, Title = t.Title }));
+                return album;
+            }
+            dummy = AlbumOf(portishead, "Dummy", "Portishead", "1994", (gloryBox, "Glory Box")).Id;
+            third = AlbumOf(portishead, "Third", "Portishead", "2008").Id;
+            mezzanine = AlbumOf(massive, "Mezzanine", "Massive Attack", "1998", (teardrop, "Teardrop")).Id;
+            protection = AlbumOf(massive, "Protection", "Massive Attack", "1994").Id;
+            await db.SaveChangesAsync();
+        }
+
+        var similar = await _api.ListSimilarAlbumsAsync(dummy);
+        // Mezzanine has Teardrop, like Glory Box, and is by an artist like Portishead; Protection only the latter.
+        Assert.Equal([mezzanine, protection], similar.Select(s => s.Album.Id));
+        Assert.Equal(1, similar[0].Score);
+        Assert.True(similar[1].Score < 1);
+        Assert.Equal("Massive Attack", similar[0].Album.ArtistCredit);
+        // The album and its artist's other albums aren't among them.
+        Assert.DoesNotContain(similar, s => s.Album.Id == third || s.Album.Id == dummy);
+
+        Assert.Equal(HttpStatusCode.NotFound,
+            (await Assert.ThrowsAsync<HttpRequestException>(() => _api.ListSimilarAlbumsAsync(Guid.NewGuid()))).StatusCode);
+    }
+
+    [Fact]
     public async Task Recommendations_come_from_a_linked_listenbrainz_account()
     {
         var (_, _, _, teardrop) = await SeedAsync();

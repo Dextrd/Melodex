@@ -1,5 +1,6 @@
 using Melodex.Client;
 using Melodex.Core.Access;
+using Melodex.Core.Library;
 using Melodex.Core.Listening;
 
 namespace Melodex.Core.Api;
@@ -24,6 +25,19 @@ public static class DiscoveryEndpoints
             .WithSummary($"Artists like this one, the closest first, combined from the discovery plugins (at most {DiscoveryService.MaxTake}). Those "
                          + "matched to the catalogue have its ID; the rest only their name.")
             .Produces<IReadOnlyList<SimilarArtist>>().Produces(StatusCodes.Status404NotFound);
+
+        discovery.MapGet("/albums/{id:guid}/similar", async (Guid id, DiscoveryService service, LibraryView library, CancellationToken ct, int take = 12) =>
+            {
+                if (await service.SimilarAlbumsAsync(id, take, ct) is not { } similar)
+                    return Results.NotFound();
+                var albums = (await library.GetAlbumSummariesAsync(similar.Select(s => s.AlbumId).ToList(), ct)).ToDictionary(a => a.Id);
+                return Results.Ok(similar.Where(s => albums.ContainsKey(s.AlbumId)).Select(s => new SimilarAlbum(albums[s.AlbumId], s.Score, s.From)).ToList());
+            })
+            .RequireScope(Scopes.Read)
+            .WithName("ListSimilarAlbums")
+            .WithSummary($"Albums like this one, the closest first (at most {DiscoveryService.MaxTake}): those songs like a few of its songs come from, "
+                         + "and albums by artists like its artist. The album's artist's other albums are left out.")
+            .Produces<IReadOnlyList<SimilarAlbum>>().Produces(StatusCodes.Status404NotFound);
 
         discovery.MapGet("/tracks/{id:guid}/similar", async (Guid id, DiscoveryService service, CancellationToken ct, int take = 20) =>
                 await service.SimilarSongsAsync(id, take, ct) is { } similar ? Results.Ok(similar) : Results.NotFound())

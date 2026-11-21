@@ -17,7 +17,8 @@ namespace Melodex.Core.Listening;
 /// what several find, so what they agree on comes first. What they find is matched to the catalogue by its IDs, else by
 /// name when that's clear; an artist with a MusicBrainz ID the catalogue hasn't seen yet is added to it, as a search would.
 /// </summary>
-public sealed class DiscoveryService(MelodexDbContext db, DiscoveryPlugins plugins, CatalogueService catalogue, ILogger<DiscoveryService> logger)
+public sealed class DiscoveryService(MelodexDbContext db, DiscoveryPlugins plugins, CatalogueService catalogue, IServiceScopeFactory scopes,
+    ILogger<DiscoveryService> logger)
 {
     /// <summary>How long a plugin's similar artists and songs are kept; they change slowly.</summary>
     public static readonly TimeSpan SimilarFor = TimeSpan.FromDays(1);
@@ -35,6 +36,11 @@ public sealed class DiscoveryService(MelodexDbContext db, DiscoveryPlugins plugi
     public static readonly TimeSpan Lately = TimeSpan.FromDays(90);
 
     private const int Seeds = 10;
+
+    // How many of an album's songs to look for songs like, and how much an album of an artist like its artist counts
+    // against one songs like its songs come from.
+    private const int AlbumSeeds = 3;
+    private const double ArtistsAlbums = 0.5;
 
     public async Task<DiscoveryStatus> StatusAsync(CancellationToken ct)
     {
@@ -81,6 +87,60 @@ public sealed class DiscoveryService(MelodexDbContext db, DiscoveryPlugins plugi
         var answers = await AskAsync(DiscoveryCapabilities.SimilarRecordings, $"track|{trackId}", SimilarFor,
             (plugin, ct2) => plugin.SimilarRecordingsAsync(query, Ask(take), ct2), ct);
         return await SongsAsync(answers, take, [trackId], ct);
+    }
+
+    /// <summary>
+    /// Albums like this one (#226), closest first, as album IDs with how close and which plugins led to them; null when
+    /// there's no such album. No plugin finds albums, so they're found through what they do find: the albums songs like a
+    /// few of its songs come from, and albums by artists like its artist, a little less. The album and its artist's
+    /// other albums are left out.
+    /// </summary>
+    public async Task<IReadOnlyList<(Guid AlbumId, double Score, IReadOnlyList<string> From)>?> SimilarAlbumsAsync(Guid albumId, int take, CancellationToken ct)
+    {
+        if (await db.Albums.AsNoTracking().FirstOrDefaultAsync(a => a.Id == albumId, ct) is not { } album)
+            return null;
+        take = Math.Clamp(take, 1, MaxTake);
+        // A few of its songs, those you have first, then in the order they come.
+        var tracks = await db.EditionTracks.AsNoTracking().Where(et => et.Edition.AlbumId == albumId)
+            .OrderBy(et => et.Disc).ThenBy(et => et.Position).Select(et => et.TrackId).Distinct().ToListAsync(ct);
+        var owned = (await db.LibraryFiles.Where(f => f.TrackId != null && tracks.Contains(f.TrackId.Value)).Select(f => f.TrackId!.Value).ToListAsync(ct))
+            .ToHashSet();
+        var seeds = tracks.OrderBy(t => owned.Contains(t) ? 0 : 1).Take(AlbumSeeds).ToList();
+
+        // Each asked in a scope of its own, at once, so the plugins are waited on once rather than for each song in turn.
+        async Task<TResult> InScopeAsync<TResult>(Func<DiscoveryService, Task<TResult>> ask)
+        {
+            await using var scope = scopes.CreateAsyncScope();
+            return await ask(scope.ServiceProvider.GetRequiredService<DiscoveryService>());
+        }
+        var songs = seeds.Select(t => InScopeAsync(s => s.SimilarSongsAsync(t, 30, ct))).ToList();
+        var artists = InScopeAsync(s => s.SimilarArtistsAsync(album.ArtistId, 10, ct));
+        await Task.WhenAll([.. songs, artists]);
+
+        var found = new Dictionary<Guid, (double Score, HashSet<string> From)>();
+        void Add(Guid id, double score, IEnumerable<string> from)
+        {
+            var (was, by) = found.TryGetValue(id, out var known) ? known : (0, new HashSet<string>());
+            by.UnionWith(from);
+            found[id] = (was + score, by);
+        }
+        foreach (var song in songs.SelectMany(s => s.Result ?? []))
+            if (song.AlbumId is { } id)
+                Add(id, song.Score, song.From);
+        // Two albums of each artist like it: those you have first, then their earliest.
+        foreach (var artist in (artists.Result ?? []).Where(a => a.Id is not null))
+        {
+            var theirs = await db.Albums.AsNoTracking().Where(a => a.ArtistId == artist.Id && a.Type == AlbumType.Album && !a.Ignored)
+                .Select(a => new { a.Id, a.SecondaryTypes, a.FirstReleaseDate, Owned = a.Editions.Any(e => db.LibraryFiles.Any(f => f.EditionId == e.Id)) })
+                .ToListAsync(ct);
+            foreach (var their in theirs.Where(a => a.SecondaryTypes.Count == 0).OrderBy(a => a.Owned ? 0 : 1).ThenBy(a => a.FirstReleaseDate ?? "9999").Take(2))
+                Add(their.Id, ArtistsAlbums * artist.Score, artist.From);
+        }
+
+        var same = (await db.Albums.Where(a => a.ArtistId == album.ArtistId).Select(a => a.Id).ToListAsync(ct)).ToHashSet();
+        var ranked = found.Where(f => !same.Contains(f.Key)).OrderByDescending(f => f.Value.Score).Take(take).ToList();
+        var best = ranked.Count > 0 ? ranked[0].Value.Score : 1;
+        return ranked.Select(f => (f.Key, f.Value.Score / best, (IReadOnlyList<string>)f.Value.From.ToList())).ToList();
     }
 
     /// <summary>Songs recommended for someone, best first, from what the plugins know of them and what they've played lately.</summary>

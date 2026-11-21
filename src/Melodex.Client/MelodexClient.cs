@@ -1057,6 +1057,10 @@ public sealed class MelodexClient(HttpClient http)
     public async Task<IReadOnlyList<SimilarArtist>> ListSimilarArtistsAsync(Guid artistId, int take = 20, CancellationToken ct = default) =>
         await http.GetFromJsonAsync<List<SimilarArtist>>($"{Api}/artists/{artistId}/similar?take={take}", MelodexJson.Options, ct) ?? [];
 
+    /// <summary>Albums like this one, the closest first (#226).</summary>
+    public async Task<IReadOnlyList<SimilarAlbum>> ListSimilarAlbumsAsync(Guid albumId, int take = 12, CancellationToken ct = default) =>
+        await http.GetFromJsonAsync<List<SimilarAlbum>>($"{Api}/albums/{albumId}/similar?take={take}", MelodexJson.Options, ct) ?? [];
+
     /// <summary>The next songs for a radio (#4); null when what it was started from is gone.</summary>
     public async Task<RadioBatch?> NextRadioAsync(RadioNext next, CancellationToken ct = default)
     {
