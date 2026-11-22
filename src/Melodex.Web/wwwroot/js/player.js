@@ -29,6 +29,16 @@ function element() {
     el.volume = storedVolume();
     // Only the one playing is heard from: the spare loading or the one just finished say nothing.
     const on = (name, handler) => el.addEventListener(name, e => { if (el === audio) handler(e); });
+    for (const name of ["loadedmetadata", "canplay", "playing", "waiting", "stalled", "pause", "seeking", "ended", "error"])
+        on(name, () => {
+            if (!stream)
+                return;
+            note(`${name} at ${el.currentTime.toFixed(2)}, ready ${el.readyState}${el.error ? `, error ${el.error.code} ${el.error.message}` : ""}`);
+            if (name === "playing")
+                stream.started = true;
+            if (name === "error")
+                report("The stream hit an error on this device.");
+        });
     on("timeupdate", () => {
         // While seeking, the time can still be the old one, which would put the seek bar back.
         if (audio.seeking)
@@ -359,6 +369,25 @@ const failed = new Set();
 let stream = null;
 // How much of a song is fetched before it's added: a few seconds of lossless sound.
 const CHUNK = 512 * 1024;
+// Given up on for this visit, once a stream didn't start: songs play one at a time instead.
+let unstreamable = false;
+// The stream's last few steps, put in the server's log if a song doesn't start in it: there's no seeing a phone's
+// console without a computer beside it.
+const trail = [];
+
+function note(step) {
+    trail.push(`${(performance.now() / 1000).toFixed(2)}s ${step}`);
+    if (trail.length > 60)
+        trail.shift();
+}
+
+function report(message) {
+    fetch("api/v1/client-errors", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message, details: `${navigator.userAgent}\nKept as they are: ${keeps.join(", ") || "none"}\n${trail.join("\n")}`, page: location.pathname }),
+    }).catch(() => { });
+}
 
 function forced() {
     try {
@@ -400,8 +429,32 @@ function begin(url, meta, length) {
     };
     // A ManagedMediaSource won't open without it: AirPlay would need the music from somewhere else.
     audio.disableRemotePlayback = true;
+    note(`begin ${path(url)}`);
+    for (const name of ["sourceopen", "sourceended", "sourceclose", "startstreaming", "endstreaming"])
+        source.addEventListener(name, () => note(`${name}${stream === s ? "" : " (old stream)"}`));
     source.addEventListener("sourceopen", () => add(s, s.now), { once: true });
     audio.src = s.object;
+    // Not started a while after its song came, though asked to play: given up on, and played the old way. The server
+    // may take a while to make the song's copy the first time.
+    const watch = () => s.watchdog = setTimeout(() => {
+        if (stream !== s || s.started || audio.paused)
+            return;
+        if (!s.now.added)
+            return watch();
+        giveUp(s, "A song didn't start in the stream on this device; it's played on its own instead.");
+    }, 15000);
+    watch();
+}
+
+function giveUp(s, message) {
+    note("given up");
+    report(message);
+    unstreamable = true;
+    const { url } = s.now, from = here();
+    close();
+    audio.src = source(url);
+    seek(from);
+    play();
 }
 
 /** Ends the stream, as another song plays on its own or the music stops. */
@@ -410,6 +463,7 @@ function close() {
     if (!s)
         return;
     stream = null;
+    clearTimeout(s.watchdog);
     s.now.controller.abort();
     s.next?.controller.abort();
     URL.revokeObjectURL(s.object);
@@ -469,12 +523,14 @@ async function fill(s, song) {
             cache: "no-cache",
         });
         const type = response.headers.get("Content-Type") ?? "";
+        note(`fetched ${path(song.url)}: ${response.status} ${type}, from ${song.start.toFixed(2)}`);
         if (!response.ok || !type.startsWith("audio/mp4") || !Source.isTypeSupported(type))
             throw new Error(`Not a song for the stream: ${response.status} ${type}`);
         await change(s, b => {
             if (!b) {
                 s.buffer = s.source.addSourceBuffer(type);
                 s.buffer.mode = "segments";
+                s.buffer.addEventListener("bufferedchange", e => note(`let go of ${ranges(e.removedRanges)}, now ${ranges(s.buffer.buffered)}`));
             } else if (s.type !== type)
                 b.changeType(type);
             s.type = type;
@@ -504,11 +560,14 @@ async function fill(s, song) {
                 break;
         }
         song.end = s.end = endOf(s, song);
+        note(`added ${path(song.url)}, to ${song.end.toFixed(2)}; there's ${ranges(s.buffer.buffered)}`);
         finish(s);
     } catch (e) {
         if (stream !== s || song.dropped)
             return;
         console.warn("Melodex: a song couldn't be added to the stream.", e);
+        note(`couldn't add ${path(song.url)}: ${e?.name} ${e?.message}`);
+        report("A song couldn't be added to the stream.");
         failed.add(path(song.url));
         if (song === s.now && !song.added) {
             // Played on its own.
@@ -538,6 +597,13 @@ async function fill(s, song) {
     }
 }
 
+function ranges(r) {
+    const out = [];
+    for (let i = 0; r && i < r.length; i++)
+        out.push(`${r.start(i).toFixed(2)}–${r.end(i).toFixed(2)}`);
+    return out.join(", ") || "nothing";
+}
+
 function join(parts, size) {
     if (parts.length === 1)
         return parts[0];
@@ -564,6 +630,7 @@ async function append(s, song, bytes) {
         } catch (e) {
             if (e?.name !== "QuotaExceededError")
                 throw e;
+            note("full");
             const behind = audio.currentTime - 10, buffered = s.buffer.buffered;
             if (buffered.length && buffered.start(0) < behind - 1)
                 await change(s, b => {
@@ -673,14 +740,30 @@ function skip(quiet) {
 
 // A stream run dry. While the song's still being fetched, it'll come; otherwise what was there was let go of to save
 // memory (an iPhone may), and the stream starts again from here.
+// How much of the stream there is from here on.
+function ahead(s) {
+    try {
+        const buffered = s.buffer.buffered, at = audio.currentTime;
+        for (let i = 0; i < buffered.length; i++)
+            if (buffered.start(i) <= at + 0.1 && buffered.end(i) > at)
+                return buffered.end(i) - at;
+    } catch {
+    }
+    return 0;
+}
+
 function stalled() {
     const s = stream;
     setTimeout(() => {
-        if (stream !== s || s.filling || audio.paused || audio.readyState > 2)
+        if (stream !== s || s.filling || !s.now.added || audio.paused || audio.readyState > 2 || ahead(s) > 1)
             return;
+        note(`ran dry at ${audio.currentTime.toFixed(2)}; there's ${ranges(s.buffer?.buffered)}`);
+        if (s.rebuilt)
+            return giveUp(s, "The stream ran dry on this device; songs are played on their own instead.");
         const { now, next } = s, from = here();
         begin(now.url, now.meta, now.length);
         stream.now.token = now.token;
+        stream.rebuilt = true;
         if (next)
             follow(next.url, next.meta, next.token, next.length);
         seek(from);
@@ -693,7 +776,7 @@ export function load(url, meta, length) {
     lengths.set(audio, length);
     second = -1;
     unwatch();
-    if (streams && url.includes("/stream?") && !failed.has(path(url))) {
+    if (streams && !unstreamable && url.includes("/stream?") && !failed.has(path(url))) {
         // The next song, there already: played on in the stream. Otherwise a new stream, starting with this one.
         if (stream?.next && path(stream.next.url) === path(url) && ready(stream.next)) {
             stream.next.meta = meta;
@@ -713,6 +796,8 @@ export function load(url, meta, length) {
 
 export function play() {
     audio.play().catch(e => {
+        if (stream)
+            note(`play refused: ${e.name} ${e.message}`);
         // Loading another track first isn't a failure; the browser refusing to start without a click is shown as paused.
         if (e.name !== "AbortError")
             player.invokeMethodAsync("OnPlaying", false);
