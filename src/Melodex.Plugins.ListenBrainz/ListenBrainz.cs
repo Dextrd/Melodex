@@ -16,12 +16,13 @@ public sealed class ListenBrainzFactory : IPluginFactory
     {
         Id = PluginId,
         Name = "ListenBrainz",
-        Version = "0.1.0",
+        Version = "0.2.0",
         Type = PluginType.Discovery,
         ContractVersion = ContractVersions.Discovery.ToString(),
-        Description = "Similar artists and songs from what ListenBrainz's listeners play together, and songs it recommends for you once you've linked your account. Free and open; no account needed for the rest.",
+        Description = "Similar artists and songs from what ListenBrainz's listeners play together, songs it recommends for you once you've linked your account, and artists' genres. Free and open; no account needed for the rest.",
         Homepage = "https://listenbrainz.org",
-        Capabilities = [DiscoveryCapabilities.SimilarArtists, DiscoveryCapabilities.SimilarRecordings, DiscoveryCapabilities.Recommendations],
+        Capabilities = [DiscoveryCapabilities.SimilarArtists, DiscoveryCapabilities.SimilarRecordings, DiscoveryCapabilities.Recommendations,
+            DiscoveryCapabilities.ArtistGenres],
         Access = new PluginAccess { Network = ["api.listenbrainz.org", "labs.api.listenbrainz.org"] },
         // ListenBrainz asks every app to keep to one call a second.
         MaxRequestsPerSecond = 1,
@@ -117,6 +118,14 @@ public sealed class ListenBrainz(PluginContext context) : IDiscoveryPlugin
         return scored.Where(m => metadata.ContainsKey(m.Mbid!)).Select(m => metadata[m.Mbid!] with { Score = m.Score }).ToList();
     }
 
+    public async Task<IReadOnlyList<DiscoveredGenre>> ArtistGenresAsync(DiscoveryArtist artist, int count, CancellationToken cancellationToken)
+    {
+        if (Mbid(artist.Ids) is not { } mbid)
+            return [];
+        var answer = await GetAsync($"{Api}metadata/artist/?artist_mbids={mbid}&inc=tag", cancellationToken);
+        return answer is { ValueKind: JsonValueKind.Array } list ? ReadGenres(list, count) : [];
+    }
+
     public async Task<HealthReport> CheckHealthAsync(CancellationToken cancellationToken)
     {
         try
@@ -144,6 +153,21 @@ public sealed class ListenBrainz(PluginContext context) : IDiscoveryPlugin
         .Where(a => a.Mbid is not null && a.Name is not null && !string.Equals(a.Mbid, reference, StringComparison.OrdinalIgnoreCase))
         .Take(count)
         .Select(a => new DiscoveredArtist(a.Name!, [new ProviderId(Providers.MusicBrainz, a.Mbid!)], a.Score, a.Comment))
+        .ToList();
+
+    /// <summary>
+    /// An artist's genres from the metadata API: the tags MusicBrainz's users gave them that are genres, not any other
+    /// tag, by how many gave each.
+    /// </summary>
+    public static IReadOnlyList<DiscoveredGenre> ReadGenres(JsonElement list, int count) => list.EnumerateArray()
+        .Where(a => a.TryGetProperty("tag", out var tag) && tag.ValueKind == JsonValueKind.Object)
+        .SelectMany(a => a.GetProperty("tag").TryGetProperty("artist", out var tags) && tags.ValueKind == JsonValueKind.Array ? tags.EnumerateArray() : [])
+        .Where(t => Text(t, "genre_mbid") is not null && Text(t, "tag") is not null)
+        .Select(t => new DiscoveredGenre(Text(t, "tag")!.ToLowerInvariant(), Number(t, "count")))
+        .Where(g => g.Score > 0)
+        .GroupBy(g => g.Name).Select(g => g.MaxBy(x => x.Score)!)
+        .OrderByDescending(g => g.Score)
+        .Take(count)
         .ToList();
 
     /// <summary>The labs API's similar songs, leaving out the song asked about; their artists are only names.</summary>

@@ -56,10 +56,14 @@ What changed in each release of Melodex. Versions follow [semantic versioning](h
   **Weekly discoveries** mix, made each Monday, of songs you don't have like what you've played lately, with
   ListenBrainz's recommendations for you among them; and rows of **Artists for you** and **Albums for you** you don't
   have, **Back to your albums** you haven't played in a while, and ListenBrainz's recommendations. Daily mixes are made
-  again each day. **Keep** copies a mix into a playlist of yours, synced to Navidrome like any other, with songs you
-  don't have holding their place until they arrive. A mix can start a radio too. The Library's other views are at
+  again each day, named for their artists' genres, such as "Trip hop & dub". **Keep** copies a mix into a playlist of
+  yours, synced to Navidrome like any other, with songs you don't have holding their place until they arrive, and asks
+  whether to get them (or not to ask again). A mix can start a radio too. The Library's other views are at
   `/browse`. The API has `GET /mixes`, `GET /mixes/{id}`, `POST /mixes/{id}/keep`, `GET /for-you/artists`,
   `GET /for-you/albums` and `GET /for-you/your-albums` (#5).
+- Discovery plugin contract 1.1: an artist's genres, with the `artist-genres` capability, `ArtistGenresAsync`, and
+  `POST /v1/artist-genres` for plugins at an address. ListenBrainz gives the genres MusicBrainz's users tagged an artist
+  with (#5).
 - Melodex's own Subsonic extension, `melodex`: each song's ID in the API, and whether you have all of an album (#7).
 - **Settings → Scheduled tasks**: daily, weekly and monthly windows, each with its own times (running past midnight
   if it ends earlier than it starts), the weekly one on a day you pick and the monthly one on a day of the month (in a

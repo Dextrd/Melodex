@@ -2,10 +2,14 @@
 @inject MelodexClient Api
 @inject Player Player
 @inject Notices Notices
+@inject AuthState Auth
+@inject RequestTracker Tracker
+@inject Preferences Preferences
 
 @*
     A mix made for you (#5): its songs, to play from any of them, those you don't have fetched to listen to as they come
-    near. Keep copies it into a playlist of yours, as it is today, since the mix is remade tomorrow, or next Monday.
+    near. Keep copies it into a playlist of yours, as it is today, since the mix is remade tomorrow, or next Monday, and
+    offers to get the songs you don't have, unless you've said not to ask again.
 *@
 
 <PageTitle>@(_mix?.Mix.Name ?? "Mix") · Melodex</PageTitle>
@@ -48,12 +52,42 @@ else
     <SongList Songs="detail.Songs" PlayFrom="at => Player.PlayMixAsync(detail, at)" />
 }
 
+@if (_asking is { } asking)
+{
+    <Dialog Title="@($"Get the {Format.Count(asking.Songs.Count, "song", "songs")} you don't have?")" Alert="true" OnClose="() => AnswerAsync(false)">
+        <p>
+            @asking.Playlist.Playlist.Name has @Format.Count(asking.Songs.Count, "song that isn't", "songs that aren't") in your library yet.
+            Get @(asking.Songs.Count == 1 ? "it" : "them") now and each fills its place in the playlist as it arrives, or get
+            @(asking.Songs.Count == 1 ? "it" : "them") later from the playlist.
+        </p>
+        <label class="auth-check">
+            <input type="checkbox" @bind="_dontAsk" />
+            <span>
+                Don't ask again
+                <span class="muted small">Keeping a mix won't offer this again in this browser.</span>
+            </span>
+        </label>
+        <div class="toolbar">
+            <span class="spacer"></span>
+            <button @onclick="() => AnswerAsync(false)">Not now</button>
+            <button class="primary" disabled="@_keeping" @onclick="() => AnswerAsync(true)">
+                @if (_keeping) { <span class="spinner"></span> }Get @Format.Count(asking.Songs.Count, "song", "songs")
+            </button>
+        </div>
+    </Dialog>
+}
+
 @code {
     [Parameter] public Guid Id { get; set; }
 
     private MixDetail? _mix;
-    private bool _gone, _keeping;
+    private bool _gone, _keeping, _dontAsk;
     private string? _error;
+
+    // A mix just kept, with the songs in it you don't have and haven't asked for, while asking whether to get them.
+    private (PlaylistDetail Playlist, IReadOnlyList<Guid> Songs)? _asking;
+
+    private const string DontAskKey = "mixes.dontAskToGet";
 
     protected override async Task OnParametersSetAsync()
     {
@@ -72,11 +106,43 @@ else
             var kept = await Api.KeepMixAsync(Id, new KeepMix());
             Notices.Show(new Notice($"mix:{Id}", NoticeKind.Action, "Kept as a playlist", kept.Playlist.Name, $"playlists/{kept.Playlist.Id}", "playlist"),
                 always: true);
+            if (Auth.May(UserPermissions.Request) && !await Preferences.GetAsync(DontAskKey, false))
+            {
+                await Tracker.EnsureLoadedAsync();
+                var missing = kept.Songs
+                    .Where(s => s.State == PlaylistSongState.Awaiting && s.TrackId is not null && Tracker.Find(RequestKind.Track, s.TrackId.Value) is null)
+                    .Select(s => s.TrackId!.Value).Distinct().ToList();
+                if (missing.Count > 0)
+                    (_asking, _dontAsk) = ((kept, missing), false);
+            }
         }
         catch (Exception e) when (e is HttpRequestException or MelodexApiException)
         {
             _error = $"Couldn't keep it: {e.Message}";
         }
         _keeping = false;
+    }
+
+    private async Task AnswerAsync(bool get)
+    {
+        if (_asking is not { } asking || _keeping)
+            return;
+        if (_dontAsk)
+            await Preferences.SetAsync(DontAskKey, true);
+        if (get)
+        {
+            _keeping = true;
+            try
+            {
+                foreach (var track in asking.Songs)
+                    await Tracker.CreateAsync(new CreateRequest(RequestKind.Track, track));
+            }
+            catch (Exception e) when (e is HttpRequestException or MelodexApiException)
+            {
+                _error = $"Couldn't get them all: {e.Message}";
+            }
+            _keeping = false;
+        }
+        _asking = null;
     }
 }

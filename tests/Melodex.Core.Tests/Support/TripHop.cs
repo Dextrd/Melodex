@@ -59,7 +59,7 @@ public static class TripHop
 
     /// <summary>
     /// Stands in for ListenBrainz: Teardrop and Overcome are like Glory Box, and Glory Box like anything else; Massive
-    /// Attack are like Portishead.
+    /// Attack are like Portishead, and trip hop, with some dub.
     /// </summary>
     public sealed class FakeListenBrainz : HttpMessageHandler
     {
@@ -83,6 +83,21 @@ public static class TripHop
                     new { recording_mbid = GloryBox, recording_name = "Glory Box", artist_credit_name = "Portishead", score = 100 },
                 },
                 ("labs.api.listenbrainz.org", "/acr-lookup/json") => Array.Empty<object>(),
+                ("api.listenbrainz.org", "/1/metadata/artist/") when query["artist_mbids"] == MassiveAttack => new object[]
+                {
+                    new
+                    {
+                        artist_mbid = MassiveAttack,
+                        tag = new
+                        {
+                            artist = new object[]
+                            {
+                                new { tag = "trip hop", count = 20, genre_mbid = "2a1a4a8f-1f3c-4a4f-9a5e-5b0c0c0c0c01" },
+                                new { tag = "dub", count = 6, genre_mbid = "c72a5d45-75a8-4b35-9f48-67e49eb4b5e5" },
+                            },
+                        },
+                    },
+                },
                 ("api.listenbrainz.org", "/1/metadata/recording/") => query["recording_mbids"]!.Split(',').ToDictionary(m => m, m => (object)new
                 {
                     artist = new

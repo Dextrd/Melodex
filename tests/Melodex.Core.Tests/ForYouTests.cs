@@ -44,7 +44,8 @@ public sealed class ForYouTests : IDisposable
 
         var mixes = await _api.ListMixesAsync();
         var daily = Assert.Single(mixes, m => m.Kind == MixKind.Daily);
-        Assert.Equal("Daily mix 1", daily.Name);
+        // Named for their genre: trip hop, and not enough dub to say so too.
+        Assert.Equal("Trip hop mix", daily.Name);
         Assert.Equal(["Massive Attack"], daily.Artists);
         var weekly = Assert.Single(mixes, m => m.Kind == MixKind.Weekly);
         var discoveries = (await _api.GetMixAsync(weekly.Id))!;
@@ -57,14 +58,14 @@ public sealed class ForYouTests : IDisposable
         var detail = (await _api.GetMixAsync(daily.Id))!;
         Assert.Equal(daily.Songs, detail.Songs.Count);
         var kept = await _api.KeepMixAsync(daily.Id, new KeepMix());
-        Assert.StartsWith("Daily mix 1, ", kept.Playlist.Name);
+        Assert.StartsWith("Trip hop mix, ", kept.Playlist.Name);
         Assert.Equal(detail.Songs.Select(x => x.TrackId), kept.Songs.Select(x => x.TrackId!.Value));
 
         Assert.Contains(kept.Songs, x => x.State == PlaylistSongState.Awaiting);
 
         // A radio carries on from it.
         var radio = (await _api.NextRadioAsync(new RadioNext(daily.Id, detail.Songs.Select(x => x.TrackId).ToList())))!;
-        Assert.Equal(("Daily mix 1", RadioSeedKind.Mix), (radio.Name, radio.Kind));
+        Assert.Equal(("Trip hop mix", RadioSeedKind.Mix), (radio.Name, radio.Kind));
 
         // The next day the daily mix is made again.
         using (var scope = _factory.Services.CreateScope())

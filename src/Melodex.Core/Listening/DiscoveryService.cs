@@ -26,6 +26,9 @@ public sealed class DiscoveryService(MelodexDbContext db, DiscoveryPlugins plugi
     /// <summary>How long a plugin's recommendations for someone are kept; services remake them about daily.</summary>
     public static readonly TimeSpan RecommendedFor = TimeSpan.FromHours(6);
 
+    /// <summary>How long a plugin's genres for an artist are kept; they hardly change.</summary>
+    public static readonly TimeSpan GenresFor = TimeSpan.FromDays(7);
+
     /// <summary>The most a list can be.</summary>
     public const int MaxTake = 100;
 
@@ -49,6 +52,18 @@ public sealed class DiscoveryService(MelodexDbContext db, DiscoveryPlugins plugi
         bool Has(string capability) => manifests.Any(m => m.Capabilities.Contains(capability));
         return new DiscoveryStatus(Has(DiscoveryCapabilities.SimilarArtists), Has(DiscoveryCapabilities.SimilarRecordings),
             Has(DiscoveryCapabilities.Recommendations));
+    }
+
+    /// <summary>
+    /// An artist's genres from the plugins (#5), the most fitting first, scored from 0 to 1 as their answers are combined;
+    /// none when no plugin knows any.
+    /// </summary>
+    public async Task<IReadOnlyList<(string Name, double Score)>> ArtistGenresAsync(Guid artistId, CancellationToken ct)
+    {
+        var query = await ArtistOfAsync(artistId, ct);
+        var answers = await AskAsync(DiscoveryCapabilities.ArtistGenres, $"genres|{artistId}", GenresFor,
+            (plugin, ct2) => plugin.ArtistGenresAsync(query, 10, ct2), ct);
+        return Combine(answers, g => g.Score, g => [g.Name.ToLowerInvariant()]).Select(g => (g.Best.Name.ToLowerInvariant(), g.Score)).ToList();
     }
 
     /// <summary>Artists like this one, closest first; null when there's no such artist.</summary>

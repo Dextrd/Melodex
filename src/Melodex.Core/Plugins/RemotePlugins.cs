@@ -164,6 +164,11 @@ public sealed class RemoteDiscoveryPlugin(HttpClient http, JsonElement settings,
         Declares(DiscoveryCapabilities.Recommendations)
             ? ListAsync<RecommendationsInput, DiscoveredRecording>("v1/recommendations", new(listener, count), cancellationToken)
             : Task.FromResult<IReadOnlyList<DiscoveredRecording>>([]);
+
+    public Task<IReadOnlyList<DiscoveredGenre>> ArtistGenresAsync(DiscoveryArtist artist, int count, CancellationToken cancellationToken) =>
+        Declares(DiscoveryCapabilities.ArtistGenres)
+            ? ListAsync<ArtistGenresInput, DiscoveredGenre>("v1/artist-genres", new(artist, count), cancellationToken)
+            : Task.FromResult<IReadOnlyList<DiscoveredGenre>>([]);
 }
 
 /// <summary>

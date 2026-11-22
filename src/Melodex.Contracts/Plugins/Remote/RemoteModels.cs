@@ -57,6 +57,9 @@ public sealed record SimilarArtistsInput(DiscoveryArtist Artist, int Count);
 /// <summary>A song to find others like, and how many.</summary>
 public sealed record SimilarRecordingsInput(DiscoveryRecording Recording, int Count);
 
+/// <summary>An artist to give the genres of, and how many (discovery 1.1).</summary>
+public sealed record ArtistGenresInput(DiscoveryArtist Artist, int Count);
+
 /// <summary>Someone to recommend songs to, and how many.</summary>
 public sealed record RecommendationsInput(DiscoveryListener Listener, int Count);
 

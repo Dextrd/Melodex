@@ -24,7 +24,9 @@ The Library opens on **For you**, made from what you play, and different for eve
 
 - **Your mixes**: up to four daily mixes, each around one of the artists you play most, lately counting most, with up
   to two others you play that are like them. They're mostly songs you have, by those artists and like them, with the
-  [radio's](requests-and-listening.md#radio) share of songs you don't, and they're made again each day. **Weekly
+  [radio's](requests-and-listening.md#radio) share of songs you don't, and they're made again each day. Each is named
+  for its artists' genres, from the [discovery plugins](plugins.md#discovery): "Trip hop & dub", say, or "Trip hop mix"
+  when one genre fits best, and after its first artist when no plugin knows their genres. **Weekly
   discoveries**, made each Monday, is only songs you don't have, like what you've played lately, with ListenBrainz's
   recommendations for you among them once your ListenBrainz account is linked. Mixes are picked as a radio picks its
   songs, so a song you skipped quickly stays out.
@@ -35,8 +37,9 @@ The Library opens on **For you**, made from what you play, and different for eve
 
 Play a mix from its tile, or open it to see its songs. Songs you don't have are fetched to listen to as they come up.
 **Keep** copies a mix into a playlist of yours, named after it and the day it was made, and synced to Navidrome like any
-other; songs you don't have hold their place in it until they're in your library. The mix itself changes the next day,
-or week. **Radio** carries on from a mix without end.
+other; songs you don't have hold their place in it until they're in your library. With the Request permission, it
+then asks whether to get those songs now. Tick **Don't ask again** and that browser won't ask again; you can still get
+them from the playlist with its **Get** button. The mix itself changes the next day, or week. **Radio** carries on from a mix without end.
 
 A new person, or one who hasn't played much yet, sees little here until they have. Without the Listen permission the
 Library opens on its other views, as it always did.

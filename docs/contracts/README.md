@@ -10,7 +10,7 @@ go with the catalogue, the words of the songs, and music like what's played. Eac
 | [Media-server connector](media-server-connectors.md) | Where music ends up | In process (.NET assembly), or [at an address](remote-plugins.md) | `IMediaServerConnector` v1.3 | Navidrome (Subsonic API) |
 | [Artwork plugin](artwork-plugins.md) | What it looks like | In process (.NET assembly), or [at an address](remote-plugins.md) | `IArtworkPlugin` v1.0 | Cover Art Archive, Wikimedia Commons, Deezer |
 | [Lyrics plugin](lyrics-plugins.md) | What the words are | In process (.NET assembly), or [at an address](remote-plugins.md) | `ILyricsPlugin` v1.1 | LRCLIB |
-| [Discovery plugin](discovery-plugins.md) | What else you'd like | In process (.NET assembly), or [at an address](remote-plugins.md) | `IDiscoveryPlugin` v1.0 | ListenBrainz, Last.fm |
+| [Discovery plugin](discovery-plugins.md) | What else you'd like | In process (.NET assembly), or [at an address](remote-plugins.md) | `IDiscoveryPlugin` v1.1 | ListenBrainz, Last.fm |
 
 Plugins that come with Melodex run in process, but a catalogue, artwork, lyrics, discovery or media-server plugin can also run
 on its own, in any language, and be added by its address: see [plugins at an address](remote-plugins.md).

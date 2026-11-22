@@ -11,7 +11,7 @@ for its kind.
 | Catalogue | [`IIndexPlugin`](index-plugins.md) | Index v1.0 |
 | Artwork | [`IArtworkPlugin`](artwork-plugins.md) | Artwork v1.0 |
 | Lyrics | [`ILyricsPlugin`](lyrics-plugins.md) | Lyrics v1.1 |
-| Discovery | [`IDiscoveryPlugin`](discovery-plugins.md) | Discovery v1.0 |
+| Discovery | [`IDiscoveryPlugin`](discovery-plugins.md) | Discovery v1.1 |
 | Media server | [`IMediaServerConnector`](media-server-connectors.md) | Connector v1.3 |
 
 The models are the ones in `Melodex.Contracts`, serialized as the retrieval contract's are: camelCase names, enums as
@@ -77,6 +77,7 @@ Declare `artists`, `albums` and `editions` for what the plugin can picture; it's
 | `POST /v1/similar-artists` | `{ "artist": DiscoveryArtist, "count" }` | `DiscoveredArtist[]`, closest first. Only with `similar-artists`. |
 | `POST /v1/similar-recordings` | `{ "recording": DiscoveryRecording, "count" }` | `DiscoveredRecording[]`, closest first. Only with `similar-recordings`. |
 | `POST /v1/recommendations` | `{ "listener": DiscoveryListener, "count" }` | `DiscoveredRecording[]`, best first. Only with `recommendations`. |
+| `POST /v1/artist-genres` | `{ "artist": DiscoveryArtist, "count" }` | `DiscoveredGenre[]`, the most fitting first. Only with `artist-genres` (1.1). |
 
 ## Media server
 

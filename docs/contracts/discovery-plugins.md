@@ -1,7 +1,7 @@
-# Discovery plugins (contract v1.0)
+# Discovery plugins (contract v1.1)
 
 Discovery plugins find music related to what someone plays: artists like an artist, songs like a song, and songs to
-recommend to a listener, each with a score. They sit under Discovery in Settings → Plugins. Code:
+recommend to a listener, and an artist's genres (since 1.1), each with a score. They sit under Discovery in Settings → Plugins. Code:
 `Melodex.Contracts.Plugins.Discovery`.
 
 ## How the core uses them
@@ -28,6 +28,7 @@ recommend to a listener, each with a score. They sit under Discovery in Settings
 | `SimilarArtistsAsync(artist, count)` | Artists like this one, closest first | Only with `similar-artists`. Defaults to none. |
 | `SimilarRecordingsAsync(recording, count)` | Songs like this one, closest first | Only with `similar-recordings`. Defaults to none. |
 | `RecommendAsync(listener, count)` | Songs to recommend to a listener, best first | Only with `recommendations`. Defaults to none. |
+| `ArtistGenresAsync(artist, count)` | An artist's genres, the most fitting first | Only with `artist-genres` (1.1). Defaults to none. |
 | `CheckHealthAsync()` | A `HealthReport` | Backs the Test button. |
 
 Return an empty list when the plugin knows nothing for the query; throw for failures, such as the service being down.
@@ -45,7 +46,9 @@ linked it; one that recommends from what's played can use the rest.
 Answers are `DiscoveredArtist` (name, IDs, score, and a disambiguation if the plugin has one) and `DiscoveredRecording`
 (title, artist credit, IDs, credited artists with their IDs, score, and an album and length if the plugin knows them).
 Higher scores are better, in the plugin's own terms. Give MusicBrainz IDs where you have them: they're what matches
-best.
+best. `DiscoveredGenre` is a genre's name, in lower case as MusicBrainz names genres (`trip hop`), and a score, such as
+how many people tagged the artist with it. Give genres only, not other tags such as places or decades. The core names
+daily mixes from them, and keeps each plugin's answer for a week.
 
 ## Capabilities
 
@@ -54,10 +57,11 @@ best.
 | `similar-artists` | Artists like an artist |
 | `similar-recordings` | Songs like a song |
 | `recommendations` | Songs to recommend to a listener |
+| `artist-genres` | An artist's genres (1.1) |
 
 ## Built-in plugins
 
 | Plugin | Notes |
 | --- | --- |
-| ListenBrainz | Set up by default; no account. Similar artists and songs from [ListenBrainz](https://listenbrainz.org)'s labs API, worked out from which ones its listeners play in the same sessions; it knows them by MusicBrainz ID. It keeps a song's listens on one of its recordings, so when the song's own recording has nothing, it looks up the one it uses for that title and artist and asks about that instead. Recommendations are its collaborative filtering's songs for the person's linked ListenBrainz account, made from the listens sent to it, once ListenBrainz has made them. Kept to one call a second, as ListenBrainz asks. |
+| ListenBrainz | Set up by default; no account. Similar artists and songs from [ListenBrainz](https://listenbrainz.org)'s labs API, worked out from which ones its listeners play in the same sessions; it knows them by MusicBrainz ID. It keeps a song's listens on one of its recordings, so when the song's own recording has nothing, it looks up the one it uses for that title and artist and asks about that instead. Recommendations are its collaborative filtering's songs for the person's linked ListenBrainz account, made from the listens sent to it, once ListenBrainz has made them. Genres are the tags MusicBrainz's users gave the artist that are genres, by how many gave each. Kept to one call a second, as ListenBrainz asks. |
 | Last.fm | Needs an API key of your own, free from [last.fm/api/account/create](https://www.last.fm/api/account/create); it can be the one for scrobbling. Similar artists and songs from [Last.fm](https://www.last.fm)'s `artist.getSimilar` and `track.getSimilar`, asked by MusicBrainz ID, then by name if Last.fm doesn't know the ID. |
