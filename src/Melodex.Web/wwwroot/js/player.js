@@ -3,6 +3,8 @@
 // that one starts, and they swap places. On an iPhone, the queue is one stream in one element instead (#109): see below.
 let audio, spare;
 let player;
+// A song shown as what's playing while it's still being fetched: see hold.
+let holding = false;
 let second = -1;
 // The song loaded in the spare, and what's said of it once it plays: { token, meta }.
 let prepared = null;
@@ -106,7 +108,8 @@ export function init(dotnet) {
 // Media keys, and the lock screen and Control Centre on a phone: taken as each song is loaded, and given back when the
 // music stops, so a phone no longer shows Melodex with nothing to play (#98).
 const actions = {
-    play: () => audio.play(),
+    // Nothing to play while the song's being fetched.
+    play: () => { if (!holding) audio.play(); },
     pause: () => audio.pause(),
     previoustrack: () => player.invokeMethodAsync("OnRemote", "previous"),
     // The next song is started at once if it's loaded already, as it is to run on without a gap: a locked phone runs the
@@ -123,6 +126,8 @@ const actions = {
     },
     // Dragging along the phone's bar: once Melodex says which buttons it has, an iPhone offers only those.
     seekto: details => {
+        if (holding)
+            return;
         const to = (stream ? stream.now.start : 0) + details.seekTime;
         if (details.fastSeek && audio.fastSeek)
             audio.fastSeek(to);
@@ -186,12 +191,39 @@ function position() {
     }
 }
 
+// Covers as the phone's controls are given them: where they really are, as an iPhone didn't always follow the cover URL
+// on to its image, and how big they are, by URL.
+const artwork = new Map();
+
 function setMetadata(meta) {
-    if ("mediaSession" in navigator && "MediaMetadata" in window)
-        navigator.mediaSession.metadata = meta ? new MediaMetadata({
-            title: meta.title, artist: meta.artist, album: meta.album ?? "",
-            artwork: meta.cover ? [{ src: new URL(meta.cover, document.baseURI).href }] : [],
-        }) : null;
+    if (!("mediaSession" in navigator && "MediaMetadata" in window))
+        return;
+    const show = art => navigator.mediaSession.metadata = meta ? new MediaMetadata({
+        title: meta.title, artist: meta.artist, album: meta.album ?? "", artwork: art,
+    }) : null;
+    if (!meta?.cover) {
+        show([]);
+        return;
+    }
+    const url = new URL(meta.cover, document.baseURI).href;
+    const known = artwork.get(url);
+    show(known ?? [{ src: url }]);
+    if (known)
+        return;
+    // Shown again once it's found, if it's still this song.
+    const image = new Image();
+    image.onload = () => {
+        const art = [{ src: image.currentSrc || image.src, sizes: `${image.naturalWidth}x${image.naturalHeight}` }];
+        artwork.set(url, art);
+        if (navigator.mediaSession.metadata?.title === meta.title && navigator.mediaSession.metadata?.artwork?.[0]?.src === url)
+            show(art);
+    };
+    fetch(url).then(response => {
+        if (response.ok) {
+            image.src = response.url;
+            artwork.set(url, [{ src: response.url }]);
+        }
+    }).catch(() => { });
 }
 
 // iPhones and iPads, in any browser: all are WebKit. After a song started in the other element, iOS sometimes kept its
@@ -583,6 +615,12 @@ function begin(url, meta, length) {
         pump(s);
     }, { once: true });
     audio.src = s.object;
+    // Looked at every second too, whatever it's heard: a stream left short by quick seeks, or let go of while nothing
+    // was said, is filled again.
+    s.beat = setInterval(() => {
+        if (!audio.paused || audio.seeking)
+            pump(s);
+    }, 1000);
     // Not started a while after its song came, though asked to play: given up on, and played the old way. The server
     // may take a while to make the song's copy the first time.
     const watch = () => s.watchdog = setTimeout(() => {
@@ -608,6 +646,7 @@ function close() {
     stream = null;
     clearTimeout(s.watchdog);
     clearTimeout(s.retry);
+    clearInterval(s.beat);
     URL.revokeObjectURL(s.object);
     audio.disableRemotePlayback = false;
 }
@@ -758,10 +797,13 @@ async function fill(s) {
             return;
         }
         s.run = { song, index: index + 1 };
-        // A piece that didn't go where it was meant to would be added for ever: left until something changes.
-        if (edge(s, at) <= end + 0.01 && ++s.stuck > 3) {
+        // A piece that didn't go where it was meant to would be added for ever: left a moment, and tried again.
+        if (edge(s, at) > end + 0.01)
+            s.stuck = 0;
+        else if (++s.stuck > 3) {
             note(`stuck at ${end.toFixed(2)}`);
             s.stuck = 0;
+            s.run = null;
             return;
         }
         if (!song.added) {
@@ -839,6 +881,7 @@ function change(s, act) {
             return resolve();
         const b = s.buffer;
         const settle = ok => () => {
+            clearTimeout(late);
             b.removeEventListener("updateend", end);
             b.removeEventListener("error", error);
             ok ? resolve() : reject(new Error("The stream couldn't take it."));
@@ -846,6 +889,11 @@ function change(s, act) {
         const end = settle(true), error = settle(false);
         b.addEventListener("updateend", end);
         b.addEventListener("error", error);
+        // Not heard back from: not waited for for ever, or nothing more would be added.
+        const late = setTimeout(() => {
+            note("a change wasn't heard back from");
+            settle(false)();
+        }, 5000);
     }));
     s.work = work.catch(() => { });
     return work;
@@ -912,6 +960,7 @@ function skip(quiet) {
 
 export function load(url, meta, length) {
     epoch++;
+    holding = false;
     lengths.set(audio, length);
     second = -1;
     unwatch();
@@ -934,6 +983,8 @@ export function load(url, meta, length) {
 }
 
 export function play() {
+    if (holding)
+        return;
     audio.play().catch(e => {
         if (stream)
             note(`play refused: ${e.name} ${e.message}`);
@@ -955,8 +1006,25 @@ export function seek(seconds) {
         audio.currentTime = (stream ? stream.now.start : 0) + seconds;
 }
 
+/**
+ * A song still being fetched to listen to: shown as what's playing, paused at its start, until it can play. The phone's
+ * controls stay Melodex's, rather than going back to the page's own.
+ */
+export function hold(meta, length) {
+    epoch++;
+    holding = true;
+    unprepare();
+    close();
+    audio.pause();
+    setMetadata(meta);
+    controls(true);
+    start(length);
+    state("paused");
+}
+
 export function stop() {
     epoch++;
+    holding = false;
     unprepare();
     close();
     audio.pause();

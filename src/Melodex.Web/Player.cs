@@ -917,9 +917,11 @@ public sealed class Player : IAsyncDisposable
             }
             if (entry.Waiting)
             {
-                // Paused here until the server says it's ready; polling too, in case events are down.
+                // Paused here until the server says it's ready; polling too, in case events are down. It's shown as what's
+                // playing meanwhile, the phone's controls too.
                 if (_audio is not null)
-                    await _audio.InvokeVoidAsync("stop");
+                    await _audio.InvokeVoidAsync("hold", new { title = entry.Title, artist = entry.ArtistCredit, album = entry.AlbumTitle, cover = entry.CoverUrl },
+                        entry.DurationSeconds);
                 Playing = false;
                 _poll ??= new Timer(_ => _ = RefreshListeningAsync(), null, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(5));
                 break;
