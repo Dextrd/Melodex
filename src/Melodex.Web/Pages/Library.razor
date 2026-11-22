@@ -1,4 +1,4 @@
-@page "/"
+@page "/browse"
 @implements IDisposable
 @inject LibraryStore Store
 @inject Preferences Prefs
@@ -437,7 +437,7 @@
         // Shown here rather than left to the address changing: going to artists from the last view used, at the bare
         // address, doesn't change it.
         await ApplyViewAsync(view);
-        Nav.NavigateTo(view == "artists" ? "" : $"?view={view}", replace: true);
+        Nav.NavigateTo(view == "artists" ? "browse" : $"browse?view={view}", replace: true);
     }
 
     private async Task LoadAsync()

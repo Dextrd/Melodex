@@ -18,6 +18,29 @@ Star a song, album or artist you have from its page, or from **⋯** wherever it
 what you've starred, in each view, and **Your rating** sorts albums and tracks by your ratings. Everyone has their
 own, and they're the same in [Subsonic players](subsonic-players.md).
 
+## For you
+
+The Library opens on **For you**, made from what you play, and different for everyone:
+
+- **Your mixes**: up to four daily mixes, each around one of the artists you play most, lately counting most, with up
+  to two others you play that are like them. They're mostly songs you have, by those artists and like them, with the
+  [radio's](requests-and-listening.md#radio) share of songs you don't, and they're made again each day. **Weekly
+  discoveries**, made each Monday, is only songs you don't have, like what you've played lately, with ListenBrainz's
+  recommendations for you among them once your ListenBrainz account is linked. Mixes are picked as a radio picks its
+  songs, so a song you skipped quickly stays out.
+- **Artists for you** and **Albums for you**: like those you play most, and not in your library.
+- **Back to your albums**: albums you have and played before, but not in the last two months, and a few you've never
+  played.
+- **Recommended by ListenBrainz**, once your ListenBrainz account is linked.
+
+Play a mix from its tile, or open it to see its songs. Songs you don't have are fetched to listen to as they come up.
+**Keep** copies a mix into a playlist of yours, named after it and the day it was made, and synced to Navidrome like any
+other; songs you don't have hold their place in it until they're in your library. The mix itself changes the next day,
+or week. **Radio** carries on from a mix without end.
+
+A new person, or one who hasn't played much yet, sees little here until they have. Without the Listen permission the
+Library opens on its other views, as it always did.
+
 ## History
 
 The Library's **History** tab lists the songs you've played, the latest first, with where you played them from: an

@@ -322,6 +322,17 @@ public sealed class DiscoveryService(MelodexDbContext db, DiscoveryPlugins plugi
     /// Whether each song is in the library, and an album it's on for its cover: one you have; else the one the plugin
     /// named; else a studio album rather than a single, live album or compilation, the earliest first.
     /// </summary>
+    /// <summary>These songs, in this order, shaped as similar songs are: whether you have them, and an album with its cover.</summary>
+    public async Task<IReadOnlyList<DiscoveredSong>> SongsOfAsync(IReadOnlyList<Guid> trackIds, CancellationToken ct)
+    {
+        var tracks = await db.Tracks.AsNoTracking().Where(t => trackIds.Contains(t.Id))
+            .Select(t => new { t.Id, t.Title, t.ArtistCredit, t.ArtistId, t.Duration }).ToDictionaryAsync(t => t.Id, ct);
+        var songs = trackIds.Where(tracks.ContainsKey).Select(id => tracks[id])
+            .Select(t => new DiscoveredSong(t.Id, t.Title, t.ArtistCredit, t.ArtistId, null, null, null, t.Duration?.TotalSeconds, false, 0, []))
+            .ToList();
+        return await WithAlbumsAsync(songs, ct);
+    }
+
     public async Task<IReadOnlyList<DiscoveredSong>> WithAlbumsAsync(IReadOnlyList<DiscoveredSong> found, CancellationToken ct)
     {
         var ids = found.Select(f => f.TrackId).ToList();

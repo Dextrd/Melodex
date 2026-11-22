@@ -51,6 +51,15 @@ What changed in each release of Melodex. Versions follow [semantic versioning](h
   same **Radio** section. Subsonic players' instant mix
   (`getSimilarSongs`, `getSimilarSongs2`) is a radio of songs you have. The API has `POST /radio`,
   `POST /radio/skips` and `GET /radio/settings`, and `radioMissingPercent` and `radioAutoplay` in the fetch settings (#4).
+- **For you**, the Library's first tab and where it now opens: up to four **daily mixes**, each around a few of the
+  artists you play most and others like them, mostly songs you have with the radio's share of ones you don't; a
+  **Weekly discoveries** mix, made each Monday, of songs you don't have like what you've played lately, with
+  ListenBrainz's recommendations for you among them; and rows of **Artists for you** and **Albums for you** you don't
+  have, **Back to your albums** you haven't played in a while, and ListenBrainz's recommendations. Daily mixes are made
+  again each day. **Keep** copies a mix into a playlist of yours, synced to Navidrome like any other, with songs you
+  don't have holding their place until they arrive. A mix can start a radio too. The Library's other views are at
+  `/browse`. The API has `GET /mixes`, `GET /mixes/{id}`, `POST /mixes/{id}/keep`, `GET /for-you/artists`,
+  `GET /for-you/albums` and `GET /for-you/your-albums` (#5).
 - Melodex's own Subsonic extension, `melodex`: each song's ID in the API, and whether you have all of an album (#7).
 - **Settings → Scheduled tasks**: daily, weekly and monthly windows, each with its own times (running past midnight
   if it ends earlier than it starts), the weekly one on a day you pick and the monthly one on a day of the month (in a

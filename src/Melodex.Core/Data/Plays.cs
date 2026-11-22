@@ -49,6 +49,30 @@ public class RadioSkip
     public DateTime SkippedAt { get; set; } = DateTime.UtcNow;
 }
 
+/// <summary>
+/// A mix made for someone (#5), on the For you tab: a daily one around a group of artists they play, or the weekly one of
+/// songs they don't have. Remade each day or week, replacing the last; kept only as a copy, in a playlist.
+/// </summary>
+public class Mix
+{
+    public Guid Id { get; set; } = Guid.CreateVersion7();
+    public Guid UserId { get; set; }
+    public Melodex.Client.MixKind Kind { get; set; }
+
+    /// <summary>Its place among that kind: daily mix 1 to 4.</summary>
+    public int Number { get; set; }
+
+    public required string Name { get; set; }
+
+    /// <summary>Who's in it, to say so under its name: the artists it was made around, or most heard in it.</summary>
+    public List<string> Artists { get; set; } = [];
+
+    /// <summary>Its songs, in order, by track ID.</summary>
+    public List<Guid> Tracks { get; set; } = [];
+
+    public DateTime MadeAt { get; set; } = DateTime.UtcNow;
+}
+
 /// <summary>Someone's account on ListenBrainz or Last.fm, which their plays are sent to.</summary>
 public class ScrobbleAccount
 {

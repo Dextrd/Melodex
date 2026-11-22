@@ -1,0 +1,82 @@
+@page "/mixes/{Id:guid}"
+@inject MelodexClient Api
+@inject Player Player
+@inject Notices Notices
+
+@*
+    A mix made for you (#5): its songs, to play from any of them, those you don't have fetched to listen to as they come
+    near. Keep copies it into a playlist of yours, as it is today, since the mix is remade tomorrow, or next Monday.
+*@
+
+<PageTitle>@(_mix?.Mix.Name ?? "Mix") · Melodex</PageTitle>
+
+<h1>Library</h1>
+<LibraryTabs Current="for-you" />
+
+@if (_gone)
+{
+    <div class="empty card">This mix has been remade since. <a href="">Your new mixes</a> are on For you.</div>
+}
+else if (_mix is not { } detail)
+{
+    <Loading />
+}
+else
+{
+    var mix = detail.Mix;
+    <div class="page-head">
+        <PlaylistCover Covers="mix.Covers" />
+        <div>
+            <h2 class="title">@mix.Name</h2>
+            <div class="row muted small">
+                <span>@(mix.Kind == MixKind.Daily ? "Made for you today" : "Made for you this week")</span>
+                <span>@Format.Count(mix.Songs, "song", "songs")</span>
+                @if (mix.Artists.Count > 0) { <span>@string.Join(", ", mix.Artists)</span> }
+            </div>
+            <div class="row album-actions" style="margin-top: .5rem;">
+                <IconButton Icon="play" Requires="@UserPermissions.Listen" Primary="true" Large="true" Label="Play" Title="Play it from the start"
+                            OnClick="() => Player.PlayMixAsync(detail)" />
+                <IconButton Icon="playlist" Requires="@UserPermissions.Listen" Large="true" Label="Keep" Title="Keep it as it is today, as a playlist of yours"
+                            Disabled="_keeping" OnClick="KeepAsync" />
+                <IconButton Icon="radio" Requires="@UserPermissions.Listen" Large="true" Title="Start radio: songs like the mix's, without end"
+                            OnClick="() => Player.StartRadioAsync(mix.Id)" />
+            </div>
+            @if (_error is not null) { <div class="error small">@_error</div> }
+        </div>
+    </div>
+
+    <SongList Songs="detail.Songs" PlayFrom="at => Player.PlayMixAsync(detail, at)" />
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private MixDetail? _mix;
+    private bool _gone, _keeping;
+    private string? _error;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_mix?.Mix.Id == Id)
+            return;
+        (_mix, _gone) = (null, false);
+        _mix = await Api.GetMixAsync(Id);
+        _gone = _mix is null;
+    }
+
+    private async Task KeepAsync()
+    {
+        (_keeping, _error) = (true, null);
+        try
+        {
+            var kept = await Api.KeepMixAsync(Id, new KeepMix());
+            Notices.Show(new Notice($"mix:{Id}", NoticeKind.Action, "Kept as a playlist", kept.Playlist.Name, $"playlists/{kept.Playlist.Id}", "playlist"),
+                always: true);
+        }
+        catch (Exception e) when (e is HttpRequestException or MelodexApiException)
+        {
+            _error = $"Couldn't keep it: {e.Message}";
+        }
+        _keeping = false;
+    }
+}

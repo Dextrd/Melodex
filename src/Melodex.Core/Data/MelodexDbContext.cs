@@ -98,6 +98,7 @@ public partial class MelodexDbContext(DbContextOptions<MelodexDbContext> options
     public DbSet<ScrobbleAccount> ScrobbleAccounts => Set<ScrobbleAccount>();
     public DbSet<ScrobbleSend> ScrobbleSends => Set<ScrobbleSend>();
     public DbSet<RadioSkip> RadioSkips => Set<RadioSkip>();
+    public DbSet<Mix> Mixes => Set<Mix>();
     public DbSet<ListImport> Imports => Set<ListImport>();
     public DbSet<ImportLine> ImportLines => Set<ImportLine>();
 
@@ -251,6 +252,12 @@ public partial class MelodexDbContext(DbContextOptions<MelodexDbContext> options
         {
             e.HasOne<User>().WithMany().HasForeignKey(s => s.UserId).OnDelete(DeleteBehavior.Cascade);
             e.HasIndex(s => new { s.UserId, s.SkippedAt });
+        });
+
+        modelBuilder.Entity<Mix>(e =>
+        {
+            e.HasOne<User>().WithMany().HasForeignKey(m => m.UserId).OnDelete(DeleteBehavior.Cascade);
+            e.HasIndex(m => new { m.UserId, m.Kind, m.Number });
         });
 
         modelBuilder.Entity<ScrobbleAccount>(e =>

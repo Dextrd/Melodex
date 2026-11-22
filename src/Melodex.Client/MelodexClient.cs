@@ -1061,6 +1061,38 @@ public sealed class MelodexClient(HttpClient http)
     public async Task<IReadOnlyList<SimilarAlbum>> ListSimilarAlbumsAsync(Guid albumId, int take = 12, CancellationToken ct = default) =>
         await http.GetFromJsonAsync<List<SimilarAlbum>>($"{Api}/albums/{albumId}/similar?take={take}", MelodexJson.Options, ct) ?? [];
 
+    /// <summary>Your mixes (#5), made first when they're from before today, or the weekly one from before Monday.</summary>
+    public async Task<IReadOnlyList<MixSummary>> ListMixesAsync(CancellationToken ct = default) =>
+        await http.GetFromJsonAsync<List<MixSummary>>($"{Api}/mixes", MelodexJson.Options, ct) ?? [];
+
+    /// <summary>One of your mixes with its songs; null when it's gone, as when it's been remade.</summary>
+    public async Task<MixDetail?> GetMixAsync(Guid id, CancellationToken ct = default)
+    {
+        using var response = await http.GetAsync($"{Api}/mixes/{id}", ct);
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            return null;
+        await EnsureAsync(response, ct);
+        return await response.Content.ReadFromJsonAsync<MixDetail>(MelodexJson.Options, ct);
+    }
+
+    /// <summary>Copies a mix into a new playlist.</summary>
+    public async Task<PlaylistDetail> KeepMixAsync(Guid id, KeepMix body, CancellationToken ct = default)
+    {
+        using var response = await http.PostAsJsonAsync($"{Api}/mixes/{id}/keep", body, MelodexJson.Options, ct);
+        await EnsureAsync(response, ct);
+        return (await response.Content.ReadFromJsonAsync<PlaylistDetail>(MelodexJson.Options, ct))!;
+    }
+
+    public async Task<IReadOnlyList<SimilarArtist>> ListArtistsForYouAsync(CancellationToken ct = default) =>
+        await http.GetFromJsonAsync<List<SimilarArtist>>($"{Api}/for-you/artists", MelodexJson.Options, ct) ?? [];
+
+    public async Task<IReadOnlyList<SimilarAlbum>> ListAlbumsForYouAsync(CancellationToken ct = default) =>
+        await http.GetFromJsonAsync<List<SimilarAlbum>>($"{Api}/for-you/albums", MelodexJson.Options, ct) ?? [];
+
+    /// <summary>Albums of your own you haven't played in a while, and some you never have.</summary>
+    public async Task<IReadOnlyList<AlbumSummary>> ListYourAlbumsToGoBackToAsync(CancellationToken ct = default) =>
+        await http.GetFromJsonAsync<List<AlbumSummary>>($"{Api}/for-you/your-albums", MelodexJson.Options, ct) ?? [];
+
     /// <summary>The next songs for a radio (#4); null when what it was started from is gone.</summary>
     public async Task<RadioBatch?> NextRadioAsync(RadioNext next, CancellationToken ct = default)
     {

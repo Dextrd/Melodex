@@ -3,13 +3,13 @@
 @*
     Songs the discovery plugins found (#3): like a song, or recommended. Listed as search lists tracks, with what can be
     done with each: play one you have, or listen to, get or wish for one you don't. Only songs the catalogue has are
-    listed.
+    listed. Given a way to play from a song, as a mix's page is, a song's play or listen button plays the list from there.
 *@
 <div class="card">
     <table class="table track-list narrow-status discovered-songs">
         <colgroup><col class="cover-col" /><col /><col class="length-col hide-narrow" /><col class="status-col" /><col class="wide-action-col" /></colgroup>
         <tbody>
-            @foreach (var song in Songs)
+            @foreach (var (song, at) in Songs.Select((s, i) => (s, i)))
             {
                 var track = AsTrack(song);
                 <tr class="arrives" @key="song.TrackId">
@@ -36,14 +36,14 @@
                     <td class="num actions">
                         @if (song.Owned)
                         {
-                            <IconButton Icon="play" Requires="@UserPermissions.Listen" Title="Play" OnClick="() => Player.PlayAsync([PlayerEntry.Owned(track)])" />@* no space: buttons line up from row to row *@<ItemMenu Entry="PlayerEntry.Owned(track)" Keep="[new PlaylistItem(track.Id)]" Name="@track.Title" UpgradeTrackId="track.Id"
+                            <IconButton Icon="play" Requires="@UserPermissions.Listen" Title="Play" OnClick="() => PlayFrom is { } from ? from(at) : Player.PlayAsync([PlayerEntry.Owned(track)])" />@* no space: buttons line up from row to row *@<ItemMenu Entry="PlayerEntry.Owned(track)" Keep="[new PlaylistItem(track.Id)]" Name="@track.Title" UpgradeTrackId="track.Id"
                                       AlbumHref="@(track.AlbumId is { } a ? $"albums/{a}" : null)" ArtistHref="@(track.ArtistId is { } r ? $"artists/{r}" : null)" />
                         }
                         else
                         {
                             <FetchButton Kind="RequestKind.Track" Id="track.Id" Button="false">
                                 <WishButton Kind="RequestKind.Track" Id="track.Id">
-                                    <IconButton Icon="listen" Requires="@UserPermissions.Listen" Title="Listen: fetch it to play now, without adding it to your library" OnClick="() => Player.ListenAsync(track.Id)" />
+                                    <IconButton Icon="listen" Requires="@UserPermissions.Listen" Title="Listen: fetch it to play now, without adding it to your library" OnClick="() => PlayFrom is { } from ? from(at) : Player.ListenAsync(track.Id)" />
                                 </WishButton>@* no space: it lines up with an owned song's play button *@<ItemMenu ListenTrackId="track.Id" Name="@track.Title" Get="(RequestKind.Track, track.Id)" Wish="(RequestKind.Track, track.Id)"
                                           AlbumHref="@(track.AlbumId is { } a ? $"albums/{a}" : null)" ArtistHref="@(track.ArtistId is { } r ? $"artists/{r}" : null)" />
                             </FetchButton>
@@ -58,9 +58,13 @@
 @code {
     [Parameter, EditorRequired] public IReadOnlyList<DiscoveredSong> Songs { get; set; } = [];
 
+    /// <summary>Plays the whole list from the song at this place, instead of only that song.</summary>
+    [Parameter] public Func<int, Task>? PlayFrom { get; set; }
+
     /// <summary>The song as search would list it.</summary>
     private static SearchTrack AsTrack(DiscoveredSong song) =>
         new(song.TrackId, song.Title, song.ArtistCredit, song.DurationSeconds, song.Owned, [], song.ArtistId, song.AlbumId, song.AlbumTitle, song.CoverUrl);
 
-    private static string Title(DiscoveredSong song) => $"{Math.Round(song.Score * 100)}% alike, from {string.Join(" and ", song.From)}";
+    private static string? Title(DiscoveredSong song) =>
+        song.From.Count == 0 ? null : $"{Math.Round(song.Score * 100)}% alike, from {string.Join(" and ", song.From)}";
 }

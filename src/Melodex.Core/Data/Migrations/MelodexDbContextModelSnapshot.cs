@@ -801,6 +801,44 @@ namespace Melodex.Core.Data.Migrations
                     b.ToTable("MediaServerLogins");
                 });
 
+            modelBuilder.Entity("Melodex.Core.Data.Mix", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.PrimitiveCollection<string>("Artists")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("MadeAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Number")
+                        .HasColumnType("INTEGER");
+
+                    b.PrimitiveCollection<string>("Tracks")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "Kind", "Number");
+
+                    b.ToTable("Mixes");
+                });
+
             modelBuilder.Entity("Melodex.Core.Data.Play", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1690,6 +1728,15 @@ namespace Melodex.Core.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("PluginInstance");
+                });
+
+            modelBuilder.Entity("Melodex.Core.Data.Mix", b =>
+                {
+                    b.HasOne("Melodex.Core.Data.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Melodex.Core.Data.Play", b =>

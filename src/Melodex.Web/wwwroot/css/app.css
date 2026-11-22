@@ -1194,6 +1194,8 @@ button .spinner { width: .85rem; height: .85rem; vertical-align: -2px; margin-ri
 .tile-corner { position: absolute; top: .4rem; right: .4rem; opacity: 0; transition: opacity .15s; }
 .tile-wrap:hover .tile-corner, .tile-wrap:focus-within .tile-corner { opacity: 1; }
 @media (hover: none) { .tile-corner { opacity: 1; } }
+/* A mix's play button (#5), round over its tile's corner. */
+.tile-corner.mix-play { border-radius: 50%; width: 2.4rem; min-width: 0; height: 2.4rem; padding: 0; box-shadow: 0 2px 8px rgb(0 0 0 / .35); }
 /* The button in the tile's corner, and its menu below it, as wide as it needs; songmenu.js keeps it on screen whichever
    column the tile is in. More specific than .song-menu's own place in a row, which comes later. */
 .tile-wrap > .song-menu.tile-menu { position: static; opacity: 0; transition: opacity .15s; }

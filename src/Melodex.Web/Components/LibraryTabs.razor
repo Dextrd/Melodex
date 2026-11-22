@@ -1,9 +1,13 @@
 @inject NavSections Sections
 @inject AuthState Auth
 
-@* The Library page's tabs: browsing what you have, your playlists, songs fetched to listen to now, and
-   songs and albums you'd like, and what you've played. *@
+@* The Library page's tabs: what's made for you from what you play, browsing what you have, your playlists, songs
+   fetched to listen to now, songs and albums you'd like, and what you've played. *@
 <nav class="page-tabs" aria-label="Library">
+    @if (Auth.May(UserPermissions.Listen))
+    {
+        <a href="" class="@(Current == "for-you" ? "active" : null)" aria-current="@(Current == "for-you" ? "page" : null)">For you</a>
+    }
     <a href="@Sections.BrowseHref" class="@(Current == "browse" ? "active" : null)" aria-current="@(Current == "browse" ? "page" : null)">Browse</a>
     @if (Auth.May(UserPermissions.Listen))
     {
@@ -15,6 +19,6 @@
 </nav>
 
 @code {
-    /// <summary><c>browse</c>, <c>playlists</c>, <c>listen-now</c>, <c>wishlist</c> or <c>history</c>.</summary>
+    /// <summary><c>for-you</c>, <c>browse</c>, <c>playlists</c>, <c>listen-now</c>, <c>wishlist</c> or <c>history</c>.</summary>
     [Parameter, EditorRequired] public string Current { get; set; } = "browse";
 }

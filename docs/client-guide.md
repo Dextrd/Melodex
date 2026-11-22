@@ -25,6 +25,7 @@ guide covers what the reference can't: how the pieces fit together.
 - [Listening history](#listening-history)
 - [Similar music and recommendations](#similar-music-and-recommendations)
 - [Radio](#radio)
+- [For you](#for-you)
 - [The API reference](#the-api-reference)
 
 ## Getting a key
@@ -486,6 +487,22 @@ Songs like a song, album, artist or playlist, without end, with the `listen` sco
 - `GET /radio/settings` gives the server's radio settings, for any player to follow: `missingPercent`, and `autoplay`,
   whether a player carries on with a radio when its queue runs out. An admin changes them with the fetch settings, as
   `radioMissingPercent` and `radioAutoplay`.
+
+A mix's ID is a seed too, so a radio can carry on from one (`kind` `mix`).
+
+## For you
+
+What the web app's For you tab shows, with the `listen` scope and a key that belongs to a user:
+
+- `GET /mixes` lists your mixes: up to four `daily` ones and a `weekly` one, each with its `name`, the `artists` it's
+  around, up to four `covers`, how many `songs` and when it was `madeAt`. They're made each day, and each week from Monday, ahead
+  of time for anyone who's played something in the last month; otherwise when first asked, which can take a while.
+- `GET /mixes/{id}` gives a mix with its `songs`, shaped as similar songs are; a mix that's been made again since is a 404.
+- `POST /mixes/{id}/keep` copies it into a new playlist of yours and gives the playlist; send a `name` or have the
+  mix's name and the day it was made.
+- `GET /for-you/artists` and `GET /for-you/albums` give artists and albums like those you play most that aren't in the
+  library, shaped as similar artists and albums are; `GET /for-you/your-albums` gives albums you have that you haven't
+  played in two months, as album summaries.
 
 ## The API reference
 
