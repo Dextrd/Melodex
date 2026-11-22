@@ -1680,8 +1680,11 @@ input[type=search]:disabled { opacity: .6; }
 .pinned-row { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: minmax(150px, 180px); overflow-x: auto; padding-bottom: .25rem; }
 .tiles .playlist-mosaic, .tiles .cover { width: 100%; }
 
-/* One row of tiles that scrolls sideways (Carousel.razor), with arrows either side while there's more than fits. */
-.carousel { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: .4rem; }
+/*
+    One row of tiles that scrolls sideways (Carousel.razor), the full width of the page. Round arrows float over its ends,
+    each only while there's more that way, and that end fades out rather than cutting off. On a touch screen it's swiped.
+*/
+.carousel { position: relative; --carousel-fade: 3rem; }
 .carousel-track {
     display: flex; gap: 1rem; overflow-x: auto; scroll-snap-type: x proximity; scrollbar-width: none; overscroll-behavior-x: contain;
     padding: .1rem 0;
@@ -1689,10 +1692,22 @@ input[type=search]:disabled { opacity: .6; }
 .carousel-track::-webkit-scrollbar { display: none; }
 .carousel-track > * { flex: 0 0 150px; scroll-snap-align: start; }
 .carousel-track .cover { width: 100%; }
-.carousel-fits > .carousel-back, .carousel-fits > .carousel-on { visibility: hidden; }
-@media (max-width: 640px) {
-    .carousel { grid-template-columns: minmax(0, 1fr); }
-    .carousel > .carousel-back, .carousel > .carousel-on { display: none; }
+.carousel.can-back .carousel-track { mask-image: linear-gradient(to right, transparent, #000 var(--carousel-fade)); }
+.carousel.can-on .carousel-track { mask-image: linear-gradient(to left, transparent, #000 var(--carousel-fade)); }
+.carousel.can-back.can-on .carousel-track {
+    mask-image: linear-gradient(to right, transparent, #000 var(--carousel-fade), #000 calc(100% - var(--carousel-fade)), transparent);
+}
+.carousel > .icon-button {
+    position: absolute; top: 50%; z-index: 1; width: 2.4rem; min-width: 0; height: 2.4rem; padding: 0; border-radius: 50%;
+    background: var(--surface); box-shadow: 0 2px 8px rgb(0 0 0 / .35);
+    transform: translateY(-50%); opacity: 0; pointer-events: none; transition: opacity .2s ease;
+}
+.carousel > .carousel-back { left: .25rem; }
+.carousel > .carousel-on { right: .25rem; }
+.carousel.can-back > .carousel-back, .carousel.can-on > .carousel-on { opacity: 1; pointer-events: auto; }
+@media (max-width: 640px), (hover: none) {
+    .carousel > .icon-button { display: none; }
+    .carousel { --carousel-fade: 1.5rem; }
     .carousel-track > * { flex-basis: 130px; }
 }
 .playlist-cover-preview { width: min(14rem, 100%); margin: 0 auto 1rem; }

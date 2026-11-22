@@ -1,5 +1,5 @@
-// A row of tiles that scrolls sideways (Carousel.razor): the arrows move it a screenful at a time, and are greyed at
-// either end; on a phone it's swiped.
+// A row of tiles that scrolls sideways (Carousel.razor): the arrows move it a screenful at a time. It's marked with
+// which ways there's more to see, for the arrows to show and the ends to fade; on a phone it's swiped.
 window.melodexCarousel = {
     update: box => {
         if (!box)
@@ -8,9 +8,8 @@ window.melodexCarousel = {
         const back = box.querySelector('.carousel-back');
         const on = box.querySelector('.carousel-on');
         const show = () => {
-            back.disabled = track.scrollLeft <= 1;
-            on.disabled = track.scrollLeft + track.clientWidth >= track.scrollWidth - 1;
-            box.classList.toggle('carousel-fits', back.disabled && on.disabled);
+            box.classList.toggle('can-back', track.scrollLeft > 1);
+            box.classList.toggle('can-on', track.scrollLeft + track.clientWidth < track.scrollWidth - 1);
         };
         if (!box.dataset.ready) {
             box.dataset.ready = '1';

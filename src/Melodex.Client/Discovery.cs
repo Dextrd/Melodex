@@ -29,4 +29,10 @@ public sealed record DiscoveredSong(Guid TrackId, string Title, string ArtistCre
 /// <param name="SimilarArtists">Artists like an artist.</param>
 /// <param name="SimilarSongs">Songs like a song.</param>
 /// <param name="Recommendations">Songs recommended for someone.</param>
+/// <summary>An album like another (#226), found through songs like its songs and artists like its artist.</summary>
+/// <param name="Album">The album, as the library shows it: whether you have it, its cover, its artist.</param>
+/// <param name="Score">How close, from 0 to 1: the closest is 1.</param>
+/// <param name="From">The plugins that led to it.</param>
+public sealed record SimilarAlbum(AlbumSummary Album, double Score, IReadOnlyList<string> From);
+
 public sealed record DiscoveryStatus(bool SimilarArtists, bool SimilarSongs, bool Recommendations);

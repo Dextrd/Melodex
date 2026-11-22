@@ -37,6 +37,10 @@ What changed in each release of Melodex. Versions follow [semantic versioning](h
   start and needs no account; it also recommends songs for you once your ListenBrainz account is linked. **Last.fm**
   needs an API key of your own. The API has `GET /artists/{id}/similar`, `GET /tracks/{id}/similar`,
   `GET /discovery/recommendations` and `GET /discovery`, and plugins at an address can be discovery plugins (#3).
+  Similar songs and artists are asked for as their page loads, and a plugin that's slow to answer is left out after
+  15 seconds. Similar artists are one row you scroll sideways, in a section that opens and shuts.
+- **Similar albums** on an album's page, in a row you scroll sideways: the albums songs like its songs come from, and
+  albums by artists like its artist. The API has `GET /albums/{id}/similar` (#226).
 - **Radio**: start one from a song, album, artist or playlist (its page, or the **⋯** menu of any song or album) and
   it plays songs like it without end, kept a few songs ahead as it plays. It's a mix of what you have and, a quarter of
   it by default, songs you don't, fetched to listen to. The share is a target for every account, set from none to all

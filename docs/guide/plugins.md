@@ -22,10 +22,11 @@ through a catalogue that isn't MusicBrainz, such as Deezer, is filed as it's tag
 
 ## Discovery
 
-Discovery plugins find music like what you play: **Similar artists** at the foot of an artist's page, and **Similar
-songs** on a song's. Those in the catalogue open their page, with whether you have them; the rest search for their name
+Discovery plugins find music like what you play: **Similar artists** at the foot of an artist's page, **Similar
+songs** on a song's, and, through those, **Similar albums** on an album's. Those in the catalogue open their page, with whether you have them; the rest search for their name
 when opened. Melodex asks every discovery plugin at once and puts first what they agree on, counting the first in the
-order most, so drag the one you trust most to the top. Answers are kept a day.
+order most, so drag the one you trust most to the top. Answers are kept a day. A plugin that hasn't answered in 15
+seconds is left out for that page, so one that's slow doesn't keep the others' answers from you.
 
 - **ListenBrainz** is set up from the start and needs no account. It knows artists and songs by their MusicBrainz IDs,
   so an artist no MusicBrainz ID is known for gets nothing from it. Songs it also finds by title and artist. Once you link your ListenBrainz account for

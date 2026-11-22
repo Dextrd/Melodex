@@ -2,8 +2,8 @@
 @inject IJSRuntime Js
 
 @*
-    One row of tiles that scrolls sideways, with arrows either side to step through it on a computer (carousel.js).
-    The arrows go when everything fits.
+    One row of tiles that scrolls sideways, the full width of the page (carousel.js). On a computer, a round arrow floats
+    over each end while there's more that way, and that end fades out; on a touch screen it's swiped.
 *@
 <div class="carousel @Class" @ref="_box">
     <IconButton Icon="back" Class="small carousel-back" Title="Back" />
