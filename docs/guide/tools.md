@@ -82,6 +82,24 @@ out too: they're artists you follow, not music to fetch.
 
 Deezer's copy names each song's ISRC, so its songs match surely, by the recording itself.
 
+## Importing from Apple Music
+
+**Import from Apple Music** reads the copy of your data Apple gives you, so your favourite songs, the songs in your
+library and your playlists come across. It needs no Apple account linked to Melodex.
+
+To get the copy, at [privacy.apple.com](https://privacy.apple.com) choose **Request a copy of your data**, tick
+**Apple Media Services information** and ask for it. An email brings a link to download it, usually within a week. It
+can come in parts: choose the one with your Apple Music data in (`Apple Media Services information Part 1 of 2.zip`),
+as it is.
+
+Apple's copy holds a lot besides your music: purchases, payments, devices and what you've listened to. Melodex opens
+only three files in it, from its `Apple Music Activity` folder: your **library's songs**, **your playlists**, and your
+**favourites**. Your favourite songs become a playlist (call it what you like), and so do the songs in your library and
+each playlist you made. Favourite albums and artists are left out: Apple names an album without its artist, and
+artists are ones you follow, not music to fetch.
+
+Apple's copy doesn't name songs' ISRCs, so its songs are matched by title, artist, album and length.
+
 ## Checking and applying the lists
 
 Choose **Start Import**, and each list is matched as a list import is, by its songs' ISRCs where the copy has them, and

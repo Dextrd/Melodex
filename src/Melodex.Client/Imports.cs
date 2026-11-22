@@ -20,6 +20,9 @@ public enum ImportFormat
 
     /// <summary>Deezer's copy of your personal data: a playlist, favourite tracks or favourite albums.</summary>
     Deezer,
+
+    /// <summary>Apple's copy of your Apple Music data: a playlist, favourite songs or the songs in your library.</summary>
+    AppleMusic,
 }
 
 /// <summary>What a CSV column holds.</summary>
