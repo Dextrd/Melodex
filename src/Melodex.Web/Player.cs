@@ -943,7 +943,6 @@ public sealed class Player : IAsyncDisposable
                     _poll ??= new Timer(_ => _ = RefreshListeningAsync(), null, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(5));
                     break;
                 }
-                Tell($"{entry.Title} was passed over.");
                 if (Current + 1 >= _queue.Count)
                 {
                     await StopAsync();
@@ -1079,18 +1078,12 @@ public sealed class Player : IAsyncDisposable
     // What the phone's controls and the script are told of a song.
     private static object Meta(PlayerEntry entry) => new { title = entry.Title, artist = entry.ArtistCredit, album = entry.AlbumTitle, cover = entry.CoverUrl };
 
-    // The player's steps, in the trail the script keeps of a phone's stream, put in the server's log when something goes
+    // The player's steps, in the trail the script keeps of a phone's stream, put in the server's log if the stream goes
     // wrong there (#109).
     private void Trace(string step)
     {
         if (_audio is { } audio)
             _ = CallQuietlyAsync(audio, "trace", step);
-    }
-
-    private void Tell(string message)
-    {
-        if (_audio is { } audio)
-            _ = CallQuietlyAsync(audio, "tell", message);
     }
 
     private static async Task CallQuietlyAsync(IJSObjectReference audio, string name, string text)
@@ -1428,10 +1421,7 @@ public sealed class Player : IAsyncDisposable
         if (_choosing != 0)
             return Task.CompletedTask;
         if (token != _preparedToken || _prepared is not { } entry || _queue.IndexOf(entry) is var index && index < 0)
-        {
-            Tell("A song ran on into one no longer next.");
             return NextAsync();
-        }
         _starting++;
         _prepared = null;
         Current = index;
@@ -1457,7 +1447,6 @@ public sealed class Player : IAsyncDisposable
         Trace($"error {message}{(_choosing != 0 ? ", ignored while choosing" : "")}");
         if (_choosing != 0)
             return Task.CompletedTask;
-        Tell($"{Now?.Title} couldn't be played: {message}");
         if (Now is { } entry)
         {
             entry.Unplayable = true;

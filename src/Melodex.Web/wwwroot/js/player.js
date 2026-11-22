@@ -1051,12 +1051,6 @@ export function trace(step) {
     note(step);
 }
 
-/** Puts the trail in the server's log, where something went wrong with the stream on a phone. */
-export function tell(message) {
-    if (streams)
-        report(message);
-}
-
 /**
  * A song still being fetched to listen to: shown as what's playing, paused at its start, until it can play. The phone's
  * controls stay Melodex's, rather than going back to the page's own.
