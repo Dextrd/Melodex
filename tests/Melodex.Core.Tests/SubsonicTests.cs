@@ -320,6 +320,9 @@ public sealed class SubsonicTests : IDisposable
             .SelectMany(s => s!["genres"]!.AsArray().Select(g => (string)g!["name"]!)).Distinct().ToList();
         Assert.Contains("Trip Hop", await GenresOfDummyAsync());
         Assert.Contains((await OkAsync("getGenres", key))["genres"]!["genre"]!.AsArray(), g => (string)g!["value"]! == "Trip Hop");
+
+        // And its page shows them.
+        Assert.Contains("Trip Hop", (await _api.GetAlbumAsync(dummy))!.Genres);
     }
 
     private async Task WaitForAsync(string kind)

@@ -407,6 +407,10 @@ public sealed partial class LibraryView(MelodexDbContext db, SettingsService set
         {
             OwnShowing = s.Settings.ArtistShowing.ContainsKey(id),
             Songs = await SongsOnNoAlbumAsync(id, ct),
+            Genres = SongGenres.Lines(artist.Genres) is { Count: > 0 } genres
+                ? genres.Select(SongGenres.Name).ToList()
+                : SongGenres.Common((await db.LibraryFiles.Where(f => f.Track!.ArtistId == id && f.HiddenAt == null && f.Genres != null && f.Genres != "")
+                    .Select(f => f.Genres).ToListAsync(ct)).Select(SongGenres.Lines)).Take(SongGenres.Kept).ToList(),
         };
     }
 
@@ -469,7 +473,14 @@ public sealed partial class LibraryView(MelodexDbContext db, SettingsService set
             }
         }
 
-        return new AlbumDetail(Summarise(s, evaluation), album.Artist.Name, evaluation.OwnedEdition?.Id, shown?.Id, editionSummaries, tracks);
+        var fileGenres = await db.LibraryFiles.Where(f => f.EditionId != null && editionIds.Contains(f.EditionId.Value) && f.HiddenAt == null)
+            .Select(f => f.Genres).ToListAsync(ct);
+        return new AlbumDetail(Summarise(s, evaluation), album.Artist.Name, evaluation.OwnedEdition?.Id, shown?.Id, editionSummaries, tracks)
+        {
+            Genres = fileGenres.Count > 0
+                ? SongGenres.Common(fileGenres.Select(g => SongGenres.Of(g, album.Genres, album.Artist.Genres)))
+                : SongGenres.Of(null, album.Genres, album.Artist.Genres),
+        };
     }
 
     public async Task<TrackDetail?> GetTrackAsync(Guid id, CancellationToken ct)
@@ -498,7 +509,13 @@ public sealed partial class LibraryView(MelodexDbContext db, SettingsService set
         return new TrackDetail(track.Id, track.Title, track.ArtistCredit, track.ArtistId, track.Artist.Name, track.Duration?.TotalSeconds, track.Ignored,
             ids, cover, appearances,
             files.Select(f => new TrackFile(f.Id, f.Path, f.Format, f.Duration?.TotalSeconds, f.Size, f.Edition?.AlbumId, f.EditionId,
-                TagsOf(FileTags.Parse(f.TagsJson)), f.FormattedAt, f.Lyrics, f.Quality)).ToList());
+                TagsOf(FileTags.Parse(f.TagsJson)), f.FormattedAt, f.Lyrics, f.Quality)).ToList())
+        {
+            Genres = SongGenres.Of(files.Select(f => f.Genres).FirstOrDefault(g => !string.IsNullOrEmpty(g)),
+                (files.FirstOrDefault(f => f.Edition is not null)?.Edition!.AlbumId ?? appearances.FirstOrDefault()?.AlbumId) is { } albumId
+                    ? await db.Albums.Where(a => a.Id == albumId).Select(a => a.Genres).FirstOrDefaultAsync(ct) : null,
+                track.Artist.Genres),
+        };
     }
 
     // The tags worth showing, in the order a tag editor would.

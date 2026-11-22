@@ -46,7 +46,7 @@
                         <span class="muted small">@part.Hint</span>
                     </span>
                     <select value="@part.Get()" @onchange="e => part.Set(e.Value?.ToString() ?? FormatSources.Keep)">
-                        @foreach (var source in part.Artwork ? _plan.Artwork : _plan.Tags)
+                        @foreach (var source in part.Sources?.Invoke(_plan) ?? _plan.Tags)
                         {
                             <option value="@source.Id">@source.Name</option>
                         }
@@ -123,7 +123,7 @@
     private bool _busy;
     private string? _error;
 
-    private sealed record Part(string Name, string Hint, Func<string> Get, Action<string> Set, bool Artwork = false);
+    private sealed record Part(string Name, string Hint, Func<string> Get, Action<string> Set, Func<FormatPlan, IReadOnlyList<FormatSource>>? Sources = null);
 
     private IEnumerable<Part> Parts =>
     [
@@ -131,8 +131,8 @@
         new("Track and disc numbers", "And how many there are", () => _options.Numbers, v => _options = _options with { Numbers = v }),
         new("Release details", "Dates, country, media, album type", () => _options.Release, v => _options = _options with { Release = v }),
         new("Identifiers", "MusicBrainz IDs, ISRC", () => _options.Identifiers, v => _options = _options with { Identifiers = v }),
-        new("Genres", "Up to three, for files with none of their own", () => _options.Genres, v => _options = _options with { Genres = v }),
-        new("Cover", "The picture embedded in each file", () => _options.Artwork, v => _options = _options with { Artwork = v }, Artwork: true),
+        new("Genres", "Up to three", () => _options.Genres, v => _options = _options with { Genres = v }, p => p.Genres ?? p.Tags),
+        new("Cover", "The picture embedded in each file", () => _options.Artwork, v => _options = _options with { Artwork = v }, p => p.Artwork),
     ];
 
     private bool Nothing => !_options.Move && _options.Artwork == FormatSources.Keep

@@ -117,8 +117,7 @@ public sealed class SubsonicLibrary(LibraryCache cache, IServiceScopeFactory sco
             var year = YearOf(summary.FirstReleaseDate);
             if (year is not null)
                 own = own.Select(s => s with { Year = year }).ToList();
-            var genres = own.SelectMany(s => s.Genres).GroupBy(g => g, StringComparer.OrdinalIgnoreCase)
-                .OrderByDescending(g => g.Count()).Select(g => g.Key).ToList();
+            var genres = SongGenres.Common(own.Select(s => s.Genres));
             albumList.Add(new SubsonicAlbum(summary.Id, summary.Title, summary.ArtistId, summary.ArtistCredit.Length > 0 ? summary.ArtistCredit : artistName,
                 year ?? own.Select(s => s.Year).FirstOrDefault(y => y is not null), summary.CoverUrl, own, genres,
                 summary.Ids.FirstOrDefault(i => i.Provider == "musicbrainz")?.Value, summary.Type, summary.SecondaryTypes,

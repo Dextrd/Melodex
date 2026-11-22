@@ -35,7 +35,10 @@ public sealed record FormatOptions
     /// <summary>MusicBrainz IDs and the ISRC.</summary>
     public string Identifiers { get; init; } = FormatSources.Catalogue;
 
-    /// <summary>Genres: the catalogue's where the settings use them for the song, or the file's own where they don't (#229).</summary>
+    /// <summary>
+    /// Genres (#229): the catalogue's for files with none of their own, <see cref="FormatSources.Replace"/> for every file the
+    /// catalogue has some for, over its own, or kept.
+    /// </summary>
     public string Genres { get; init; } = FormatSources.Catalogue;
 
     /// <summary>The cover embedded in each file.</summary>
@@ -54,6 +57,9 @@ public static class FormatSources
     /// <summary>What the catalogue says, as the index plugin (MusicBrainz) filled it in.</summary>
     public const string Catalogue = "catalogue";
 
+    /// <summary>Genres only: the catalogue's, over a file's own.</summary>
+    public const string Replace = "replace";
+
     /// <summary>The cover Melodex shows for the album, from whichever artwork plugin found it.</summary>
     public const string Shown = "shown";
 
@@ -71,6 +77,7 @@ public sealed record FormatSource(string Id, string Name);
 /// <param name="Formattable">Of those, the ones matched to the catalogue, which are the ones formatted.</param>
 /// <param name="Tags">Sources for each group of tags.</param>
 /// <param name="Artwork">Sources for the embedded cover.</param>
+/// <param name="Genres">Sources for genres.</param>
 /// <param name="PathTemplate">Where files move to when moving, in beets' path format.</param>
 /// <param name="WorkerReady">Whether the beets worker, which writes the files, is reachable.</param>
 /// <param name="WorkerProblem">Why not, when it isn't.</param>
@@ -85,7 +92,8 @@ public sealed record FormatPlan(
     string PathTemplate,
     bool WorkerReady,
     string? WorkerProblem,
-    IReadOnlyList<string>? MusiclessFolders = null);
+    IReadOnlyList<string>? MusiclessFolders = null,
+    IReadOnlyList<FormatSource>? Genres = null);
 
 /// <summary>Body of <c>POST /library/format</c>.</summary>
 public sealed record StartFormat(FormatScope Scope, FormatOptions Options);

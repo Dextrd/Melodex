@@ -111,9 +111,10 @@ What changed in each release of Melodex. Versions follow [semantic versioning](h
   only in the API now, saying what the schedules say (#112).
 - **Genres from MusicBrainz**: after a scan, Melodex looks up the genres of each album and artist you have, the three
   MusicBrainz's users voted for most, or ListenBrainz's for an artist MusicBrainz has none for, and again every 90
-  days. Songs whose files have no genre tags take their album's, or else its artist's.
-  Subsonic players' genres go by them, daily mixes are named from them before the discovery plugins', and formatting
-  has a **Genres** choice that writes them into the files. Index plugins have an optional `genres` capability
+  days. Songs whose files have no genre tags take their album's, or else its artist's, and album, artist and track
+  pages show them. Subsonic players' genres go by them, daily mixes are named from them before the discovery
+  plugins', and formatting has a **Genres** choice that writes them into files without their own, or over every
+  file's own. Index plugins have an optional `genres` capability
   (contract 1.1), and plugins at an address answer `v1/album-genres` and `v1/artist-genres` (#229).
 
 ### Fixed

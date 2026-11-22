@@ -31,6 +31,10 @@ public static class SongGenres
         return catalogue.Select(Name).ToList();
     }
 
+    /// <summary>The genres of several songs, the most common first.</summary>
+    public static IReadOnlyList<string> Common(IEnumerable<IReadOnlyList<string>> songs) =>
+        songs.SelectMany(s => s).GroupBy(g => g, StringComparer.OrdinalIgnoreCase).OrderByDescending(g => g.Count()).Select(g => g.Key).ToList();
+
     /// <summary>Genres' words said as letters.</summary>
     public static readonly HashSet<string> Initials = ["edm", "idm", "ebm", "uk", "us", "r&b", "dnb"];
 

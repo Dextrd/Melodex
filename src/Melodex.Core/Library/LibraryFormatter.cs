@@ -44,7 +44,12 @@ public sealed class LibraryFormatter(MelodexDbContext db, IImportWorker worker, 
             (await settings.GetFetchAsync(ct)).PathTemplate,
             health.Status == HealthStatus.Healthy,
             health.Status == HealthStatus.Healthy ? null : health.Message,
-            scope.Kind == FormatScopeKind.Library && health.Status == HealthStatus.Healthy ? await MusiclessAsync(ct) : null);
+            scope.Kind == FormatScopeKind.Library && health.Status == HealthStatus.Healthy ? await MusiclessAsync(ct) : null,
+            [
+                new FormatSource(FormatSources.Catalogue, $"{source}, where a file has none"),
+                new FormatSource(FormatSources.Replace, $"{source}, over the file's own"),
+                new FormatSource(FormatSources.Keep, "Keep the file's own"),
+            ]);
     }
 
     // The folders a format of the whole library that moves files will remove, besides those its moves leave with no music.
@@ -72,9 +77,11 @@ public sealed class LibraryFormatter(MelodexDbContext db, IImportWorker worker, 
     public async Task<Dictionary<string, string[]>> ValidateAsync(FormatOptions options, CancellationToken ct)
     {
         var errors = new Dictionary<string, string[]>();
-        foreach (var (name, value) in new[] { ("titles", options.Titles), ("numbers", options.Numbers), ("release", options.Release), ("identifiers", options.Identifiers), ("genres", options.Genres) })
+        foreach (var (name, value) in new[] { ("titles", options.Titles), ("numbers", options.Numbers), ("release", options.Release), ("identifiers", options.Identifiers) })
             if (value is not (FormatSources.Keep or FormatSources.Catalogue))
                 errors[name] = [$"Choose {FormatSources.Catalogue} or {FormatSources.Keep}."];
+        if (options.Genres is not (FormatSources.Keep or FormatSources.Catalogue or FormatSources.Replace))
+            errors["genres"] = [$"Choose {FormatSources.Catalogue}, {FormatSources.Replace} or {FormatSources.Keep}."];
         if (options.Artwork is not (FormatSources.Keep or FormatSources.Shown or FormatSources.Remove)
             && !(Guid.TryParse(options.Artwork, out var plugin) && await db.PluginInstances.AnyAsync(p => p.Id == plugin && p.Type == PluginType.Artwork && p.Enabled, ct)))
             errors["artwork"] = [$"Choose {FormatSources.Keep}, {FormatSources.Shown}, {FormatSources.Remove} or the ID of an enabled artwork plugin."];
@@ -350,7 +357,7 @@ public static class CatalogueTags
         var result = new Dictionary<Guid, Dictionary<string, string>>();
         bool titles = options.Titles == FormatSources.Catalogue, numbers = options.Numbers == FormatSources.Catalogue,
             release = options.Release == FormatSources.Catalogue, identifiers = options.Identifiers == FormatSources.Catalogue,
-            genres = options.Genres == FormatSources.Catalogue;
+            genres = options.Genres is FormatSources.Catalogue or FormatSources.Replace;
         if (!(titles || numbers || release || identifiers || genres))
             return result;
 
@@ -423,10 +430,12 @@ public static class CatalogueTags
             }
             if (genres)
             {
-                // Only for files with none of their own: theirs are left as they are.
+                // A file's own are left as they are, unless they're to be replaced and the catalogue has some.
                 var own = SongGenres.Lines(file.Genres);
-                var song = SongGenres.Of(file.Genres, edition is null ? null : albumGenres.GetValueOrDefault(edition.AlbumId),
-                    artistGenres.GetValueOrDefault(edition?.Album.ArtistId ?? track.ArtistId));
+                var song = SongGenres.Of(options.Genres == FormatSources.Replace ? null : file.Genres,
+                    edition is null ? null : albumGenres.GetValueOrDefault(edition.AlbumId), artistGenres.GetValueOrDefault(edition?.Album.ArtistId ?? track.ArtistId));
+                if (song.Count == 0)
+                    song = own;
                 if (!song.SequenceEqual(own))
                     Set("genres", string.Join('\n', song));
             }
