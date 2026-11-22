@@ -13,7 +13,7 @@
     <Collapsible Open="_open">
         @if (_similar is null)
         {
-            <Loading Inline="true" Text="Asking the discovery plugins…" />
+            <TileSlots Text="Asking the discovery plugins…" />
         }
         else if (_similar.Count > 0)
         {

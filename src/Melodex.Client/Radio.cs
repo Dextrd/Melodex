@@ -1,7 +1,7 @@
 namespace Melodex.Client;
 
 /// <summary>What a radio was started from (#4).</summary>
-public enum RadioSeedKind { Song, Album, Artist, Playlist }
+public enum RadioSeedKind { Song, Album, Artist, Playlist, Mix }
 
 /// <summary>
 /// Body of <c>POST /radio</c>: the next songs for a radio, started from a song, album, artist or playlist (#4). A radio

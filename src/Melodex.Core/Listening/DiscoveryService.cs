@@ -26,6 +26,9 @@ public sealed class DiscoveryService(MelodexDbContext db, DiscoveryPlugins plugi
     /// <summary>How long a plugin's recommendations for someone are kept; services remake them about daily.</summary>
     public static readonly TimeSpan RecommendedFor = TimeSpan.FromHours(6);
 
+    /// <summary>How long a plugin's genres for an artist are kept; they hardly change.</summary>
+    public static readonly TimeSpan GenresFor = TimeSpan.FromDays(7);
+
     /// <summary>The most a list can be.</summary>
     public const int MaxTake = 100;
 
@@ -49,6 +52,18 @@ public sealed class DiscoveryService(MelodexDbContext db, DiscoveryPlugins plugi
         bool Has(string capability) => manifests.Any(m => m.Capabilities.Contains(capability));
         return new DiscoveryStatus(Has(DiscoveryCapabilities.SimilarArtists), Has(DiscoveryCapabilities.SimilarRecordings),
             Has(DiscoveryCapabilities.Recommendations));
+    }
+
+    /// <summary>
+    /// An artist's genres from the plugins (#5), the most fitting first, scored from 0 to 1 as their answers are combined;
+    /// none when no plugin knows any.
+    /// </summary>
+    public async Task<IReadOnlyList<(string Name, double Score)>> ArtistGenresAsync(Guid artistId, CancellationToken ct)
+    {
+        var query = await ArtistOfAsync(artistId, ct);
+        var answers = await AskAsync(DiscoveryCapabilities.ArtistGenres, $"genres|{artistId}", GenresFor,
+            (plugin, ct2) => plugin.ArtistGenresAsync(query, 10, ct2), ct);
+        return Combine(answers, g => g.Score, g => [g.Name.ToLowerInvariant()]).Select(g => (g.Best.Name.ToLowerInvariant(), g.Score)).ToList();
     }
 
     /// <summary>Artists like this one, closest first; null when there's no such artist.</summary>
@@ -322,6 +337,17 @@ public sealed class DiscoveryService(MelodexDbContext db, DiscoveryPlugins plugi
     /// Whether each song is in the library, and an album it's on for its cover: one you have; else the one the plugin
     /// named; else a studio album rather than a single, live album or compilation, the earliest first.
     /// </summary>
+    /// <summary>These songs, in this order, shaped as similar songs are: whether you have them, and an album with its cover.</summary>
+    public async Task<IReadOnlyList<DiscoveredSong>> SongsOfAsync(IReadOnlyList<Guid> trackIds, CancellationToken ct)
+    {
+        var tracks = await db.Tracks.AsNoTracking().Where(t => trackIds.Contains(t.Id))
+            .Select(t => new { t.Id, t.Title, t.ArtistCredit, t.ArtistId, t.Duration }).ToDictionaryAsync(t => t.Id, ct);
+        var songs = trackIds.Where(tracks.ContainsKey).Select(id => tracks[id])
+            .Select(t => new DiscoveredSong(t.Id, t.Title, t.ArtistCredit, t.ArtistId, null, null, null, t.Duration?.TotalSeconds, false, 0, []))
+            .ToList();
+        return await WithAlbumsAsync(songs, ct);
+    }
+
     public async Task<IReadOnlyList<DiscoveredSong>> WithAlbumsAsync(IReadOnlyList<DiscoveredSong> found, CancellationToken ct)
     {
         var ids = found.Select(f => f.TrackId).ToList();

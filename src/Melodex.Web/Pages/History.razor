@@ -250,6 +250,7 @@ else
         { Kind: PlaySourceKind.Playlist, Name: { } name } => $"from the playlist {name}",
         { Kind: PlaySourceKind.Radio, Name: { } name } => $"on {name} radio",
         { Kind: PlaySourceKind.Artist, Name: { } name } => $"from {name}",
+        { Kind: PlaySourceKind.Mix, Name: { } name } => $"from {name}",
         _ => null,
     };
 

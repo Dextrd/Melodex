@@ -97,6 +97,24 @@ public sealed class DiscoveryTests : IDisposable
         Assert.Equal([new ProviderId(Providers.MusicBrainz, Teardrop), new ProviderId(Providers.Isrc, "GBAAA9800001")], teardrop.Ids);
         Assert.Equal(["Massive Attack", "Elizabeth Fraser"], teardrop.Artists.Select(a => a.Name));
         Assert.Empty(teardrop.Artists[1].Ids);
+
+        // Genres are the tags that are genres, by how many gave each.
+        var genres = ListenBrainz.ReadGenres(JsonDocument.Parse($$"""
+            [ { "artist_mbid": "{{MassiveAttack}}", "tag": { "artist": [
+                { "tag": "dub", "count": 6, "genre_mbid": "c72a5d45-75a8-4b35-9f48-67e49eb4b5e5" },
+                { "tag": "british", "count": 9 },
+                { "tag": "Trip Hop", "count": 20, "genre_mbid": "2a1a4a8f-1f3c-4a4f-9a5e-5b0c0c0c0c01" } ] } } ]
+            """).RootElement, 10);
+        Assert.Equal([("trip hop", 20.0), ("dub", 6.0)], genres.Select(g => (g.Name, g.Score)));
+    }
+
+    [Fact]
+    public void Genres_read_in_mix_names_as_theyre_said()
+    {
+        Assert.Equal("Trip hop", MixService.Genre("trip hop", true));
+        Assert.Equal("UK garage", MixService.Genre("uk garage", true));
+        Assert.Equal("EDM", MixService.Genre("edm", false));
+        Assert.Equal("drum and bass", MixService.Genre("drum and bass", false));
     }
 
     [Fact]

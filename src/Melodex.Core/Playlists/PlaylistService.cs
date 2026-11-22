@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using Melodex.Client;
+using Melodex.Contracts.Catalogue;
 using Melodex.Contracts.Plugins;
+using Melodex.Core.Catalogue;
 using Melodex.Core.Data;
 using Melodex.Core.Library;
 using Melodex.Core.Requests;
@@ -534,9 +536,9 @@ public sealed class PlaylistService(MelodexDbContext db, SettingsService setting
             own = (await local.LoadAsync(ct)).Albums.SelectMany(a => a.Songs.Select(s => (a, s))).ToDictionary(x => x.s.File.Id);
 
         var inReview = await InReviewAsync(entries, ct);
-        var awaiting = entries.Where(e => e.AwaitingFile && e.TrackId is not null && !found.ContainsKey(e.Id)).Select(e => e.TrackId!.Value).Distinct().ToList();
-        var coming = await ComingAsync(awaiting, ct);
-        var places = await AwaitedPlacesAsync(awaiting, ct);
+        var waiting = entries.Where(e => e.AwaitingFile && e.TrackId is not null && !found.ContainsKey(e.Id)).ToList();
+        var coming = await ComingAsync(waiting.Select(e => e.TrackId!.Value).Distinct().ToList(), ct);
+        var places = await AwaitedPlacesAsync(waiting, ct);
         var songs = new List<PlaylistSong>();
         foreach (var e in entries)
         {
@@ -554,9 +556,9 @@ public sealed class PlaylistService(MelodexDbContext db, SettingsService setting
             }
             else if (e.AwaitingFile && e.TrackId is { } awaited && tracks.TryGetValue(awaited, out var song))
             {
-                var place = places.GetValueOrDefault(awaited);
+                var place = places.GetValueOrDefault(e.Id);
                 songs.Add(new PlaylistSong(e.Id, awaited, null, song.Title, song.ArtistCredit, song.ArtistId, place?.AlbumId, place?.AlbumTitle ?? e.Album,
-                    place is { } on ? LibraryView.CoverUrl(on.AlbumId, on.EditionId) : null, e.DurationSeconds,
+                    place is { } on ? LibraryView.CoverUrl(on.AlbumId, null) : null, e.DurationSeconds,
                     coming.Contains(awaited) ? PlaylistSongState.Coming : PlaylistSongState.Awaiting));
             }
             else
@@ -583,12 +585,31 @@ public sealed class PlaylistService(MelodexDbContext db, SettingsService setting
 
     private sealed record AwaitedPlace(Guid AlbumId, Guid EditionId, string AlbumTitle);
 
-    // The album each song not in the library yet is on, for its cover and link: the first edition the catalogue has it on.
-    private async Task<Dictionary<Guid, AwaitedPlace>> AwaitedPlacesAsync(IReadOnlyList<Guid> trackIds, CancellationToken ct) =>
-        trackIds.Count == 0 ? [] : (await db.EditionTracks.AsNoTracking().Where(et => trackIds.Contains(et.TrackId))
-                .Select(et => new { et.TrackId, et.EditionId, et.Edition.AlbumId, et.Edition.Album.Title, et.Edition.Album.FirstReleaseDate }).ToListAsync(ct))
-            .GroupBy(x => x.TrackId)
-            .ToDictionary(g => g.Key, g => g.OrderBy(x => x.FirstReleaseDate ?? "9999").Select(x => new AwaitedPlace(x.AlbumId, x.EditionId, x.Title)).First());
+    // The album each song not in the library yet is on, for its cover and link: the one the entry names if the catalogue
+    // has it on that, else an album proper before singles, live albums and compilations, the first released first. As
+    // songs found by discovery are given theirs, with the album's own cover, so a kept mix looks as the mix did.
+    private async Task<Dictionary<Guid, AwaitedPlace>> AwaitedPlacesAsync(IReadOnlyList<PlaylistEntry> entries, CancellationToken ct)
+    {
+        var trackIds = entries.Select(e => e.TrackId).OfType<Guid>().Distinct().ToList();
+        if (trackIds.Count == 0)
+            return [];
+        var on = (await db.EditionTracks.AsNoTracking().Where(et => trackIds.Contains(et.TrackId))
+                .Select(et => new { et.TrackId, et.EditionId, et.Edition.AlbumId, et.Edition.Album.Title, et.Edition.Album.Type, et.Edition.Album.SecondaryTypes,
+                    et.Edition.Album.FirstReleaseDate })
+                .ToListAsync(ct))
+            .ToLookup(x => x.TrackId);
+        var places = new Dictionary<Guid, AwaitedPlace>();
+        foreach (var e in entries)
+        {
+            var named = TextMatch.NormaliseTitle(e.Album);
+            if (on[e.TrackId!.Value].OrderByDescending(x => named.Length > 0 && TextMatch.NormaliseTitle(x.Title) == named)
+                    .ThenByDescending(x => x.Type == AlbumType.Album && x.SecondaryTypes.Count == 0)
+                    .ThenBy(x => x.FirstReleaseDate ?? "9999")
+                    .FirstOrDefault() is { } best)
+                places[e.Id] = new AwaitedPlace(best.AlbumId, best.EditionId, best.Title);
+        }
+        return places;
+    }
 
     /// <summary>
     /// Songs only the media server has that look to be among the files waiting for review: the same title, an artist in
@@ -663,10 +684,11 @@ public sealed class PlaylistService(MelodexDbContext db, SettingsService setting
             .ToList();
     }
 
-    // Each entry's cover, for the mosaics on the list.
+    // Each entry's cover, for the mosaics on the list: songs not in the library yet too, as the playlist's page shows them.
     private async Task<Dictionary<Guid, string>> CoversAsync(IReadOnlyList<PlaylistEntry> entries, CancellationToken ct)
     {
         var found = await FindFilesAsync(entries, ct);
+        var places = await AwaitedPlacesAsync(entries.Where(e => e.AwaitingFile && e.TrackId is not null && !found.ContainsKey(e.Id)).ToList(), ct);
         var preferFileCovers = (await settings.GetLibraryAsync(ct)).PreferFileCovers;
         var covers = new Dictionary<Guid, string>();
         foreach (var (entryId, file) in found)
@@ -676,6 +698,8 @@ public sealed class PlaylistService(MelodexDbContext db, SettingsService setting
             else if (file.AlbumId is { } album)
                 covers[entryId] = LibraryView.CoverUrl(album, file.EditionId);
         }
+        foreach (var (entryId, place) in places)
+            covers[entryId] = LibraryView.CoverUrl(place.AlbumId, null);
         return covers;
     }
 }

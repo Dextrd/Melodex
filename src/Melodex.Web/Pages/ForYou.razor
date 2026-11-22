@@ -1,0 +1,172 @@
+@page "/"
+@inject MelodexClient Api
+@inject AuthState Auth
+@inject Player Player
+@inject NavigationManager Nav
+
+@*
+    The Library's first tab (#5): what's made for you from what you play. Your mixes, made fresh each day and each
+    Monday; artists and albums like those you play most that you don't have; albums of your own to go back to; and
+    ListenBrainz's recommendations when your account there is linked. Each part is asked for on its own and shows as
+    it comes, saying it's on its way until then. Someone who may not listen has no For you: Browse is their Library.
+*@
+
+<PageTitle>For you · Melodex</PageTitle>
+
+<h1>Library</h1>
+<LibraryTabs Current="for-you" />
+
+<h2 class="section">Your mixes</h2>
+@if (_mixes is null)
+{
+    <TileSlots Count="4" Row="false" Text="Making your mixes…" />
+}
+else if (_mixes.Count == 0)
+{
+    <div class="empty card">
+        No mixes yet: they're made from what you play. Play some music, here or in a Subsonic player, and come back tomorrow.
+    </div>
+}
+else
+{
+    <div class="tiles mixes">
+        @foreach (var mix in _mixes)
+        {
+            <div class="tile-wrap" @key="mix.Id">
+                <a class="tile arrives" href="mixes/@mix.Id" title="@mix.Name">
+                    <PlaylistCover Covers="mix.Covers" />
+                    <div class="tile-name">@mix.Name</div>
+                    <div class="muted small tile-sub">@Artists(mix)</div>
+                </a>
+                <div class="mix-corner">
+                    <IconButton Icon="play" Requires="@UserPermissions.Listen" Primary="true" Class="mix-play" Title="@($"Play {mix.Name}")"
+                                OnClick="() => PlayAsync(mix)" />
+                </div>
+            </div>
+        }
+    </div>
+}
+
+<h2 class="section">Artists for you</h2>
+@if (_artists is null)
+{
+    <TileSlots Artist="true" Text="Asking the discovery plugins…" />
+}
+else if (_artists.Count == 0)
+{
+    <div class="muted small">None yet: they're artists like the ones you play most, once the discovery plugins know them.</div>
+}
+else
+{
+    <Carousel>
+        @foreach (var artist in _artists)
+        {
+            <a class="tile arrives" href="@(artist.Id is { } id ? $"artists/{id}" : $"search?q={Uri.EscapeDataString(artist.Name)}")" title="@artist.Name">
+                <Cover Url="@artist.ImageUrl" Artist="true" />
+                <div class="tile-name">@artist.Name</div>
+                @if (artist.Disambiguation is not null) { <div class="muted small tile-sub">@artist.Disambiguation</div> }
+            </a>
+        }
+    </Carousel>
+}
+
+<h2 class="section">Albums for you</h2>
+@if (_albums is null)
+{
+    <TileSlots Text="Asking the discovery plugins…" />
+}
+else if (_albums.Count == 0)
+{
+    <div class="muted small">None yet: they're albums like the ones you play most, that you don't have.</div>
+}
+else
+{
+    <Carousel>
+        @foreach (var similar in _albums)
+        {
+            @AlbumTile(similar.Album)
+        }
+    </Carousel>
+}
+
+@if (_yours is not { Count: 0 })
+{
+    <h2 class="section">Back to your albums</h2>
+    @if (_yours is null)
+    {
+        <TileSlots />
+    }
+    else
+    {
+        <Carousel>
+            @foreach (var album in _yours)
+            {
+                @AlbumTile(album)
+            }
+        </Carousel>
+    }
+}
+
+@if (_recommended is { Count: > 0 } recommended)
+{
+    <h2 class="section">Recommended by ListenBrainz</h2>
+    <SongList Songs="recommended" />
+}
+
+@code {
+    private IReadOnlyList<MixSummary>? _mixes;
+    private IReadOnlyList<SimilarArtist>? _artists;
+    private IReadOnlyList<SimilarAlbum>? _albums;
+    private IReadOnlyList<AlbumSummary>? _yours;
+    private IReadOnlyList<DiscoveredSong>? _recommended;
+
+    protected override void OnInitialized()
+    {
+        // The Library's Browse tab lived here once: its old links, with what they chose, go there still.
+        var query = new Uri(Nav.Uri).Query;
+        if (!Auth.May(UserPermissions.Listen) || query.Length > 1)
+        {
+            Nav.NavigateTo($"browse{query}", replace: true);
+            return;
+        }
+        // Each part as it comes, not all once the slowest has.
+        _ = LoadAsync(async () => _mixes = await Api.ListMixesAsync(), () => _mixes = []);
+        _ = LoadAsync(async () => _artists = await Api.ListArtistsForYouAsync(), () => _artists = []);
+        _ = LoadAsync(async () => _albums = await Api.ListAlbumsForYouAsync(), () => _albums = []);
+        _ = LoadAsync(async () => _yours = await Api.ListYourAlbumsToGoBackToAsync(), () => _yours = []);
+        _ = LoadAsync(async () => _recommended = await Api.ListRecommendationsAsync(15), () => _recommended = []);
+    }
+
+    private async Task LoadAsync(Func<Task> load, Action failed)
+    {
+        try
+        {
+            await load();
+        }
+        catch (Exception e) when (e is HttpRequestException or MelodexApiException)
+        {
+            failed();
+        }
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task PlayAsync(MixSummary summary)
+    {
+        if (await Api.GetMixAsync(summary.Id) is { } mix)
+            await Player.PlayMixAsync(mix);
+    }
+
+    private static string Artists(MixSummary mix) => mix.Artists.Count switch
+    {
+        0 => $"{mix.Songs} songs",
+        1 => mix.Artists[0],
+        _ => $"{string.Join(", ", mix.Artists)} and more",
+    };
+
+    private static RenderFragment AlbumTile(AlbumSummary album) =>
+        @<a class="tile arrives" href="@Format.AlbumHref(album)" title="@album.Title · @album.ArtistCredit">
+            <Cover Url="@album.CoverUrl" />
+            <div class="tile-name">@album.Title</div>
+            <div class="muted small tile-sub">@album.ArtistCredit@(Format.Year(album.FirstReleaseDate) is { Length: > 0 } year ? $" · {year}" : "")</div>
+        </a>;
+}

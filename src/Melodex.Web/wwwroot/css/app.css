@@ -1078,18 +1078,17 @@ td.actions > :is(.icon-button, .queue-menu, .song-menu) + .badge, td.actions > .
 /* "blank", not "empty": that's the padded "nothing here" card. */
 .cover.blank img { display: none; }
 .cover.loaded img { animation: fade-in .25s ease-out; }
-.cover.pending {
-    background: linear-gradient(100deg, var(--bg) 30%, var(--border) 50%, var(--bg) 70%) 0 0 / 300% 100%;
-    animation: shimmer 1.4s linear infinite;
+/* The shine sweeps across on a layer of its own, moved rather than repainted, so a page of them stays smooth. */
+.cover.pending::after, .shimmer-line::after {
+    content: ""; position: absolute; inset: 0; pointer-events: none;
+    background: linear-gradient(100deg, transparent 30%, var(--border) 50%, transparent 70%);
+    transform: translateX(-100%); animation: sweep 1.4s linear infinite; will-change: transform;
 }
+@keyframes sweep { to { transform: translateX(100%); } }
 /* Something still loading on a page that's otherwise there: lines shimmering where it will be. */
 .loading-card { display: flex; flex-direction: column; gap: .7rem; }
-.shimmer-line {
-    display: block; height: .9rem; border-radius: 4px;
-    background: linear-gradient(100deg, var(--bg) 30%, var(--border) 50%, var(--bg) 70%) 0 0 / 300% 100%;
-    animation: shimmer 1.4s linear infinite;
-}
-@media (prefers-reduced-motion: reduce) { .shimmer-line { animation: none; } }
+.shimmer-line { position: relative; overflow: hidden; display: block; height: .9rem; border-radius: 4px; background: var(--bg); }
+@media (prefers-reduced-motion: reduce) { .cover.pending::after, .shimmer-line::after { animation: none; transform: none; } }
 @keyframes shimmer { from { background-position: 100% 0; } to { background-position: 0 0; } }
 @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
 /* Something on its way: a blank where it'll go, shimmering like a cover does. */
@@ -1194,6 +1193,30 @@ button .spinner { width: .85rem; height: .85rem; vertical-align: -2px; margin-ri
 .tile-corner { position: absolute; top: .4rem; right: .4rem; opacity: 0; transition: opacity .15s; }
 .tile-wrap:hover .tile-corner, .tile-wrap:focus-within .tile-corner { opacity: 1; }
 @media (hover: none) { .tile-corner { opacity: 1; } }
+/* A mix's play button (#5), round over its tile's corner. */
+/* A mix's play button: a circle centred inside its picture's top right corner, so well over a quarter of it shows, cut off by the picture's edges. Behind it, a circle the colour of the tile a little larger reads as a gap
+   cut into the picture. Pointed at, the button grows into that gap, and the gap a little with it, from their centre. */
+.mix-corner {
+    --mix-r: 1.85rem; --mix-in: .65rem; --mix-gap: 6px; --mix-ease: .4s cubic-bezier(.4, 0, .2, 1);
+    position: absolute; top: calc(.75rem + 1px); right: calc(.75rem + 1px); width: 4rem; height: 4rem;
+    overflow: hidden; border-top-right-radius: 6px; pointer-events: none;
+}
+.mix-corner::before, .mix-corner > .mix-play { position: absolute; border-radius: 50%; transition: transform var(--mix-ease); }
+.mix-corner::before {
+    content: ""; background: var(--surface);
+    top: calc(var(--mix-in) - var(--mix-r) - var(--mix-gap)); right: calc(var(--mix-in) - var(--mix-r) - var(--mix-gap));
+    width: calc(2 * (var(--mix-r) + var(--mix-gap))); height: calc(2 * (var(--mix-r) + var(--mix-gap)));
+}
+.mix-corner > .mix-play {
+    top: calc(var(--mix-in) - var(--mix-r)); right: calc(var(--mix-in) - var(--mix-r));
+    width: calc(2 * var(--mix-r)); height: calc(2 * var(--mix-r)); min-width: 0; padding: 0; border: none; pointer-events: auto;
+}
+/* The icon sits in the part that shows, toward the picture. */
+.mix-corner > .mix-play svg { width: 1.3rem; height: 1.3rem; transform: translate(-.35rem, .35rem); }
+.mix-corner > .mix-play:hover:not(:disabled), .mix-corner > .mix-play:focus-visible { transform: scale(1.2); filter: brightness(1.1); }
+/* The gap grows less than the button, so the button takes up most of it: from 6px to about 3px. */
+.mix-corner:has(> .mix-play:hover:not(:disabled), > .mix-play:focus-visible)::before { transform: scale(1.1); }
+@media (prefers-reduced-motion: reduce) { .mix-corner::before, .mix-corner > .mix-play { transition: none; } }
 /* The button in the tile's corner, and its menu below it, as wide as it needs; songmenu.js keeps it on screen whichever
    column the tile is in. More specific than .song-menu's own place in a row, which comes later. */
 .tile-wrap > .song-menu.tile-menu { position: static; opacity: 0; transition: opacity .15s; }
@@ -1599,7 +1622,13 @@ input[type=search]:disabled { opacity: .6; }
 
 /* Playlists: a tree of folders, each playlist with a small cover; four album covers in a square once it has them. */
 .playlist-mosaic { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
-.playlist-mosaic img { position: static; width: 100%; height: 100%; }
+.playlist-mosaic .mosaic-part { position: relative; overflow: hidden; min-width: 0; min-height: 0; }
+.playlist-mosaic .mosaic-part img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+/* A part whose picture didn't load: hidden while it's asked after again, the placeholder once there's none. */
+.playlist-mosaic .mosaic-part svg { display: none; }
+.playlist-mosaic .mosaic-part img[data-failed] { opacity: 0; }
+.playlist-mosaic .mosaic-part.blank img { display: none; }
+.playlist-mosaic .mosaic-part.blank svg { display: block; }
 .playlist-mosaic.pending img { opacity: 0; }
 .playlist-mosaic.loaded img { animation: fade-in .25s ease-out; }
 .cover.small { width: 2.75rem; flex: none; }
@@ -1910,6 +1939,9 @@ table.slots > tbody > tr.dim > td { opacity: 1; color: color-mix(in srgb, var(--
 table.slots > tbody > tr.dim > td > * { opacity: .6; }
 table.slots > tbody > tr.dim > td:has(.menu) { color: var(--text); }
 table.slots > tbody > tr.dim > td > :has(.menu) { opacity: 1; }
+/* Only what's said of a song you can't play is greyed: its buttons work, so they look it. */
+table.slots > tbody > tr.dim > td.actions { color: var(--text); }
+table.slots > tbody > tr.dim > td.actions > * { opacity: 1; }
 
 /* Export: which playlists, as what; the library's columns. */
 a.button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
@@ -1976,3 +2008,18 @@ a.toast-body:hover .toast-title { text-decoration: underline; }
 .section-head + .track-file, .section-head + .collapsible > .collapsible-inner > .track-file:first-child { margin-top: .5rem; }
 /* The path takes the room the buttons leave. */
 .track-file-head > code { overflow-wrap: anywhere; min-width: 0; flex: 1 1 16rem; }
+.dialog .warning { color: var(--partial); }
+
+/* Read out, not shown. */
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+/* Tiles and songs on their way (TileSlots, SongSlots): shaped as they'll be, shimmering. */
+.shimmer-line.small { height: .7rem; }
+.tile-slot { gap: .55rem; pointer-events: none; }
+.tile-slot:hover { border-color: var(--border); }
+.slot-row { display: flex; gap: 1rem; overflow: hidden; padding: .1rem 0; }
+.slot-row > .tile-slot { flex: 0 0 150px; }
+.tile-slot .cover, .song-slot .cover { border-color: transparent; }
+.song-slot { display: grid; grid-template-columns: 2.5rem 1fr; gap: 1rem; align-items: center; padding: .5rem .75rem; border-bottom: 1px solid var(--border); }
+.song-slot:last-child { border-bottom: none; }
+.song-slot .cover { width: 2.5rem; }
+.song-slot > div:last-child { display: flex; flex-direction: column; gap: .45rem; }

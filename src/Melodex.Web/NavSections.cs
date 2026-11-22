@@ -52,7 +52,7 @@ public sealed class NavSections : IDisposable
     }
 
     /// <summary>The Library's Browse tab, as you left it: which view, and so on.</summary>
-    public string BrowseHref => _browse ?? "";
+    public string BrowseHref => _browse ?? "browse";
 
     private string? _browse;
 
@@ -65,11 +65,11 @@ public sealed class NavSections : IDisposable
     // The pages that belong to whichever section they were opened from.
     private static bool IsDeep(string path) =>
         Bare(path) is var bare && (bare.StartsWith("artists/") || bare.StartsWith("albums/") || bare.StartsWith("tracks/") || bare.StartsWith("local/")
-                                   || bare.StartsWith("playlists/"));
+                                   || bare.StartsWith("playlists/") || bare.StartsWith("mixes/"));
 
     private static NavSection? SectionOf(string path) => Bare(path) switch
     {
-        "" or "playlists" or "listen-now" or "wishlist" or "history" => NavSection.Library,
+        "" or "browse" or "playlists" or "listen-now" or "wishlist" or "history" => NavSection.Library,
         "search" => NavSection.Search,
         var bare when bare == "tools" || bare.StartsWith("tools/") => NavSection.Tools,
         _ => null,
@@ -88,11 +88,11 @@ public sealed class NavSections : IDisposable
         {
             Current = section;
             _home[section] = _last[section] = path;
-            if (Bare(path) == "")
+            if (Bare(path) == "browse")
                 _browse = path;
         }
-        // A playlist is the Library's, however it was opened: its page shows the Library's tabs.
-        else if (Bare(path).StartsWith("playlists/"))
+        // A playlist or mix is the Library's, however it was opened: its page shows the Library's tabs.
+        else if (Bare(path).StartsWith("playlists/") || Bare(path).StartsWith("mixes/"))
         {
             Current = NavSection.Library;
             _last[NavSection.Library] = path;

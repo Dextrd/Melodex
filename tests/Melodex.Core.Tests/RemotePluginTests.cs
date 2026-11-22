@@ -149,7 +149,7 @@ public sealed class RemotePluginTests : IDisposable
     [Fact]
     public async Task Discovery_comes_from_a_plugin_at_an_address()
     {
-        _plugins.Add("my-discovery", Manifest("example.discovery", PluginType.Discovery, DiscoveryCapabilities.SimilarArtists));
+        _plugins.Add("my-discovery", Manifest("example.discovery", PluginType.Discovery, DiscoveryCapabilities.SimilarArtists, DiscoveryCapabilities.ArtistGenres));
         _plugins.Answer("my-discovery", "/v1/similar-artists", call =>
         {
             var input = call.GetProperty("input");
@@ -161,6 +161,8 @@ public sealed class RemotePluginTests : IDisposable
         var discovery = await RunningAsync(async s => (await s.GetRequiredService<DiscoveryPlugins>().GetAsync(default)).Single(p => p.Instance.Endpoint is not null).Plugin);
         var similar = Assert.Single(await discovery.SimilarArtistsAsync(new DiscoveryArtist("Portishead", []), 5, default));
         Assert.Equal(("Massive Attack", 0.9), (similar.Name, similar.Score));
+        _plugins.Answer("my-discovery", "/v1/artist-genres", _ => new[] { new DiscoveredGenre("trip hop", 12) });
+        Assert.Equal([new DiscoveredGenre("trip hop", 12)], await discovery.ArtistGenresAsync(new DiscoveryArtist("Massive Attack", []), 5, default));
         // Only what it declares is asked.
         Assert.Empty(await discovery.RecommendAsync(new DiscoveryListener(new Dictionary<string, string>(), [], []), 5, default));
         Assert.DoesNotContain(_plugins.Calls, c => c.Path == "/v1/recommendations");

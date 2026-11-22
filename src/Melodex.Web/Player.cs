@@ -449,6 +449,10 @@ public sealed class Player : IAsyncDisposable
     // Songs a radio couldn't be started from (a file of your own no catalogue knows, say), so autoplay doesn't keep asking.
     private readonly HashSet<Guid> _noRadio = [];
 
+    /// <summary>Plays a mix made for you (#5) from the song at this place; those you don't have are fetched to listen to.</summary>
+    public Task PlayMixAsync(MixDetail mix, int start = 0) =>
+        PlayAsync(mix.Songs.Select(PlayerEntry.Discovered).ToList(), start, new PlaySource(PlaySourceKind.Mix, mix.Mix.Id, mix.Mix.Name));
+
     /// <summary>
     /// Replaces the queue with a radio started from a song, album, artist or playlist, and plays it. It keeps itself
     /// topped up as it plays, and never runs out.

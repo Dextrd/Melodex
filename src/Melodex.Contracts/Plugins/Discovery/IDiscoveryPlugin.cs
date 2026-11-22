@@ -3,12 +3,12 @@ using Melodex.Contracts.Catalogue;
 namespace Melodex.Contracts.Plugins.Discovery;
 
 /// <summary>
-/// Discovery plugin contract (version 1.0): music related to what someone plays. Similar artists for an artist, similar
-/// songs for a song, and songs to recommend to a listener, each with a score. The core asks the enabled discovery
+/// Discovery plugin contract (version 1.1): music related to what someone plays. Similar artists for an artist, similar
+/// songs for a song, songs to recommend to a listener, and an artist's genres (1.1), each with a score. The core asks the enabled discovery
 /// plugins in the user's order, combines what they say, and matches it to the catalogue and the library.
 /// </summary>
 /// <remarks>
-/// A plugin declares which of the three it answers with <see cref="DiscoveryCapabilities"/>; the core only asks for
+/// A plugin declares which of these it answers with <see cref="DiscoveryCapabilities"/>; the core only asks for
 /// those. Return an empty list when the plugin knows nothing for the query, and throw for anything else, such as network
 /// failures, so the core leaves the plugin out of that answer instead of remembering that there's nothing. Scores are
 /// the plugin's own, higher meaning closer: the core scales each plugin's to its best before combining them.
@@ -26,6 +26,10 @@ public interface IDiscoveryPlugin : IPlugin
     /// <summary>Songs to recommend to a listener, best first.</summary>
     Task<IReadOnlyList<DiscoveredRecording>> RecommendAsync(DiscoveryListener listener, int count, CancellationToken cancellationToken) =>
         Task.FromResult<IReadOnlyList<DiscoveredRecording>>([]);
+
+    /// <summary>An artist's genres, the most fitting first (contract 1.1).</summary>
+    Task<IReadOnlyList<DiscoveredGenre>> ArtistGenresAsync(DiscoveryArtist artist, int count, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<DiscoveredGenre>>([]);
 }
 
 /// <summary>An artist to find others like, or one the plugin found.</summary>
@@ -70,6 +74,11 @@ public sealed record DiscoveredArtist(string Name, IReadOnlyList<ProviderId> Ids
 public sealed record DiscoveredRecording(string Title, string Artist, IReadOnlyList<ProviderId> Ids, IReadOnlyList<DiscoveryArtist> Artists,
     double Score, string? Album = null, TimeSpan? Duration = null);
 
+/// <summary>A genre a plugin gives an artist.</summary>
+/// <param name="Name">The genre, in lower case as MusicBrainz names them, such as <c>trip hop</c>.</param>
+/// <param name="Score">How well it fits, in the plugin's own terms, such as how many people tagged it: higher fits better.</param>
+public sealed record DiscoveredGenre(string Name, double Score);
+
 /// <summary>Capability names a discovery plugin declares.</summary>
 public static class DiscoveryCapabilities
 {
@@ -81,6 +90,9 @@ public static class DiscoveryCapabilities
 
     /// <summary>Songs to recommend to a listener.</summary>
     public const string Recommendations = "recommendations";
+
+    /// <summary>An artist's genres (contract 1.1).</summary>
+    public const string ArtistGenres = "artist-genres";
 }
 
 /// <summary>Service names in <see cref="DiscoveryListener.Accounts"/>.</summary>

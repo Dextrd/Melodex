@@ -1,7 +1,7 @@
 namespace Melodex.Client;
 
 /// <summary>What a song was played from.</summary>
-public enum PlaySourceKind { Album, Playlist, Artist, Radio, Other }
+public enum PlaySourceKind { Album, Playlist, Artist, Radio, Other, Mix }
 
 /// <summary>Where a play came from: an album, a playlist, a radio. The name is kept as it was, in case the thing goes.</summary>
 public sealed record PlaySource(PlaySourceKind Kind, Guid? Id = null, string? Name = null);

@@ -27,8 +27,10 @@ public sealed partial class RadioService(MelodexDbContext db, DiscoveryService d
 
     // How many songs like each seed to ask for, how many seeds a batch uses (fewer for the first, so it starts quickly),
     // and how many songs apart the same artist comes.
-    private const int Asked = 40;
+    /// <summary>How many songs like each seed are asked for.</summary>
+    public const int Asked = 40;
     private const int FirstSeeds = 2, Seeds = 4;
+    private const int MixBatch = 6;
     private const int ArtistGap = 3;
     private const string Library = "Your library";
 
@@ -45,10 +47,36 @@ public sealed partial class RadioService(MelodexDbContext db, DiscoveryService d
     {
         if (await SeedAsync(userId, body.SeedId, ct) is not { } seed)
             return null;
-        var take = Math.Clamp(body.Take, 1, MaxTake);
-        var recent = body.Recent ?? [];
+        var missingShare = body.OwnedOnly ? 0 : await MissingShareAsync(ct);
+        return await BatchAsync(userId, seed, body.Recent ?? [], Math.Clamp(body.Take, 1, MaxTake), missingShare, ct);
+    }
+
+    /// <summary>The server's share of a radio's songs that are ones not in the library, from 0 to 1.</summary>
+    public async Task<double> MissingShareAsync(CancellationToken ct) =>
+        Math.Clamp((await settings.GetFetchAsync(ct)).RadioMissingPercent, 0, 100) / 100.0;
+
+    /// <summary>
+    /// A mix (#5) as a radio would play it: so many songs like these, and these artists', with this share of them ones
+    /// you don't have, spaced and steered as a radio's are. Made a few at a time, each from a few of the songs at random.
+    /// </summary>
+    public async Task<IReadOnlyList<DiscoveredSong>> MixAsync(Guid userId, string name, IReadOnlyList<Guid> tracks, IReadOnlyList<Guid> artists, int take,
+        double missingShare, CancellationToken ct)
+    {
+        var seed = new Seed(name, RadioSeedKind.Mix, tracks, artists);
+        var songs = new List<DiscoveredSong>();
+        while (songs.Count < take)
+        {
+            var batch = await BatchAsync(userId, seed, songs.Select(s => s.TrackId).ToList(), Math.Min(MixBatch, take - songs.Count), missingShare, ct);
+            if (batch.Songs.Count == 0)
+                break;
+            songs.AddRange(batch.Songs);
+        }
+        return songs;
+    }
+
+    private async Task<RadioBatch> BatchAsync(Guid userId, Seed seed, IReadOnlyList<Guid> recent, int take, double missingShare, CancellationToken ct)
+    {
         var queued = recent.ToHashSet();
-        var missingShare = body.OwnedOnly ? 0 : Math.Clamp((await settings.GetFetchAsync(ct)).RadioMissingPercent, 0, 100) / 100.0;
 
         var since = DateTime.UtcNow - SkipsKept;
         var skips = await db.RadioSkips.AsNoTracking().Where(s => s.UserId == userId && s.SkippedAt >= since).ToListAsync(ct);
@@ -61,14 +89,18 @@ public sealed partial class RadioService(MelodexDbContext db, DiscoveryService d
             .ToHashSet();
 
         // A few of what it was started from, then what it played that you starred, and the last song it played that
-        // wasn't skipped, a little less: so it drifts with what you're enjoying.
+        // wasn't skipped, a little less: so it drifts with what you're enjoying. A mix, made before anyone listens,
+        // keeps to what it was made from.
         var seeds = new Dictionary<Guid, double>();
         foreach (var track in seed.Tracks.OrderBy(_ => Random.Shared.Next()).Take(recent.Count == 0 ? FirstSeeds : Seeds))
             seeds[track] = 1;
-        foreach (var track in recent.Reverse().Where(starred.Contains).Take(2))
-            seeds.TryAdd(track, 1);
-        foreach (var track in recent.Reverse().Where(t => !skipped.Contains(t) && !starred.Contains(t)).Take(1))
-            seeds.TryAdd(track, 0.6);
+        if (seed.Kind != RadioSeedKind.Mix)
+        {
+            foreach (var track in recent.Reverse().Where(starred.Contains).Take(2))
+                seeds.TryAdd(track, 1);
+            foreach (var track in recent.Reverse().Where(t => !skipped.Contains(t) && !starred.Contains(t)).Take(1))
+                seeds.TryAdd(track, 0.6);
+        }
 
         var candidates = new Dictionary<Guid, Candidate>();
         void Add(DiscoveredSong song, double score)
@@ -196,7 +228,7 @@ public sealed partial class RadioService(MelodexDbContext db, DiscoveryService d
         return new RadioSettings(fetch.RadioMissingPercent, fetch.RadioAutoplay);
     }
 
-    /// <summary>What a radio was started from: a song, album, artist, or one of their own playlists.</summary>
+    /// <summary>What a radio was started from: a song, album, artist, or one of their own playlists or mixes.</summary>
     private async Task<Seed?> SeedAsync(Guid userId, Guid id, CancellationToken ct)
     {
         if (await db.Tracks.AsNoTracking().Where(t => t.Id == id).Select(t => new { t.Title, t.ArtistId }).FirstOrDefaultAsync(ct) is { } track)
@@ -210,6 +242,12 @@ public sealed partial class RadioService(MelodexDbContext db, DiscoveryService d
         {
             var tracks = await db.Tracks.Where(t => t.ArtistId == id && !t.Ignored).Select(t => t.Id).ToListAsync(ct);
             return new Seed(artist, RadioSeedKind.Artist, await OwnedFirstAsync(tracks, ct), [id]);
+        }
+        if (await db.Mixes.AsNoTracking().Where(m => m.Id == id && m.UserId == userId).FirstOrDefaultAsync(ct) is { } mix)
+        {
+            var artists = await db.Tracks.Where(t => mix.Tracks.Contains(t.Id)).GroupBy(t => t.ArtistId).OrderByDescending(g => g.Count())
+                .Select(g => g.Key).Take(3).ToListAsync(ct);
+            return mix.Tracks.Count == 0 ? null : new Seed(mix.Name, RadioSeedKind.Mix, mix.Tracks, artists);
         }
         if (await db.Playlists.AsNoTracking().Where(p => p.Id == id && p.UserId == userId && p.DeletedAt == null).Select(p => p.Name)
                 .FirstOrDefaultAsync(ct) is { } playlist)
