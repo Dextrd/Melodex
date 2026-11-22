@@ -58,9 +58,13 @@ What changed in each release of Melodex. Versions follow [semantic versioning](h
   have, **Back to your albums** you haven't played in a while, and ListenBrainz's recommendations. Daily mixes are made
   again each day, named for their artists' genres, such as "Trip hop & dub". **Keep** copies a mix into a playlist of
   yours, synced to Navidrome like any other, with songs you don't have holding their place until they arrive, and asks
-  whether to get them (or not to ask again). A mix can start a radio too. The Library's other views are at
+  whether to get them (or not to ask again). Pressed again, **Kept** deletes that playlist, warning if it's been changed.
+  A mix can start a radio too. The Library's other views are at
   `/browse`. The API has `GET /mixes`, `GET /mixes/{id}`, `POST /mixes/{id}/keep`, `GET /for-you/artists`,
-  `GET /for-you/albums` and `GET /for-you/your-albums` (#5).
+  `GET /for-you/albums` and `GET /for-you/your-albums`, and `DELETE /mixes/{id}/keep` (#5).
+- Songs in a playlist you don't have yet show their covers in its picture, and keep a **Listen** button and a menu that
+  look as usable as they are; only what's said of them is greyed (#5).
+- Tiles and songs still loading on For you and in similar artists, albums and songs shimmer where they'll be (#5).
 - Discovery plugin contract 1.1: an artist's genres, with the `artist-genres` capability, `ArtistGenresAsync`, and
   `POST /v1/artist-genres` for plugins at an address. ListenBrainz gives the genres MusicBrainz's users tagged an artist
   with (#5).

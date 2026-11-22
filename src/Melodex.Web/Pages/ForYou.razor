@@ -19,7 +19,7 @@
 <h2 class="section">Your mixes</h2>
 @if (_mixes is null)
 {
-    <Loading Inline="true" Text="Making your mixes…" />
+    <TileSlots Count="4" Row="false" Text="Making your mixes…" />
 }
 else if (_mixes.Count == 0)
 {
@@ -48,7 +48,7 @@ else
 <h2 class="section">Artists for you</h2>
 @if (_artists is null)
 {
-    <Loading Inline="true" Text="Asking the discovery plugins…" />
+    <TileSlots Artist="true" Text="Asking the discovery plugins…" />
 }
 else if (_artists.Count == 0)
 {
@@ -71,7 +71,7 @@ else
 <h2 class="section">Albums for you</h2>
 @if (_albums is null)
 {
-    <Loading Inline="true" Text="Asking the discovery plugins…" />
+    <TileSlots Text="Asking the discovery plugins…" />
 }
 else if (_albums.Count == 0)
 {
@@ -92,7 +92,7 @@ else
     <h2 class="section">Back to your albums</h2>
     @if (_yours is null)
     {
-        <Loading Inline="true" />
+        <TileSlots />
     }
     else
     {

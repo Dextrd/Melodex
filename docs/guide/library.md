@@ -36,8 +36,10 @@ The Library opens on **For you**, made from what you play, and different for eve
 - **Recommended by ListenBrainz**, once your ListenBrainz account is linked.
 
 Play a mix from its tile, or open it to see its songs. Songs you don't have are fetched to listen to as they come up.
-**Keep** copies a mix into a playlist of yours, named after it and the day it was made, and synced to Navidrome like any
-other; songs you don't have hold their place in it until they're in your library. With the Request permission, it
+**Keep** copies a mix into a playlist of yours, named after it and the day it was made, with the same picture, and
+synced to Navidrome like any other; songs you don't have hold their place in it until they're in your library. The
+button then says **Kept**: press it again to delete that playlist, with a warning if you've changed it since. Once the
+mix is made again, the playlist is yours alone, and stays. With the Request permission, it
 then asks whether to get those songs now. Tick **Don't ask again** and that browser won't ask again; you can still get
 them from the playlist with its **Get** button. The mix itself changes the next day, or week. **Radio** carries on from a mix without end.
 

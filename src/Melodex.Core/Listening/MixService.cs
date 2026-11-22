@@ -37,9 +37,10 @@ public sealed class MixService(MelodexDbContext db, PlayService plays, Discovery
     {
         await EnsureAsync(userId, DateTime.UtcNow, ct);
         var mixes = await db.Mixes.AsNoTracking().Where(m => m.UserId == userId).ToListAsync(ct);
+        var kept = await KeptAsync(mixes, ct);
         var summaries = new List<MixSummary>();
         foreach (var mix in mixes.OrderBy(m => m.Kind).ThenBy(m => m.Number))
-            summaries.Add(Summary(mix, await discovery.SongsOfAsync(mix.Tracks.Take(12).ToList(), ct)));
+            summaries.Add(Summary(mix, await discovery.SongsOfAsync(mix.Tracks.Take(12).ToList(), ct), kept));
         return summaries;
     }
 
@@ -48,23 +49,57 @@ public sealed class MixService(MelodexDbContext db, PlayService plays, Discovery
         if (await db.Mixes.AsNoTracking().FirstOrDefaultAsync(m => m.Id == id && m.UserId == userId, ct) is not { } mix)
             return null;
         var songs = await discovery.SongsOfAsync(mix.Tracks, ct);
-        return new MixDetail(Summary(mix, songs), songs);
+        return new MixDetail(Summary(mix, songs, await KeptAsync([mix], ct)), songs);
     }
 
     /// <summary>
     /// A copy of the mix as one of their playlists, by its name and the day it was made unless they name it. Songs they
-    /// don't have hold their place, as an import's do, until they're in the library.
+    /// don't have hold their place, as an import's do, until they're in the library. Kept already, it's that playlist.
     /// </summary>
     public async Task<PlaylistDetail?> KeepAsync(Guid userId, Guid id, KeepMix body, CancellationToken ct)
     {
-        if (await db.Mixes.AsNoTracking().FirstOrDefaultAsync(m => m.Id == id && m.UserId == userId, ct) is not { } mix)
+        if (await db.Mixes.FirstOrDefaultAsync(m => m.Id == id && m.UserId == userId, ct) is not { } mix)
             return null;
+        if (mix.KeptAs is { } already && await playlists.GetAsync(userId, already, ct) is { } existing)
+            return existing;
         var name = string.IsNullOrWhiteSpace(body.Name) ? $"{mix.Name}, {mix.MadeAt:d MMM yyyy}" : body.Name.Trim();
         var songs = (await discovery.SongsOfAsync(mix.Tracks, ct))
             .Select(s => new ImportedSong(s.TrackId, null, s.Title, s.ArtistCredit, s.AlbumTitle, s.DurationSeconds)).ToList();
         var (playlist, _) = (await playlists.ImportAsync(userId, null, name, songs, ct))!.Value;
-        return await playlists.GetAsync(userId, playlist, ct);
+        var detail = (await playlists.GetAsync(userId, playlist, ct))!;
+        (mix.KeptAs, mix.KeptAt) = (playlist, detail.Playlist.UpdatedAt);
+        await db.SaveChangesAsync(ct);
+        return detail;
     }
+
+    /// <summary>Deletes the playlist the mix was kept as, however it's been changed since; false if it wasn't kept, or is gone.</summary>
+    public async Task<bool> UnkeepAsync(Guid userId, Guid id, CancellationToken ct)
+    {
+        if (await db.Mixes.FirstOrDefaultAsync(m => m.Id == id && m.UserId == userId, ct) is not { KeptAs: { } playlist } mix)
+            return false;
+        var deleted = await playlists.DeleteAsync(userId, playlist, ct);
+        (mix.KeptAs, mix.KeptAt) = (null, null);
+        await db.SaveChangesAsync(ct);
+        return deleted;
+    }
+
+    // The playlists these mixes were kept as that are still there, with whether each has been changed since.
+    private async Task<Dictionary<Guid, KeptMix>> KeptAsync(IReadOnlyList<Mix> mixes, CancellationToken ct)
+    {
+        var ids = mixes.Select(m => m.KeptAs).OfType<Guid>().ToList();
+        if (ids.Count == 0)
+            return [];
+        var found = await db.Playlists.AsNoTracking().Where(p => ids.Contains(p.Id) && p.DeletedAt == null)
+            .Select(p => new { p.Id, p.Name, p.UpdatedAt }).ToDictionaryAsync(p => p.Id, ct);
+        var kept = new Dictionary<Guid, KeptMix>();
+        foreach (var mix in mixes)
+            if (mix.KeptAs is { } id && found.TryGetValue(id, out var p))
+                kept[mix.Id] = new KeptMix(p.Id, p.Name, mix.KeptAt is not { } at || p.UpdatedAt > at + Moment);
+        return kept;
+    }
+
+    // Changes this close to keeping it are keeping it.
+    private static readonly TimeSpan Moment = TimeSpan.FromSeconds(1);
 
     /// <summary>Makes their daily mixes if none were made today, and the weekly one if it wasn't made since Monday.</summary>
     public async Task EnsureAsync(Guid userId, DateTime now, CancellationToken ct)
@@ -223,8 +258,9 @@ public sealed class MixService(MelodexDbContext db, PlayService plays, Discovery
         await db.SaveChangesAsync(ct);
     }
 
-    private static MixSummary Summary(Mix mix, IReadOnlyList<DiscoveredSong> songs) => new(mix.Id, mix.Kind, mix.Name, mix.Artists,
-        songs.Select(s => s.CoverUrl).OfType<string>().Distinct().Take(4).ToList(), mix.Tracks.Count, DateTime.SpecifyKind(mix.MadeAt, DateTimeKind.Utc));
+    private static MixSummary Summary(Mix mix, IReadOnlyList<DiscoveredSong> songs, Dictionary<Guid, KeptMix> kept) => new(mix.Id, mix.Kind, mix.Name,
+        mix.Artists, songs.Select(s => s.CoverUrl).OfType<string>().Distinct().Take(4).ToList(), mix.Tracks.Count,
+        DateTime.SpecifyKind(mix.MadeAt, DateTimeKind.Utc), kept.GetValueOrDefault(mix.Id));
 }
 
 /// <summary>

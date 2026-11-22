@@ -18,8 +18,9 @@ its songs in your library.
 A song that leaves your library stays in the playlist, greyed out, so it's there again if the song comes back.
 
 A playlist can also be made from a list of songs: an M3U playlist, a CSV, or lines you paste. See
-[importing from a list](tools.md#importing-from-a-list). Songs from it that you don't have hold their places, greyed
-out, until they arrive.
+[importing from a list](tools.md#importing-from-a-list), or by keeping a [mix](library.md#for-you). Songs from it that
+you don't have hold their places, greyed out, until they arrive. Their covers count toward the playlist's picture, and
+their **Listen** button and **⋯** menu still work: listen to one now, or get it.
 
 ## Finding them
 

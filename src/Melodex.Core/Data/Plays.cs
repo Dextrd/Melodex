@@ -71,6 +71,12 @@ public class Mix
     public List<Guid> Tracks { get; set; } = [];
 
     public DateTime MadeAt { get; set; } = DateTime.UtcNow;
+
+    /// <summary>The playlist it was kept as, while the mix lasts: Keep again offers to delete it.</summary>
+    public Guid? KeptAs { get; set; }
+
+    /// <summary>When it was kept: the playlist's been changed since if it was updated later.</summary>
+    public DateTime? KeptAt { get; set; }
 }
 
 /// <summary>Someone's account on ListenBrainz or Last.fm, which their plays are sent to.</summary>

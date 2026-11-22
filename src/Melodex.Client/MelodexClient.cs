@@ -1083,6 +1083,16 @@ public sealed class MelodexClient(HttpClient http)
         return (await response.Content.ReadFromJsonAsync<PlaylistDetail>(MelodexJson.Options, ct))!;
     }
 
+    /// <summary>Deletes the playlist a mix was kept as; false when it wasn't kept, or is gone.</summary>
+    public async Task<bool> UnkeepMixAsync(Guid id, CancellationToken ct = default)
+    {
+        using var response = await http.DeleteAsync($"{Api}/mixes/{id}/keep", ct);
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            return false;
+        await EnsureAsync(response, ct);
+        return true;
+    }
+
     public async Task<IReadOnlyList<SimilarArtist>> ListArtistsForYouAsync(CancellationToken ct = default) =>
         await http.GetFromJsonAsync<List<SimilarArtist>>($"{Api}/for-you/artists", MelodexJson.Options, ct) ?? [];
 

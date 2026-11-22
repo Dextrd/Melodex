@@ -811,6 +811,12 @@ namespace Melodex.Core.Data.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<Guid?>("KeptAs")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("KeptAt")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("Kind")
                         .IsRequired()
                         .HasColumnType("TEXT");

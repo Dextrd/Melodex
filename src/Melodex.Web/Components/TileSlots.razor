@@ -1,0 +1,39 @@
+@*
+    Tiles on their way: a cover and two lines shimmering in each, the shape of the tiles to come, in a row that scrolls
+    sideways as theirs will, or a grid. Said to screen readers as one "loading".
+*@
+<div role="status" class="tile-slots">
+    <span class="visually-hidden">@Text</span>
+    @if (Row)
+    {
+        <Carousel>@Slots</Carousel>
+    }
+    else
+    {
+        <div class="tiles">@Slots</div>
+    }
+</div>
+
+@code {
+    /// <summary>How many slots: about a row's worth.</summary>
+    [Parameter] public int Count { get; set; } = 8;
+
+    /// <summary>Round covers, as artists' are.</summary>
+    [Parameter] public bool Artist { get; set; }
+
+    /// <summary>One row scrolling sideways, as a carousel; otherwise a grid.</summary>
+    [Parameter] public bool Row { get; set; } = true;
+
+    [Parameter] public string Text { get; set; } = "Loading…";
+
+    private RenderFragment Slots => @<text>
+        @for (var i = 0; i < Count; i++)
+        {
+            <div class="tile tile-slot" aria-hidden="true">
+                <div class="cover pending @(Artist ? "artist" : "album")"></div>
+                <span class="shimmer-line" style="width: 75%"></span>
+                <span class="shimmer-line small" style="width: 50%"></span>
+            </div>
+        }
+    </text>;
+}

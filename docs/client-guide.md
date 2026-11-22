@@ -499,7 +499,9 @@ What the web app's For you tab shows, with the `listen` scope and a key that bel
   of time for anyone who's played something in the last month; otherwise when first asked, which can take a while.
 - `GET /mixes/{id}` gives a mix with its `songs`, shaped as similar songs are; a mix that's been made again since is a 404.
 - `POST /mixes/{id}/keep` copies it into a new playlist of yours and gives the playlist; send a `name` or have the
-  mix's name and the day it was made.
+  mix's name and the day it was made. While the mix lasts it says so in `kept` (the `playlistId`, its `name`, and
+  whether it's `changed` since), and keeping it again gives the same playlist. `DELETE /mixes/{id}/keep` deletes that
+  playlist; 404 if it wasn't kept.
 - `GET /for-you/artists` and `GET /for-you/albums` give artists and albums like those you play most that aren't in the
   library, shaped as similar artists and albums are; `GET /for-you/your-albums` gives albums you have that you haven't
   played in two months, as album summaries.

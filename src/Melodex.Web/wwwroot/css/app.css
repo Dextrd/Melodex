@@ -1195,7 +1195,19 @@ button .spinner { width: .85rem; height: .85rem; vertical-align: -2px; margin-ri
 .tile-wrap:hover .tile-corner, .tile-wrap:focus-within .tile-corner { opacity: 1; }
 @media (hover: none) { .tile-corner { opacity: 1; } }
 /* A mix's play button (#5), round over its tile's corner. */
-.tile-corner.mix-play { border-radius: 50%; width: 2.4rem; min-width: 0; height: 2.4rem; padding: 0; box-shadow: 0 2px 8px rgb(0 0 0 / .35); }
+/* A mix's play button fills its picture's top right corner as a quarter of a circle, the picture cut away a little
+   further round it, so a thin gap runs between them. */
+.mixes { --mix-play: 2.9rem; --mix-gap: 3px; }
+.mixes .tile .cover {
+    mask-image: radial-gradient(circle at 100% 0, transparent calc(var(--mix-play) + var(--mix-gap)), #000 calc(var(--mix-play) + var(--mix-gap) + .5px));
+}
+.tile-corner.mix-play {
+    top: calc(.75rem + 1px); right: calc(.75rem + 1px); width: var(--mix-play); min-width: 0; height: var(--mix-play);
+    padding: .55rem .55rem 0 0; border: none; border-radius: 0 6px 0 100%; opacity: 1;
+    align-items: flex-start; justify-content: flex-end;
+}
+.tile-corner.mix-play svg { width: 1.05rem; height: 1.05rem; }
+.tile-corner.mix-play:hover:not(:disabled) { filter: brightness(1.12); }
 /* The button in the tile's corner, and its menu below it, as wide as it needs; songmenu.js keeps it on screen whichever
    column the tile is in. More specific than .song-menu's own place in a row, which comes later. */
 .tile-wrap > .song-menu.tile-menu { position: static; opacity: 0; transition: opacity .15s; }
@@ -1912,6 +1924,9 @@ table.slots > tbody > tr.dim > td { opacity: 1; color: color-mix(in srgb, var(--
 table.slots > tbody > tr.dim > td > * { opacity: .6; }
 table.slots > tbody > tr.dim > td:has(.menu) { color: var(--text); }
 table.slots > tbody > tr.dim > td > :has(.menu) { opacity: 1; }
+/* Only what's said of a song you can't play is greyed: its buttons work, so they look it. */
+table.slots > tbody > tr.dim > td.actions { color: var(--text); }
+table.slots > tbody > tr.dim > td.actions > * { opacity: 1; }
 
 /* Export: which playlists, as what; the library's columns. */
 a.button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
@@ -1978,3 +1993,15 @@ a.toast-body:hover .toast-title { text-decoration: underline; }
 .section-head + .track-file, .section-head + .collapsible > .collapsible-inner > .track-file:first-child { margin-top: .5rem; }
 /* The path takes the room the buttons leave. */
 .track-file-head > code { overflow-wrap: anywhere; min-width: 0; flex: 1 1 16rem; }
+.dialog .warning { color: var(--partial); }
+
+/* Read out, not shown. */
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+/* Tiles and songs on their way (TileSlots, SongSlots): shaped as they'll be, shimmering. */
+.shimmer-line.small { height: .7rem; }
+.tile-slot { gap: .55rem; }
+.tile-slot .cover, .song-slot .cover { border-color: transparent; }
+.song-slot { display: grid; grid-template-columns: 2.5rem 1fr; gap: 1rem; align-items: center; padding: .5rem .75rem; border-bottom: 1px solid var(--border); }
+.song-slot:last-child { border-bottom: none; }
+.song-slot .cover { width: 2.5rem; }
+.song-slot > div:last-child { display: flex; flex-direction: column; gap: .45rem; }

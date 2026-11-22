@@ -63,6 +63,20 @@ public sealed class ForYouTests : IDisposable
 
         Assert.Contains(kept.Songs, x => x.State == PlaylistSongState.Awaiting);
 
+        // Kept, the mix says so, and keeping it again is the same playlist.
+        Assert.Equal(new KeptMix(kept.Playlist.Id, kept.Playlist.Name, false), (await _api.GetMixAsync(daily.Id))!.Mix.Kept);
+        Assert.Equal(kept.Playlist.Id, (await _api.KeepMixAsync(daily.Id, new KeepMix())).Playlist.Id);
+        Assert.Single(await _api.ListPlaylistsAsync());
+        // Changed since, it says that too; and unkept, the playlist's gone and the mix can be kept anew.
+        await Task.Delay(1100);
+        await _api.UpdatePlaylistAsync(kept.Playlist.Id, new UpdatePlaylist(Name: "Mine now"));
+        Assert.Equal(new KeptMix(kept.Playlist.Id, "Mine now", true), (await _api.ListMixesAsync()).Single(m => m.Id == daily.Id).Kept);
+        Assert.True(await _api.UnkeepMixAsync(daily.Id));
+        Assert.Null((await _api.GetMixAsync(daily.Id))!.Mix.Kept);
+        Assert.Null(await _api.GetPlaylistAsync(kept.Playlist.Id));
+        Assert.False(await _api.UnkeepMixAsync(daily.Id));
+        kept = await _api.KeepMixAsync(daily.Id, new KeepMix());
+
         // A radio carries on from it.
         var radio = (await _api.NextRadioAsync(new RadioNext(daily.Id, detail.Songs.Select(x => x.TrackId).ToList())))!;
         Assert.Equal(("Trip hop mix", RadioSeedKind.Mix), (radio.Name, radio.Kind));

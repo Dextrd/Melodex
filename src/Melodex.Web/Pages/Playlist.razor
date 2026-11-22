@@ -140,6 +140,11 @@ else
                                     {
                                         <IconButton Icon="play" Requires="@UserPermissions.Listen" Title="Play the playlist from here" OnClick="() => PlayFromAsync(song)" />
                                     }
+                                    else if (song.State is PlaylistSongState.Awaiting or PlaylistSongState.Coming && song.TrackId is { } listen)
+                                    {
+                                        <IconButton Icon="listen" Requires="@UserPermissions.Listen" Title="Listen: fetch it to play now, without adding it to your library"
+                                                    OnClick="() => Player.ListenAsync(listen)" />
+                                    }
                                     <ItemMenu Entry="@(canPlay ? PlaylistNames.Playable([song]).FirstOrDefault() : null)" Name="@song.Title"
                                               Keep="@(song.State == PlaylistSongState.Library && song.TrackId is { } kept ? [new PlaylistItem(kept)] : null)"
                                               UpgradeTrackId="@(song.State == PlaylistSongState.Library ? song.TrackId : null)" AlbumHref="@albumHref"

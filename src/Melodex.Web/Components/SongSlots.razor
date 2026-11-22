@@ -1,0 +1,26 @@
+@*
+    Songs on their way, shaped as a list of songs is: a cover and a title and artist shimmering on each row. Said to
+    screen readers as one "loading".
+*@
+<div role="status" class="card song-slots">
+    <span class="visually-hidden">@Text</span>
+    @for (var i = 0; i < Count; i++)
+    {
+        <div class="song-slot" aria-hidden="true">
+            <div class="cover pending album"></div>
+            <div>
+                <span class="shimmer-line" style="width: @(Widths[i % Widths.Length])%"></span>
+                <span class="shimmer-line small" style="width: @(Widths[(i + 2) % Widths.Length] / 2)%"></span>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public int Count { get; set; } = 5;
+
+    [Parameter] public string Text { get; set; } = "Loading…";
+
+    // Titles differ in length, so the lines do.
+    private static readonly int[] Widths = [55, 40, 65, 35, 50];
+}

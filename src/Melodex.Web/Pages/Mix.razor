@@ -9,7 +9,8 @@
 @*
     A mix made for you (#5): its songs, to play from any of them, those you don't have fetched to listen to as they come
     near. Keep copies it into a playlist of yours, as it is today, since the mix is remade tomorrow, or next Monday, and
-    offers to get the songs you don't have, unless you've said not to ask again.
+    offers to get the songs you don't have, unless you've said not to ask again. Kept, the same button offers to delete
+    the playlist, warning when it's been changed since.
 *@
 
 <PageTitle>@(_mix?.Mix.Name ?? "Mix") · Melodex</PageTitle>
@@ -40,8 +41,16 @@ else
             <div class="row album-actions" style="margin-top: .5rem;">
                 <IconButton Icon="play" Requires="@UserPermissions.Listen" Primary="true" Large="true" Label="Play" Title="Play it from the start"
                             OnClick="() => Player.PlayMixAsync(detail)" />
-                <IconButton Icon="playlist" Requires="@UserPermissions.Listen" Large="true" Label="Keep" Title="Keep it as it is today, as a playlist of yours"
-                            Disabled="_keeping" OnClick="KeepAsync" />
+                @if (mix.Kept is { } kept)
+                {
+                    <IconButton Icon="playlist" Requires="@UserPermissions.Listen" Large="true" Label="Kept" On="true"
+                                Title="@($"Kept as {kept.Name}: click to delete that playlist")" Disabled="_keeping" OnClick="() => _unkeeping = kept" />
+                }
+                else
+                {
+                    <IconButton Icon="playlist" Requires="@UserPermissions.Listen" Large="true" Label="Keep" Title="Keep it as it is today, as a playlist of yours"
+                                Disabled="_keeping" OnClick="KeepAsync" />
+                }
                 <IconButton Icon="radio" Requires="@UserPermissions.Listen" Large="true" Title="Start radio: songs like the mix's, without end"
                             OnClick="() => Player.StartRadioAsync(mix.Id)" />
             </div>
@@ -50,6 +59,28 @@ else
     </div>
 
     <SongList Songs="detail.Songs" PlayFrom="at => Player.PlayMixAsync(detail, at)" />
+}
+
+@if (_unkeeping is { } unkeeping)
+{
+    <Dialog Title="@($"Delete {unkeeping.Name}?")" Alert="true" OnClose="() => _unkeeping = null">
+        <p>
+            The playlist you kept this mix as is deleted, from your media server too if it's synced there. The mix stays,
+            so you can keep it again while it lasts.
+        </p>
+        @if (unkeeping.Changed)
+        {
+            <p class="warning">
+                You've changed the playlist since you kept it, renaming it or adding, taking out or moving songs. Those
+                changes go with it.
+            </p>
+        }
+        <div class="toolbar">
+            <span class="spacer"></span>
+            <button @onclick="() => _unkeeping = null">Keep it</button>
+            <button class="danger" disabled="@_keeping" @onclick="UnkeepAsync">@if (_keeping) { <span class="spinner"></span> }Delete</button>
+        </div>
+    </Dialog>
 }
 
 @if (_asking is { } asking)
@@ -89,6 +120,9 @@ else
 
     private const string DontAskKey = "mixes.dontAskToGet";
 
+    // The playlist it was kept as, while asking whether to delete it.
+    private KeptMix? _unkeeping;
+
     protected override async Task OnParametersSetAsync()
     {
         if (_mix?.Mix.Id == Id)
@@ -104,6 +138,8 @@ else
         try
         {
             var kept = await Api.KeepMixAsync(Id, new KeepMix());
+            if (_mix is { } mix)
+                _mix = mix with { Mix = mix.Mix with { Kept = new KeptMix(kept.Playlist.Id, kept.Playlist.Name, false) } };
             Notices.Show(new Notice($"mix:{Id}", NoticeKind.Action, "Kept as a playlist", kept.Playlist.Name, $"playlists/{kept.Playlist.Id}", "playlist"),
                 always: true);
             if (Auth.May(UserPermissions.Request) && !await Preferences.GetAsync(DontAskKey, false))
@@ -121,6 +157,22 @@ else
             _error = $"Couldn't keep it: {e.Message}";
         }
         _keeping = false;
+    }
+
+    private async Task UnkeepAsync()
+    {
+        (_keeping, _error) = (true, null);
+        try
+        {
+            await Api.UnkeepMixAsync(Id);
+            if (_mix is { } mix)
+                _mix = mix with { Mix = mix.Mix with { Kept = null } };
+        }
+        catch (Exception e) when (e is HttpRequestException or MelodexApiException)
+        {
+            _error = $"Couldn't delete it: {e.Message}";
+        }
+        (_keeping, _unkeeping) = (false, null);
     }
 
     private async Task AnswerAsync(bool get)

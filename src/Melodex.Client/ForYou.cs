@@ -16,7 +16,13 @@ public enum MixKind
 /// <param name="Covers">Up to four covers of its songs' albums, for its tile.</param>
 /// <param name="Songs">How many songs it has.</param>
 /// <param name="MadeAt">When it was made; daily mixes are remade each day, the weekly one each Monday.</param>
-public sealed record MixSummary(Guid Id, MixKind Kind, string Name, IReadOnlyList<string> Artists, IReadOnlyList<string> Covers, int Songs, DateTime MadeAt);
+/// <param name="Kept">The playlist you kept it as, if you did and it's still there.</param>
+public sealed record MixSummary(Guid Id, MixKind Kind, string Name, IReadOnlyList<string> Artists, IReadOnlyList<string> Covers, int Songs, DateTime MadeAt,
+    KeptMix? Kept = null);
+
+/// <summary>The playlist a mix was kept as.</summary>
+/// <param name="Changed">Whether the playlist has been changed since it was kept: renamed, or songs added, taken out or moved.</param>
+public sealed record KeptMix(Guid PlaylistId, string Name, bool Changed);
 
 /// <summary>A mix with its songs, in order: each says whether you have it, so the rest are fetched to listen to.</summary>
 public sealed record MixDetail(MixSummary Mix, IReadOnlyList<DiscoveredSong> Songs);

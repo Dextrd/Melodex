@@ -35,8 +35,18 @@ public static class ForYouEndpoints
             .RequireScope(Scopes.Listen)
             .WithName("KeepMix")
             .WithSummary("Copies a mix into a new playlist of yours, by the name given, or the mix's name and the day it was made. "
-                         + "It's an ordinary playlist from then on, synced to the media server like the others.")
+                         + "It's an ordinary playlist, synced to the media server like the others; while the mix lasts, it's the mix's `kept`, "
+                         + "and keeping it again gives the same playlist.")
             .Produces<PlaylistDetail>().Produces(StatusCodes.Status404NotFound);
+
+        mixes.MapDelete("/{id:guid}/keep", async (Guid id, HttpContext http, MixService service, CancellationToken ct) =>
+                Owner(http) is not { } user ? NoOwner()
+                : await service.UnkeepAsync(user, id, ct) ? Results.NoContent()
+                : Results.NotFound())
+            .RequireScope(Scopes.Listen)
+            .WithName("UnkeepMix")
+            .WithSummary("Deletes the playlist a mix was kept as, from the media server too, changed since or not. 404 when it wasn't kept, or the mix is gone.")
+            .Produces(StatusCodes.Status204NoContent).Produces(StatusCodes.Status404NotFound);
 
         var forYou = api.MapGroup("/for-you").WithTags("For you");
 
