@@ -100,6 +100,8 @@ What changed in each release of Melodex. Versions follow [semantic versioning](h
 
 ### Changed
 
+- **Tools** is in two sections, **Import / Export** and **Formatting**. Formatting the whole library has moved there,
+  from the Library page's Scan menu, beside the new Even volume (#23).
 - **Retrieval plugins have repositories of their own**, `dextrd/melodex-retriever-<name>`, each with its own releases
   and image, which keeps its name. Each README has the lines to add to your compose file. Melodex's own compose file
   is just Melodex now: the core and the beets worker, with no plugins and no `COMPOSE_PROFILES`. The guide's Plugins

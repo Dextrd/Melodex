@@ -1,7 +1,9 @@
 # Tools
 
-The **Tools** page holds things you run now and then: importing lists of songs, and exporting your playlists and
-library. Importing needs the **Request** permission; what it does shows in **Activity** as it goes.
+The **Tools** page holds things you run now and then. **Import / Export** has importing lists of songs, and exporting
+your playlists and library; importing needs the **Request** permission. **Formatting** has what writes your music files
+themselves, over the whole library: [formatting](library.md#formatting) and [even volume](library.md#even-volume),
+which need the **Format** permission. What each does shows in **Activity** as it goes.
 
 ## Importing from a list
 

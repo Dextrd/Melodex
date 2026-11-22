@@ -106,7 +106,6 @@ scan.
   library this takes a while.
 - **Update catalogue**: look up every artist's discography, and the editions of their albums, so the missing view
   knows what's out there.
-- **Format the whole library**: see [Formatting](#formatting).
 
 After each scan, Melodex queues a catalogue update of its own, which shows on Activity as a separate task. To update
 the catalogue only when you ask, turn off **Update the catalogue after each scan** under **Settings → General →
@@ -196,7 +195,7 @@ a deluxe edition, a compilation) is fetched once or for each, and whether owning
 ## Formatting
 
 **Format** rewrites files' tags and covers from the catalogue, and moves them to where your naming scheme says. It's on
-each artist, album and track page, and for the whole library in the Scan menu. It shows what will change first, and
+each artist, album and track page, and for the whole library under **Tools → Formatting**. It shows what will change first, and
 nothing is written until you confirm. Set the folder layout under **Settings → General**. **Genres** writes the
 catalogue's [genres](#genres) into files that have none of their own, or into every file the catalogue has some for,
 over its own, when you choose the catalogue's **over the file's own**.
@@ -216,7 +215,7 @@ at the end. Over a whole library, it's best to format when nobody's listening.
 
 **Even volume** works out how loud each song is, and each album as a whole, and writes it into the files as
 ReplayGain, which Melodex's [player](requests-and-listening.md#even-volume), most Subsonic players and media servers
-use to play everything at about the same volume. It's under **Tools** for the whole library, and on each artist and
+use to play everything at about the same volume. It's under **Tools → Formatting** for the whole library, and on each artist and
 album page. Like formatting, it only writes files matched to the catalogue, and asks before it starts; Activity shows
 each file and how loud it was. It takes a second or two a song, so a whole library takes a while.
 

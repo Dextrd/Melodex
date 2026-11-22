@@ -3,11 +3,15 @@
 
 <PageTitle>Tools · Melodex</PageTitle>
 
-@* Things you run to build your library, not settings: a card for each. What they're doing shows in Activity. *@
+@*
+    Things you run to build your library, not settings: a card for each, in sections: lists in and out, and what writes the
+    files themselves. What they're doing shows in Activity.
+*@
 <ToolsPlace />
 <h1>Tools</h1>
 <p class="muted">Things you run now and then to build your library. What each does shows in Activity as it goes.</p>
 
+<h2>Import / Export</h2>
 <div class="tool-cards">
     @if (Auth.May(UserPermissions.Request))
     {
@@ -42,19 +46,6 @@
             </span>
         </a>
     }
-    @if (Auth.May(UserPermissions.Format))
-    {
-        <button class="card tool-card" @onclick="() => _levelling = true">
-            <Icon Name="volume" />
-            <span>
-                <strong>Even volume</strong>
-                <span class="muted small">
-                    Work out how loud each song and album is, and write it into the files as ReplayGain, so everything plays at about the same
-                    volume here, in Subsonic players and in your media server. Also on each artist and album page.
-                </span>
-            </span>
-        </button>
-    }
     <a class="card tool-card" href="tools/export">
         <Icon Name="export" />
         <span>
@@ -67,11 +58,44 @@
     </a>
 </div>
 
+@if (Auth.May(UserPermissions.Format))
+{
+    <h2>Formatting</h2>
+    <p class="muted small">These write to your music files themselves, every matched one in the library. Each asks before it starts.</p>
+    <div class="tool-cards">
+        <button class="card tool-card" @onclick="() => _formatting = true">
+            <Icon Name="format" />
+            <span>
+                <strong>Format the whole library</strong>
+                <span class="muted small">
+                    Rewrite files' tags and covers from the catalogue, and move them to where your naming scheme says. Also on each artist,
+                    album and track page.
+                </span>
+            </span>
+        </button>
+        <button class="card tool-card" @onclick="() => _levelling = true">
+            <Icon Name="volume" />
+            <span>
+                <strong>Even volume</strong>
+                <span class="muted small">
+                    Work out how loud each song and album is, and write it into the files as ReplayGain, so everything plays at about the same
+                    volume here, in Subsonic players and in your media server. Also on each artist and album page.
+                </span>
+            </span>
+        </button>
+    </div>
+}
+
+@if (_formatting)
+{
+    <FormatDialog Scope="new FormatScope(FormatScopeKind.Library, null)" Name="the whole library" OnClose="() => _formatting = false" />
+}
+
 @if (_levelling)
 {
     <ReplayGainDialog Scope="new FormatScope(FormatScopeKind.Library, null)" Name="the whole library" OnClose="() => _levelling = false" />
 }
 
 @code {
-    private bool _levelling;
+    private bool _formatting, _levelling;
 }
