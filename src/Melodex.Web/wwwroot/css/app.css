@@ -1196,17 +1196,22 @@ button .spinner { width: .85rem; height: .85rem; vertical-align: -2px; margin-ri
 /* A mix's play button (#5), round over its tile's corner. */
 /* A mix's play button fills its picture's top right corner as a quarter of a circle, the picture cut away a little
    further round it, so a thin gap runs between them. */
-.mixes { --mix-play: 2.9rem; --mix-gap: 3px; }
+/* Registered, so the button and the cut round it grow together, smoothly, when it's pointed at. */
+@property --mix-play { syntax: "<length>"; inherits: true; initial-value: 2.35rem; }
+.mixes { --mix-gap: 5px; }
+.mixes .tile-wrap { --mix-play: 2.35rem; transition: --mix-play .15s ease-out; }
+.mixes .tile-wrap:has(.mix-play:hover, .mix-play:focus-visible) { --mix-play: 2.75rem; }
 .mixes .tile .cover {
     mask-image: radial-gradient(circle at 100% 0, transparent calc(var(--mix-play) + var(--mix-gap)), #000 calc(var(--mix-play) + var(--mix-gap) + .5px));
 }
 .tile-corner.mix-play {
     top: calc(.75rem + 1px); right: calc(.75rem + 1px); width: var(--mix-play); min-width: 0; height: var(--mix-play);
-    padding: .55rem .55rem 0 0; border: none; border-radius: 0 6px 0 100%; opacity: 1;
+    padding: .5rem .5rem 0 0; border: none; border-radius: 0 6px 0 100%; opacity: 1;
     align-items: flex-start; justify-content: flex-end;
 }
-.tile-corner.mix-play svg { width: 1.05rem; height: 1.05rem; }
+.tile-corner.mix-play svg { width: .95rem; height: .95rem; }
 .tile-corner.mix-play:hover:not(:disabled) { filter: brightness(1.12); }
+@media (prefers-reduced-motion: reduce) { .mixes .tile-wrap { transition: none; } }
 /* The button in the tile's corner, and its menu below it, as wide as it needs; songmenu.js keeps it on screen whichever
    column the tile is in. More specific than .song-menu's own place in a row, which comes later. */
 .tile-wrap > .song-menu.tile-menu { position: static; opacity: 0; transition: opacity .15s; }
