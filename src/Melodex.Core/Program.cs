@@ -137,7 +137,7 @@ builder.Services.AddSingleton<SpectrumMaker>();
 builder.Services.AddSingleton<Transcoder>();
 builder.Services.AddSingleton<SubsonicLibrary>();
 builder.Services.AddScoped<SubsonicAuth>();
-builder.Services.AddSingleton<WebmCopies>();
+builder.Services.AddSingleton<StreamCopies>();
 builder.Services.AddScoped<ListenNowService>();
 // Listening history, sent on to ListenBrainz and Last.fm (#2).
 builder.Services.AddScoped<PlayService>();

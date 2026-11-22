@@ -87,6 +87,11 @@ What changed in each release of Melodex. Versions follow [semantic versioning](h
   16, 32 or 64 bands. The client guide describes the format (#102).
 - The API has `GET` and `PUT /schedules`, `POST /library/lyrics`, `POST /library/bars`, `POST /requests/retry-failed`
   and `POST /wishlist/get` (#112).
+- **Gapless playback on iPhones and iPads** (iOS 17.1 or later): the queue plays as one stream, each song added to the
+  end as soon as it's next, so songs run into each other as elsewhere, and skipping to the next one, from the lock screen
+  too, is a jump with nothing to load. Songs come in an MP4 file the server makes and keeps, like the WebM copies for
+  Safari: their own sound where the phone takes it, otherwise AAC at 256 kbps. Stream URLs take `as=mp4` and `keep` for
+  it (#109).
 
 ### Changed
 
@@ -107,6 +112,9 @@ What changed in each release of Melodex. Versions follow [semantic versioning](h
 
 ### Fixed
 
+- Starting a song you don't have, or skipping to one, no longer sometimes plays the song after it instead, or skips
+  songs on its own while they're fetched: a song not yet asked for was remembered as having nothing to play. And a song
+  chosen while another is still playing is no longer skipped past when that one ends first (#109).
 - Copy buttons work when Melodex is opened over plain http, such as at the server's own address at home, rather than
   showing an error: browsers only offer the clipboard to https pages, so the text is copied the older way (#7).
 

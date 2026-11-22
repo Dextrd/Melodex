@@ -225,9 +225,13 @@ the queue, or none, which loads nothing ahead. Repeating one song, and songs sti
 as before. An MP3 or AAC file may still have a sliver of silence its encoder added; FLAC and Opus join cleanly. A
 phone that won't start a song without a tap plays the next one the usual way.
 
-It isn't available on iPhones and iPads, in any browser: playing two songs in turn like this sometimes left the lock
-screen's music controls showing the one before, paused. There, each song starts once the one before has ended, with
-the next made ready on the server ahead of time so it starts quickly.
+On iPhones and iPads (iOS 17.1 or later, in any browser), the queue plays as one stream instead: each song is added
+to the end of it as soon as it's known to be next, so it runs on with no gap, and skipping to it, from the player or
+the lock screen, is a jump along the stream with nothing to load. Songs come in an MP4 file made on the server, with
+their own sound where the phone takes it that way (AAC, and FLAC and Opus on recent iOS) and otherwise made AAC at
+256 kbps; like the WebM copies below, they're made the first time a song plays and kept up to about 1 GB. AirPlay
+isn't offered while it plays this way. Before iOS 17.1, each song starts once the one before has ended, with the next
+made ready on the server ahead of time so it starts quickly.
 
 ### Opus in Safari
 
