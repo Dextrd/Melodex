@@ -51,6 +51,7 @@ else
             @if (_artist.InLibrary)
             {
                 <IconButton Icon="format" Requires="@UserPermissions.Format" Label="Format" Title="Rewrite this artist's files: their tags, covers and where they live" OnClick="() => _formatting = true" />
+                <IconButton Icon="volume" Requires="@UserPermissions.Format" Label="Even volume" Title="Work out how loud this artist's songs are, and write it into their files as ReplayGain" OnClick="() => _levelling = true" />
             }
             <IconButton Icon="radio" Requires="@UserPermissions.Listen" Label="Radio" Title="Start radio: play their songs and songs like them, without end"
                         OnClick="() => Player.StartRadioAsync(_artist.Id)" />
@@ -155,6 +156,11 @@ else
     <FormatDialog Scope="new FormatScope(FormatScopeKind.Artist, _artist.Id)" Name="@_artist.Name" OnClose="() => _formatting = false" />
 }
 
+@if (_levelling && _artist is not null)
+{
+    <ReplayGainDialog Scope="new FormatScope(FormatScopeKind.Artist, _artist.Id)" Name="@_artist.Name" OnClose="() => _levelling = false" />
+}
+
 @if (_showingDialog && _artist is not null)
 {
     <ArtistShowingDialog ArtistId="_artist.Id" Name="@_artist.Name" OnClose="() => _showingDialog = false"
@@ -162,7 +168,7 @@ else
 }
 
 @code {
-    private bool _formatting;
+    private bool _formatting, _levelling;
     private bool _showingDialog;
 
     [Parameter] public Guid Id { get; set; }

@@ -23,6 +23,9 @@ public sealed class PlayerEntry
     /// <summary>The listen-now track, for a track you don't have.</summary>
     public Guid? ListenId { get; set; }
 
+    /// <summary>The ReplayGain of the file it plays, once it's been asked for (#23).</summary>
+    public SongGain? Gain { get; set; }
+
     /// <summary>
     /// A track you don't have, put in the queue with its album: it's only fetched to listen to once it's near the song
     /// playing, so playing one song of a long album doesn't fetch all of it (#174).
@@ -795,8 +798,45 @@ public sealed class Player : IAsyncDisposable
     private PlayerEntry? _prepared;
     private int _preparedToken;
     private double? _preparedLength;
-    private GaplessPlayback? _gapless;
-    private DateTime _gaplessAt;
+    private PlaybackSettings? _playback;
+    private DateTime _playbackAt;
+
+    // Playback's settings, asked for again every so often, or once they're saved here.
+    private async Task<PlaybackSettings> PlaybackAsync()
+    {
+        if (_playback is null || DateTime.UtcNow - _playbackAt > TimeSpan.FromMinutes(10))
+        {
+            _playbackAt = DateTime.UtcNow;
+            try
+            {
+                _playback = (await _api.GetPlaybackAsync());
+            }
+            catch (Exception e) when (e is HttpRequestException or MelodexApiException)
+            {
+                _playback ??= new PlaybackSettings { Gapless = GaplessPlayback.Off };
+            }
+        }
+        return _playback;
+    }
+
+    /// <summary>Playback's settings were saved: they count from the next song.</summary>
+    public void PlaybackChanged(PlaybackSettings settings) => (_playback, _playbackAt) = (settings, DateTime.UtcNow);
+
+    /// <summary>How much the song's volume is turned down, or up, to even it out, as the settings say: 1 to leave it.</summary>
+    private double Level(PlayerEntry entry)
+    {
+        var levelling = _playback?.Levelling ?? VolumeLevelling.Track;
+        if (levelling == VolumeLevelling.Off || entry.Gain is not { } gain)
+            return 1;
+        var (db, peak) = levelling == VolumeLevelling.Album && gain.AlbumGain is not null || gain.TrackGain is null
+            ? (gain.AlbumGain, gain.AlbumPeak)
+            : (gain.TrackGain, gain.TrackPeak);
+        if (db is null)
+            return 1;
+        // Never so far up that its loudest moment is past full scale.
+        var factor = Math.Pow(10, db.Value / 20);
+        return peak is > 0 ? Math.Min(factor, 1 / peak.Value) : factor;
+    }
 
     /// <summary>The song to load ahead, if the settings say this one and the next run into each other.</summary>
     private PlayerEntry? GaplessNext(GaplessPlayback gapless)
@@ -814,19 +854,7 @@ public sealed class Player : IAsyncDisposable
     {
         if (_audio is null)
             return;
-        if (_gapless is null || DateTime.UtcNow - _gaplessAt > TimeSpan.FromMinutes(10))
-        {
-            _gaplessAt = DateTime.UtcNow;
-            try
-            {
-                _gapless = (await _api.GetPlaybackAsync()).Gapless;
-            }
-            catch (Exception e) when (e is HttpRequestException or MelodexApiException)
-            {
-                _gapless ??= GaplessPlayback.Off;
-            }
-        }
-        var next = GaplessNext(_gapless.Value);
+        var next = GaplessNext((await PlaybackAsync()).Gapless);
         if (ReferenceEquals(next, _prepared))
             return;
         _prepared = next;
@@ -847,7 +875,7 @@ public sealed class Player : IAsyncDisposable
                 return;
             }
             _preparedLength = length;
-            await _audio.InvokeVoidAsync("prepare", url, Meta(next), token, length);
+            await _audio.InvokeVoidAsync("prepare", url, Meta(next), token, length, Level(next));
         }
         catch (JSException)
         {
@@ -919,7 +947,8 @@ public sealed class Player : IAsyncDisposable
                         // Loaded ahead again as it plays: a start of the next song that this overtook took the spare with it.
                         _prepared = null;
                         Begin(entry, _resumeAt ?? 0);
-                        await audio.InvokeVoidAsync("load", url, Meta(entry), length);
+                        await PlaybackAsync();
+                        await audio.InvokeVoidAsync("load", url, Meta(entry), length, Level(entry));
                         if (_visualising)
                             _ = WarmNextAsync();
                         if (_resumeAt is { } at)
@@ -1045,6 +1074,7 @@ public sealed class Player : IAsyncDisposable
             if (await (entry.FileId is { } file ? _api.GetFilePlayInfoAsync(file) : _api.GetPlayInfoAsync(entry.TrackId, entry.EditionId)) is { } play)
             {
                 entry.DurationSeconds = play.DurationSeconds ?? entry.DurationSeconds;
+                entry.Gain = play.Gain;
                 return (play.StreamUrl, play.MediaType, play.DurationSeconds);
             }
             entry.Unplayable = true;
@@ -1074,6 +1104,9 @@ public sealed class Player : IAsyncDisposable
 
     /// <summary>Whether songs can run into each other in this browser: not on iPhones and iPads before iOS 17.1 (#107, #109).</summary>
     public async Task<bool> GaplessWorksAsync() => await (await AudioAsync()).InvokeAsync<bool>("gaplessWorks");
+
+    /// <summary>Whether songs' volume can be evened out in this browser: not on iPhones and iPads, whose volume is the phone's own (#23).</summary>
+    public async Task<bool> VolumeWorksAsync() => await (await AudioAsync()).InvokeAsync<bool>("volumeWorks");
 
     // What the phone's controls and the script are told of a song.
     private static object Meta(PlayerEntry entry) => new { title = entry.Title, artist = entry.ArtistCredit, album = entry.AlbumTitle, cover = entry.CoverUrl };

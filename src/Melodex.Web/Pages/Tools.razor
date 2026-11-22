@@ -42,6 +42,19 @@
             </span>
         </a>
     }
+    @if (Auth.May(UserPermissions.Format))
+    {
+        <button class="card tool-card" @onclick="() => _levelling = true">
+            <Icon Name="volume" />
+            <span>
+                <strong>Even volume</strong>
+                <span class="muted small">
+                    Work out how loud each song and album is, and write it into the files as ReplayGain, so everything plays at about the same
+                    volume here, in Subsonic players and in your media server. Also on each artist and album page.
+                </span>
+            </span>
+        </button>
+    }
     <a class="card tool-card" href="tools/export">
         <Icon Name="export" />
         <span>
@@ -53,3 +66,12 @@
         </span>
     </a>
 </div>
+
+@if (_levelling)
+{
+    <ReplayGainDialog Scope="new FormatScope(FormatScopeKind.Library, null)" Name="the whole library" OnClose="() => _levelling = false" />
+}
+
+@code {
+    private bool _levelling;
+}

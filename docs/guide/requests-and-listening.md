@@ -233,6 +233,16 @@ their own sound where the phone takes it that way (AAC, and FLAC and Opus on rec
 isn't offered while it plays this way. Before iOS 17.1, each song starts once the one before has ended, with the next
 made ready on the server ahead of time so it starts quickly.
 
+### Even volume
+
+Songs are mastered at very different volumes, so one song can be much louder than the next. With **ReplayGain** in
+your files, the player turns loud songs down and quiet ones up so they all play at about the same volume. Under
+**Settings → Playback → Even volume** choose **Each song**, the default, which suits playlists, radios and shuffle;
+**Each album**, which keeps an album's songs as loud as each other as they were made, so a quiet intro stays quiet; or
+**Off**. A song is never turned up so far that it would clip. Files that came with ReplayGain use theirs; for the rest,
+see [Even volume](library.md#even-volume). On iPhones and iPads the volume is the phone's own, which a web page can't
+set, so songs play as they are there.
+
 ### Opus in Safari
 
 Safari, and every browser on an iPhone, gets the time of an Opus song in an Ogg file wrong: the timer and seek bar stop

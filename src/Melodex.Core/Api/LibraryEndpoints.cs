@@ -267,6 +267,28 @@ public static class LibraryEndpoints
                          + "like a scan; only matched files are formatted. This writes your music files.")
             .Produces<TaskInfo>().ProducesValidationProblem().Produces(StatusCodes.Status404NotFound);
 
+        library.MapPost("/replaygain", async (StartReplayGain body, MelodexDbContext db, TaskQueue queue, CancellationToken ct) =>
+            {
+                if (body.Scope.Kind is not (FormatScopeKind.Library or FormatScopeKind.Artist or FormatScopeKind.Album))
+                    return Results.ValidationProblem(new Dictionary<string, string[]> { ["scope.kind"] = ["Choose the library, an artist or an album."] });
+                if (body.Scope.Kind != FormatScopeKind.Library && body.Scope.Id is null)
+                    return Results.ValidationProblem(new Dictionary<string, string[]> { ["scope.id"] = ["Say which artist or album."] });
+                try
+                {
+                    var task = await ReplayGainTask.StartAsync(db, queue, body.Scope, ct);
+                    return Results.Ok(TaskQueue.ToInfo(task) with { Title = ReplayGainTask.Title(task.PayloadJson) });
+                }
+                catch (KeyNotFoundException)
+                {
+                    return Results.NotFound();
+                }
+            })
+            .RequireScope(Scopes.Format).WithName("StartReplayGain")
+            .WithSummary("Work out the loudness of the library's, an artist's or an album's songs and albums, and write it into their files as "
+                         + "ReplayGain (R128 tags in Opus files), for even volume. Files that have it already are left, unless the playback settings "
+                         + "say to work it out again. It runs in the background; only matched files are touched. This writes your music files.")
+            .Produces<TaskInfo>().ProducesValidationProblem().Produces(StatusCodes.Status404NotFound);
+
         library.MapGet("/{subject:regex(^(albums|tracks)$)}/{id:guid}/cover", async (string subject, Guid id, CoverChooser covers, CancellationToken ct) =>
                 await covers.ChoicesAsync(CoverSubjectOf(subject), id, ct) is { } choices ? Results.Ok(choices) : Results.NotFound())
             .RequireScope(Scopes.Format).WithName("GetCoverChoices")
@@ -651,8 +673,14 @@ public static class LibraryEndpoints
                          + "take, and the .bars files beside them now.");
         settings.MapPut("/playback", async (SavePlayback value, SettingsService s, TaskQueue queue, CancellationToken ct) =>
             {
+                if (value.LoudnessTarget is < -30 or > -5)
+                    return Results.ValidationProblem(new Dictionary<string, string[]> { ["loudnessTarget"] = ["Must be between -30 and -5 LUFS."] });
                 var before = (await s.GetPlaybackAsync(ct)).Visualiser;
-                await s.SavePlaybackAsync(new PlaybackSettings { Visualiser = value.Visualiser, Gapless = value.Gapless }, ct);
+                await s.SavePlaybackAsync(new PlaybackSettings
+                {
+                    Visualiser = value.Visualiser, Gapless = value.Gapless, Levelling = value.Levelling, LoudnessTarget = value.LoudnessTarget,
+                    RedoGains = value.RedoGains, GainsForNewMusic = value.GainsForNewMusic,
+                }, ct);
                 if (value.DeleteBarsFiles)
                     await queue.EnqueueAsync(BarsTask.TaskKind, BarsTask.Delete, ct);
                 else if (value.Visualiser == VisualiserBars.WhenMatching && before != VisualiserBars.WhenMatching)
@@ -661,7 +689,9 @@ public static class LibraryEndpoints
             })
             .WithName("SavePlaybackSettings")
             .WithSummary("Which songs play without a gap between them, whether there's a visualiser, and when its bars are made. Made when matching, every song gets them in a .bars file beside it, "
-                         + "starting now; with deleteBarsFiles, those files are deleted.");
+                         + "starting now; with deleteBarsFiles, those files are deleted. And ReplayGain: how the web player evens out volume, the loudness "
+                         + "songs are brought to, whether files that have it are worked out again, and whether new music gets it as it's filed.")
+            .ProducesValidationProblem();
 
         settings.MapGet("/artists/{id:guid}/showing", async (Guid id, SettingsService s, MelodexDbContext db, CancellationToken ct) =>
             {
@@ -812,6 +842,7 @@ public static class LibraryEndpoints
                 ArtistRefreshTask.TaskKind => "Catalogue update",
                 CatalogueUpdateTask.TaskKind => CatalogueUpdateTask.Title,
                 FormatTask.TaskKind => FormatTask.Title(t.PayloadJson),
+                ReplayGainTask.TaskKind => ReplayGainTask.Title(t.PayloadJson),
                 LyricsTask.TaskKind => LyricsTask.Title,
                 SpectrumTask.TaskKind => SpectrumTask.Title,
                 GenresTask.TaskKind => GenresTask.Title,

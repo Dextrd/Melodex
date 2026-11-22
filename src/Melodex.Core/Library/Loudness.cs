@@ -166,4 +166,24 @@ public sealed class LoudnessCounter(int channels)
     }
 }
 
+/// <summary>A file's ReplayGain: gains in dB to -18 LUFS, peaks with 1 as full scale; null where it has none.</summary>
+public sealed record FileGains(double? TrackGain, double? TrackPeak, double? AlbumGain, double? AlbumPeak)
+{
+    // An Opus file's R128 gains are to -23 LUFS, 5 dB under ReplayGain's.
+    private const double R128Offset = 5;
+
+    /// <summary>As the file's tags have it: ReplayGain's, or an Opus file's R128 ones.</summary>
+    public static FileGains Of(TagLib.File file)
+    {
+        if (file.GetTag(TagLib.TagTypes.Xiph) is TagLib.Ogg.XiphComment xiph && file.MimeType.Contains("opus", StringComparison.OrdinalIgnoreCase))
+        {
+            double? R128(string field) => int.TryParse(xiph.GetFirstField(field), out var q) ? q / 256.0 + R128Offset : null;
+            return new FileGains(R128("R128_TRACK_GAIN"), null, R128("R128_ALBUM_GAIN"), null);
+        }
+        var tag = file.Tag;
+        static double? Known(double value) => double.IsNaN(value) ? null : value;
+        return new FileGains(Known(tag.ReplayGainTrackGain), Known(tag.ReplayGainTrackPeak), Known(tag.ReplayGainAlbumGain), Known(tag.ReplayGainAlbumPeak));
+    }
+}
+
 public sealed class LoudnessException(string message, Exception? inner = null) : Exception(message, inner);

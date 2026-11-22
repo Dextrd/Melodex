@@ -1,5 +1,6 @@
 using Melodex.Client;
 using Melodex.Contracts.Plugins;
+using Melodex.Core.Library;
 
 namespace Melodex.Core.Data;
 
@@ -82,6 +83,28 @@ public class LibraryFile
     /// before Subsonic players were (#7).
     /// </summary>
     public string? Genres { get; set; }
+
+    /// <summary>
+    /// ReplayGain (#23), as its tags have it: gains in dB to ReplayGain's -18 LUFS (an Opus file's R128 gains, to -23,
+    /// taken to it), peaks with 1 as full scale. Null where it has none.
+    /// </summary>
+    public double? TrackGain { get; set; }
+
+    public double? TrackPeak { get; set; }
+
+    public double? AlbumGain { get; set; }
+
+    public double? AlbumPeak { get; set; }
+
+    /// <summary>Whether its ReplayGain has been read from its tags: it wasn't before #23, so a scan reads it once.</summary>
+    public bool GainsRead { get; set; }
+
+    /// <summary>Its ReplayGain, as read from its tags or just written to them.</summary>
+    public void SetGains(FileGains gains)
+    {
+        (TrackGain, TrackPeak, AlbumGain, AlbumPeak) = (gains.TrackGain, gains.TrackPeak, gains.AlbumGain, gains.AlbumPeak);
+        GainsRead = true;
+    }
 
     /// <summary>The artist the file is credited to, once resolved.</summary>
     public Guid? ArtistId { get; set; }

@@ -286,6 +286,14 @@ public sealed class MelodexClient(HttpClient http)
         (await http.GetFromJsonAsync<FormatPlan>($"{Api}/library/format?kind={scope.Kind}{(scope.Id is { } id ? $"&id={id}" : "")}", MelodexJson.Options, ct))!;
 
     /// <summary>Starts formatting in the background; the task reports progress like a scan.</summary>
+    /// <summary>Works out songs' loudness and writes it into their files as ReplayGain, in the background.</summary>
+    public async Task<TaskInfo> StartReplayGainAsync(StartReplayGain body, CancellationToken ct = default)
+    {
+        var response = await http.PostAsJsonAsync($"{Api}/library/replaygain", body, MelodexJson.Options, ct);
+        await EnsureAsync(response, ct);
+        return (await response.Content.ReadFromJsonAsync<TaskInfo>(MelodexJson.Options, ct))!;
+    }
+
     public async Task<TaskInfo> StartFormatAsync(StartFormat body, CancellationToken ct = default)
     {
         var response = await http.PostAsJsonAsync($"{Api}/library/format", body, MelodexJson.Options, ct);

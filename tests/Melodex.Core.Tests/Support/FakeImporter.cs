@@ -97,7 +97,8 @@ public sealed class FakeImporter(string stagingRoot, string libraryRoot) : IImpo
 
     public ConcurrentQueue<FormatRequest> Formats { get; } = new();
 
-    // Tags and embedded covers aren't written, but folder images and .lrc files are; moving goes to Artist/Album/title, as the tags say.
+    // Tags and embedded covers aren't written, except ReplayGain, but folder images and .lrc files are; moving goes to
+    // Artist/Album/title, as the tags say.
     public Task<FormatResult> FormatAsync(FormatRequest request, CancellationToken ct)
     {
         Formats.Enqueue(request);
@@ -111,6 +112,8 @@ public sealed class FakeImporter(string stagingRoot, string libraryRoot) : IImpo
                 results.Add(new FormattedFile(file.Path, null, null, "It isn't in the music folder any more."));
                 continue;
             }
+            if (file.Tags.ContainsKey("replaygain_track_gain"))
+                WriteGains(full, file.Tags);
             if (file.Lrc == "")
                 File.Delete(Path.ChangeExtension(full, ".lrc"));
             else if (file.Lrc is not null)
@@ -139,6 +142,17 @@ public sealed class FakeImporter(string stagingRoot, string libraryRoot) : IImpo
                 removed.Add(Path.GetRelativePath(libraryRoot, gone).Replace('\\', '/'));
             }
         return Task.FromResult(new FormatResult(results, removed));
+    }
+
+    private static void WriteGains(string path, IReadOnlyDictionary<string, string> tags)
+    {
+        using var file = TagLib.File.Create(path);
+        double Value(string field) => tags[field] == "" ? double.NaN : double.Parse(tags[field], System.Globalization.CultureInfo.InvariantCulture);
+        file.Tag.ReplayGainTrackGain = Value("replaygain_track_gain");
+        file.Tag.ReplayGainTrackPeak = Value("replaygain_track_peak");
+        file.Tag.ReplayGainAlbumGain = Value("replaygain_album_gain");
+        file.Tag.ReplayGainAlbumPeak = Value("replaygain_album_peak");
+        file.Save();
     }
 
     public ConcurrentQueue<ReplaceRequest> Replaces { get; } = new();

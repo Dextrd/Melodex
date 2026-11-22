@@ -212,6 +212,20 @@ to a copy that then takes its place, so a song already playing carries on, but a
 can't be found until the media server catches up. Melodex tells it what's changed every 20 seconds or so, and again
 at the end. Over a whole library, it's best to format when nobody's listening.
 
+## Even volume
+
+**Even volume** works out how loud each song is, and each album as a whole, and writes it into the files as
+ReplayGain, which Melodex's [player](requests-and-listening.md#even-volume), most Subsonic players and media servers
+use to play everything at about the same volume. It's under **Tools** for the whole library, and on each artist and
+album page. Like formatting, it only writes files matched to the catalogue, and asks before it starts; Activity shows
+each file and how loud it was. It takes a second or two a song, so a whole library takes a while.
+
+Loudness is measured as ReplayGain 2 does (EBU R128's way of hearing it), and each song is brought to -18 LUFS, which
+**Settings → Playback → Even volume** can change. Opus files get the R128 tags Opus players read instead. Files that
+have ReplayGain already, as many rips do, are left as they are, unless you tick **Work it out again for files that
+have it already**; an album that's gained a song is done again whole, as its album gain changes. New music is done as
+it's added, unless you untick **Work it out for new music**.
+
 ## Choosing a cover
 
 **Cover**, on an album or track page, picks the picture for it. The choices are the usual cover and each edition's

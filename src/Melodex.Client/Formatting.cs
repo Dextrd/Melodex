@@ -98,6 +98,9 @@ public sealed record FormatPlan(
 /// <summary>Body of <c>POST /library/format</c>.</summary>
 public sealed record StartFormat(FormatScope Scope, FormatOptions Options);
 
+/// <summary>Body of <c>POST /library/replaygain</c>: the library, an artist or an album.</summary>
+public sealed record StartReplayGain(FormatScope Scope);
+
 /// <summary>What a cover is chosen for.</summary>
 public enum CoverSubject
 {

@@ -37,6 +37,7 @@ public sealed class RequestPipeline(
     ListenNowLyrics listenLyrics,
     LyricsFinder lyricsFinder,
     Upgrades upgrades,
+    Tasks.TaskQueue tasks,
     IOptions<MelodexOptions> options,
     IOptions<RequestPipelineOptions> pipelineOptions,
     ILogger<RequestPipeline> logger)
@@ -470,6 +471,9 @@ public sealed class RequestPipeline(
         }
         var files = await RecordAsync(target, imported, verified.Files, cutoffs, ct);
         await FinishJobAsync(job, JobStatus.Succeeded, $"Filed {string.Join(", ", files.Select(f => f.Path))}", ct);
+        // New music gets its ReplayGain, its album worked out again whole if it had some before (#23).
+        if ((await settings.GetPlaybackAsync(ct)).GainsForNewMusic && files.Count > 0)
+            await Library.ReplayGainTask.StartAsync(db, tasks, new FormatScope(FormatScopeKind.Album, target.Edition.AlbumId), ct);
         DeleteStaging(job);
         await DeleteOtherStagingAsync(request.Id, job.Id, ct);
 
@@ -704,9 +708,10 @@ public sealed class RequestPipeline(
                 row.ModifiedAt = info.LastWriteTimeUtc;
                 try
                 {
-                    var (tags, duration, lyrics, quality, genres) = LibraryScanner.ReadTags(full);
+                    var (tags, duration, lyrics, quality, genres, gains) = LibraryScanner.ReadTags(full);
                     row.TagsJson = tags.ToJson();
                     row.Genres = genres;
+                    row.SetGains(gains);
                     row.SetQuality(quality);
                     // Its spectrum, as checked in staging: the music is the same, whatever beets did to its tags.
                     if (cutoffs.TryGetValue(file.Source, out var cutoff))

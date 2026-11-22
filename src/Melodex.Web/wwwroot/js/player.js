@@ -28,7 +28,7 @@ function lengthOf(el) {
 function element() {
     const el = new Audio();
     el.preload = "auto";
-    el.volume = storedVolume();
+    el.volume = wanted;
     // Only the one playing is heard from: the spare loading or the one just finished say nothing.
     const on = (name, handler) => el.addEventListener(name, e => { if (el === audio) handler(e); });
     for (const name of ["loadedmetadata", "canplay", "playing", "waiting", "stalled", "pause", "seeking", "ended", "error"])
@@ -235,8 +235,14 @@ export function gaplessWorks() {
     return !ios || streams;
 }
 
+// On iPhones and iPads the volume is the phone's own: a page can't set it, so songs can't be evened out there (#23).
+export function volumeWorks() {
+    return !ios;
+}
+
 /** Loads the next song into the spare, to start as this one ends. */
-export function prepare(url, meta, token, length) {
+export function prepare(url, meta, token, length, level = 1) {
+    levels.set(spare, level);
     if (stream) {
         follow(url, meta, token, length);
         return;
@@ -293,7 +299,7 @@ function handOff() {
     unwatch();
     const from = audio, to = spare, next = prepared, at = epoch;
     prepared = null;
-    to.volume = from.volume;
+    turn(to);
     to.muted = false;
     handing = to.play().then(() => {
         // Another song was chosen, or the music stopped, while this one was starting (a phone can take a while): it's
@@ -997,8 +1003,10 @@ function skip(quiet) {
     advance(quiet);
 }
 
-export function load(url, meta, length) {
+export function load(url, meta, length, level = 1) {
     epoch++;
+    levels.set(audio, level);
+    turn(audio);
     holding = false;
     note(`load ${meta?.title}`);
     lengths.set(audio, length);
@@ -1082,6 +1090,15 @@ export function stop() {
 
 // ---- Volume, kept per browser ----
 
+// Each song's own level from its ReplayGain (#23), the volume chosen times it: an iPhone's volume is the phone's own,
+// and stays as it is.
+const levels = new WeakMap();
+let wanted = storedVolume();
+
+function turn(el) {
+    el.volume = Math.min(1, wanted * (levels.get(el) ?? 1));
+}
+
 function storedVolume() {
     try {
         const v = Number(localStorage.getItem("melodex.volume"));
@@ -1092,14 +1109,15 @@ function storedVolume() {
 }
 
 export function getVolume() {
-    return audio ? audio.volume : storedVolume();
+    return wanted;
 }
 
 export function setVolume(value) {
     const v = Math.min(1, Math.max(0, value));
+    wanted = v;
     if (audio) {
-        audio.volume = v;
-        spare.volume = v;
+        turn(audio);
+        turn(spare);
     }
     try {
         localStorage.setItem("melodex.volume", String(v));
