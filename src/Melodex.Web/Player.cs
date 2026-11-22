@@ -847,7 +847,7 @@ public sealed class Player : IAsyncDisposable
                 return;
             }
             _preparedLength = length;
-            await _audio.InvokeVoidAsync("prepare", url, new { title = next.Title, artist = next.ArtistCredit, album = next.AlbumTitle, cover = next.CoverUrl }, token, length);
+            await _audio.InvokeVoidAsync("prepare", url, Meta(next), token, length);
         }
         catch (JSException)
         {
@@ -899,7 +899,12 @@ public sealed class Player : IAsyncDisposable
         {
             while (Now is { } entry)
             {
-                var (url, mediaType, length) = await SourceAsync(entry);
+                var sourcing = SourceAsync(entry);
+                // Shown at its start while it's found, the song before stopped: left playing, quick skips each played a
+                // moment of a song passed by, whose own was found first.
+                if (!sourcing.IsCompleted && _audio is not null)
+                    await _audio.InvokeVoidAsync("hold", Meta(entry), entry.DurationSeconds);
+                var (url, mediaType, length) = await sourcing;
                 if (attempt != _starting)
                     return;
                 Trace($"{entry.Title}: {(url is null ? "no stream" : "a stream")}{(entry.Waiting ? ", waiting" : "")}{(entry.Unplayable ? $", unplayable: {entry.Detail}" : "")}");
@@ -914,7 +919,7 @@ public sealed class Player : IAsyncDisposable
                         // Loaded ahead again as it plays: a start of the next song that this overtook took the spare with it.
                         _prepared = null;
                         Begin(entry, _resumeAt ?? 0);
-                        await audio.InvokeVoidAsync("load", url, new { title = entry.Title, artist = entry.ArtistCredit, album = entry.AlbumTitle, cover = entry.CoverUrl }, length);
+                        await audio.InvokeVoidAsync("load", url, Meta(entry), length);
                         if (_visualising)
                             _ = WarmNextAsync();
                         if (_resumeAt is { } at)
@@ -933,8 +938,7 @@ public sealed class Player : IAsyncDisposable
                     // Paused here until the server says it's ready; polling too, in case events are down. It's shown as what's
                     // playing meanwhile, the phone's controls too.
                     if (_audio is not null)
-                        await _audio.InvokeVoidAsync("hold", new { title = entry.Title, artist = entry.ArtistCredit, album = entry.AlbumTitle, cover = entry.CoverUrl },
-                            entry.DurationSeconds);
+                        await _audio.InvokeVoidAsync("hold", Meta(entry), entry.DurationSeconds);
                     Playing = false;
                     _poll ??= new Timer(_ => _ = RefreshListeningAsync(), null, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(5));
                     break;
@@ -1071,6 +1075,9 @@ public sealed class Player : IAsyncDisposable
 
     /// <summary>Whether songs can run into each other in this browser: not on iPhones and iPads before iOS 17.1 (#107, #109).</summary>
     public async Task<bool> GaplessWorksAsync() => await (await AudioAsync()).InvokeAsync<bool>("gaplessWorks");
+
+    // What the phone's controls and the script are told of a song.
+    private static object Meta(PlayerEntry entry) => new { title = entry.Title, artist = entry.ArtistCredit, album = entry.AlbumTitle, cover = entry.CoverUrl };
 
     // The player's steps, in the trail the script keeps of a phone's stream, put in the server's log when something goes
     // wrong there (#109).
