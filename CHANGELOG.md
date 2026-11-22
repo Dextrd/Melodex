@@ -124,6 +124,8 @@ What changed in each release of Melodex. Versions follow [semantic versioning](h
   chosen while another is still playing is no longer skipped past when that one ends first (#109).
 - Copy buttons work when Melodex is opened over plain http, such as at the server's own address at home, rather than
   showing an error: browsers only offer the clipboard to https pages, so the text is copied the older way (#7).
+- A tab left open while another device plays no longer replays everything it played, song by song and seek by seek,
+  when you come back to it: it goes straight to where the other device is now (#232).
 
 ## [1.6.0] - 2026-11-19
 
