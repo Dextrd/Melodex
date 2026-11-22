@@ -613,7 +613,7 @@ function begin(url, meta, length) {
     const source = new Source();
     const s = stream = {
         source, buffer: null, type: null, open: false, now: song(url, meta, null, length), next: null, run: null, ahead: AHEAD,
-        from: null, stuck: 0, work: Promise.resolve(), object: URL.createObjectURL(source),
+        from: null, stuck: 0, leave: new Set(), work: Promise.resolve(), object: URL.createObjectURL(source),
     };
     s.now.start = 0;
     prune();
@@ -757,23 +757,24 @@ async function fill(s) {
         const at = s.from ?? audio.currentTime;
         const buffered = s.buffer?.buffered;
         const end = edge(s, at);
-        // Well behind, or cut off ahead of what runs on from here (left from before a seek): let go of.
-        if (buffered?.length && buffered.start(0) < at - BEHIND - 5) {
+        // Well behind, or cut off ahead of what runs on from here (left from before a seek): let go of. What Safari
+        // won't let go of (a scrap of a piece, after quick seeks) is left, or it'd be asked for ever and nothing added.
+        const behind = buffered?.length && buffered.start(0) < at - BEHIND - 5 && !s.leave.has(buffered.start(0).toFixed(2))
+            ? [buffered.start(0), at - BEHIND] : null;
+        const after = !behind && buffered?.length
+            ? [...Array(buffered.length).keys()].map(i => buffered.start(i)).find(start => start > end + 0.15 && !s.leave.has(start.toFixed(2)))
+            : null;
+        if (behind || after != null) {
+            const [from, to] = behind ?? [after, Infinity], was = ranges(buffered);
             await change(s, b => {
-                b.remove(0, at - BEHIND);
+                b.remove(behind ? 0 : from, to);
                 return true;
             });
-            continue;
-        }
-        if (buffered?.length && buffered.end(buffered.length - 1) > end + 0.2) {
-            const after = [...Array(buffered.length).keys()].map(i => buffered.start(i)).find(start => start > end + 0.15);
-            if (after != null) {
-                await change(s, b => {
-                    b.remove(after, Infinity);
-                    return true;
-                });
-                continue;
+            if (ranges(s.buffer.buffered) === was) {
+                s.leave.add(from.toFixed(2));
+                note(`couldn't let go of ${from.toFixed(2)}–${to.toFixed(2)} of ${was}`);
             }
+            continue;
         }
         // As long as its songs, so a seek can go past what's there yet.
         const length = Math.max(...[s.now, s.next].map(song => song?.start != null && song.length > 0 ? song.start + song.length : 0));
@@ -998,6 +999,7 @@ function skip(quiet) {
 export function load(url, meta, length) {
     epoch++;
     holding = false;
+    note(`load ${meta?.title}`);
     lengths.set(audio, length);
     second = -1;
     unwatch();
@@ -1043,6 +1045,17 @@ export function seek(seconds) {
         audio.currentTime = (stream ? stream.now.start : 0) + seconds;
 }
 
+/** A step of the player's, in the stream's trail. */
+export function trace(step) {
+    note(step);
+}
+
+/** Puts the trail in the server's log, where something went wrong with the stream on a phone. */
+export function tell(message) {
+    if (streams)
+        report(message);
+}
+
 /**
  * A song still being fetched to listen to: shown as what's playing, paused at its start, until it can play. The phone's
  * controls stay Melodex's, rather than going back to the page's own.
@@ -1050,6 +1063,7 @@ export function seek(seconds) {
 export function hold(meta, length) {
     epoch++;
     holding = true;
+    note(`hold ${meta?.title}`);
     unprepare();
     close();
     audio.pause();

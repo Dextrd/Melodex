@@ -561,6 +561,7 @@ public sealed class Player : IAsyncDisposable
     /// </summary>
     public async Task PlayAsync(IReadOnlyList<PlayerEntry> entries, int start = 0, PlaySource? from = null)
     {
+        Trace($"play {entries.Count} songs from {start}: {(start >= 0 && start < entries.Count ? entries[start].Title : "")}");
         await LoadModesAsync();
         Tag(entries, from);
         _queue.Clear();
@@ -681,6 +682,7 @@ public sealed class Player : IAsyncDisposable
     /// <summary>On to the next song, or round to the first when repeating the queue.</summary>
     public Task NextAsync()
     {
+        Trace("next");
         NoteSkip();
         return JumpAsync(Current + 1 >= _queue.Count && Repeat != RepeatMode.Off ? 0 : Current + 1);
     }
@@ -688,6 +690,7 @@ public sealed class Player : IAsyncDisposable
     /// <summary>Back to the start of this track, or to the one before if it's only just started.</summary>
     public async Task PreviousAsync()
     {
+        Trace("previous");
         if (Position > 3 && _audio is not null)
             await SeekAsync(0);
         else
@@ -705,6 +708,7 @@ public sealed class Player : IAsyncDisposable
         if (index != Current)
             _resumeAt = null;
         Current = index;
+        Trace($"jump to {index}: {Now?.Title}");
         // Shown chosen at once, while it's found: quick skips each show, rather than all at once when they're done.
         Changed?.Invoke();
         await StartAsync();
@@ -898,6 +902,7 @@ public sealed class Player : IAsyncDisposable
                 var (url, mediaType, length) = await SourceAsync(entry);
                 if (attempt != _starting)
                     return;
+                Trace($"{entry.Title}: {(url is null ? "no stream" : "a stream")}{(entry.Waiting ? ", waiting" : "")}{(entry.Unplayable ? $", unplayable: {entry.Detail}" : "")}");
                 if (url is not null)
                 {
                     var audio = await AudioAsync();
@@ -934,6 +939,7 @@ public sealed class Player : IAsyncDisposable
                     _poll ??= new Timer(_ => _ = RefreshListeningAsync(), null, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(5));
                     break;
                 }
+                Tell($"{entry.Title} was passed over.");
                 if (Current + 1 >= _queue.Count)
                 {
                     await StopAsync();
@@ -1048,6 +1054,7 @@ public sealed class Player : IAsyncDisposable
 
     private async Task StopAsync()
     {
+        Trace("stop");
         _starting++;
         Current = -1;
         Playing = false;
@@ -1061,6 +1068,31 @@ public sealed class Player : IAsyncDisposable
 
     /// <summary>Whether songs can run into each other in this browser: not on iPhones and iPads before iOS 17.1 (#107, #109).</summary>
     public async Task<bool> GaplessWorksAsync() => await (await AudioAsync()).InvokeAsync<bool>("gaplessWorks");
+
+    // The player's steps, in the trail the script keeps of a phone's stream, put in the server's log when something goes
+    // wrong there (#109).
+    private void Trace(string step)
+    {
+        if (_audio is { } audio)
+            _ = CallQuietlyAsync(audio, "trace", step);
+    }
+
+    private void Tell(string message)
+    {
+        if (_audio is { } audio)
+            _ = CallQuietlyAsync(audio, "tell", message);
+    }
+
+    private static async Task CallQuietlyAsync(IJSObjectReference audio, string name, string text)
+    {
+        try
+        {
+            await audio.InvokeVoidAsync(name, text);
+        }
+        catch (Exception e) when (e is JSException or JSDisconnectedException or ObjectDisposedException or TaskCanceledException)
+        {
+        }
+    }
 
     private async Task<IJSObjectReference> AudioAsync()
     {
@@ -1382,10 +1414,14 @@ public sealed class Player : IAsyncDisposable
     [JSInvokable]
     public Task OnAdvanced(int token)
     {
+        Trace($"advanced to {token} (prepared {_preparedToken}){(_choosing != 0 ? ", ignored while choosing" : "")}");
         if (_choosing != 0)
             return Task.CompletedTask;
         if (token != _preparedToken || _prepared is not { } entry || _queue.IndexOf(entry) is var index && index < 0)
+        {
+            Tell("A song ran on into one no longer next.");
             return NextAsync();
+        }
         _starting++;
         _prepared = null;
         Current = index;
@@ -1399,13 +1435,19 @@ public sealed class Player : IAsyncDisposable
 
     /// <summary>A song finished: the same again when repeating one, otherwise the next.</summary>
     [JSInvokable]
-    public Task OnEnded() => _choosing != 0 ? Task.CompletedTask : Repeat == RepeatMode.One && Now is not null ? StartAsync() : NextAsync();
+    public Task OnEnded()
+    {
+        Trace($"ended {Now?.Title}{(_choosing != 0 ? ", ignored while choosing" : "")}");
+        return _choosing != 0 ? Task.CompletedTask : Repeat == RepeatMode.One && Now is not null ? StartAsync() : NextAsync();
+    }
 
     [JSInvokable]
     public Task OnError(string message)
     {
+        Trace($"error {message}{(_choosing != 0 ? ", ignored while choosing" : "")}");
         if (_choosing != 0)
             return Task.CompletedTask;
+        Tell($"{Now?.Title} couldn't be played: {message}");
         if (Now is { } entry)
         {
             entry.Unplayable = true;
@@ -1416,7 +1458,11 @@ public sealed class Player : IAsyncDisposable
     }
 
     [JSInvokable]
-    public Task OnRemote(string action) => action == "next" ? NextAsync() : PreviousAsync();
+    public Task OnRemote(string action)
+    {
+        Trace($"remote {action}");
+        return action == "next" ? NextAsync() : PreviousAsync();
+    }
 
     public async ValueTask DisposeAsync()
     {
