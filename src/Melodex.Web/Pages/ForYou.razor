@@ -38,8 +38,10 @@ else
                     <div class="tile-name">@mix.Name</div>
                     <div class="muted small tile-sub">@Artists(mix)</div>
                 </a>
-                <IconButton Icon="play" Requires="@UserPermissions.Listen" Primary="true" Class="tile-corner mix-play" Title="@($"Play {mix.Name}")"
-                            OnClick="() => PlayAsync(mix)" />
+                <div class="mix-corner">
+                    <IconButton Icon="play" Requires="@UserPermissions.Listen" Primary="true" Class="mix-play" Title="@($"Play {mix.Name}")"
+                                OnClick="() => PlayAsync(mix)" />
+                </div>
             </div>
         }
     </div>
