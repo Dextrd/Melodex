@@ -8,7 +8,7 @@ for its kind.
 
 | Kind | Interface it stands for | Contract |
 | --- | --- | --- |
-| Catalogue | [`IIndexPlugin`](index-plugins.md) | Index v1.0 |
+| Catalogue | [`IIndexPlugin`](index-plugins.md) | Index v1.1 |
 | Artwork | [`IArtworkPlugin`](artwork-plugins.md) | Artwork v1.0 |
 | Lyrics | [`ILyricsPlugin`](lyrics-plugins.md) | Lyrics v1.1 |
 | Discovery | [`IDiscoveryPlugin`](discovery-plugins.md) | Discovery v1.1 |
@@ -51,6 +51,8 @@ made.
 | `POST /v1/album` | `{ "id" }` | `IndexAlbumDetail`, or 404 |
 | `POST /v1/isrc` | `{ "isrc" }` | `IndexTrack[]`. Only with `isrc-lookup`. |
 | `POST /v1/recording-albums` | `{ "id" }` of a recording | `IndexAlbum[]`. Only with `recording-albums`. |
+| `POST /v1/album-genres` | `{ "id" }` of an album | `IndexGenre[]`, the most voted for first. Only with `genres` (1.1). |
+| `POST /v1/artist-genres` | `{ "id" }` of an artist | `IndexGenre[]`, the most voted for first. Only with `genres` (1.1). |
 
 IDs are the plugin's own; set the manifest's `provider` to their scheme, as on [index plugins](index-plugins.md).
 

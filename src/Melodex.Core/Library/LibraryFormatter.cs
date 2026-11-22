@@ -72,7 +72,7 @@ public sealed class LibraryFormatter(MelodexDbContext db, IImportWorker worker, 
     public async Task<Dictionary<string, string[]>> ValidateAsync(FormatOptions options, CancellationToken ct)
     {
         var errors = new Dictionary<string, string[]>();
-        foreach (var (name, value) in new[] { ("titles", options.Titles), ("numbers", options.Numbers), ("release", options.Release), ("identifiers", options.Identifiers) })
+        foreach (var (name, value) in new[] { ("titles", options.Titles), ("numbers", options.Numbers), ("release", options.Release), ("identifiers", options.Identifiers), ("genres", options.Genres) })
             if (value is not (FormatSources.Keep or FormatSources.Catalogue))
                 errors[name] = [$"Choose {FormatSources.Catalogue} or {FormatSources.Keep}."];
         if (options.Artwork is not (FormatSources.Keep or FormatSources.Shown or FormatSources.Remove)
@@ -140,6 +140,7 @@ public sealed class FormatTask(
             .OrderBy(f => f.EditionId).ThenBy(f => f.Path).Select(f => new { f.Id, f.EditionId, f.Path, AlbumId = f.Edition != null ? f.Edition.AlbumId : (Guid?)null }).ToListAsync(ct);
         var done = total - todo.Count;
         var template = job.Options.Move ? (await settings.GetFetchAsync(ct)).PathTemplate : null;
+        var genreSource = (await settings.GetLibraryAsync(ct)).Genres;
         var root = Path.GetFullPath(options.Value.LibraryPath);
         var touched = new List<string>();
         var moved = new List<Guid>();
@@ -163,7 +164,7 @@ public sealed class FormatTask(
             db.ChangeTracker.Clear();
             var ids = batch.Select(f => f.Id).ToList();
             var files = await db.LibraryFiles.Where(f => ids.Contains(f.Id)).ToListAsync(ct);
-            var tags = await CatalogueTags.ForAsync(db, files, job.Options, ct);
+            var tags = await CatalogueTags.ForAsync(db, files, job.Options, genreSource, ct);
             var images = new Dictionary<string, FormatArtwork>();
             if (batch[0].EditionId is { } edition && await ArtworkAsync(job.Options.Artwork, edition, ct) is { } cover)
                 images["cover"] = new FormatArtwork(Convert.ToBase64String(cover));
@@ -344,13 +345,15 @@ public sealed class FormatTask(
 /// <summary>The tags the catalogue gives files, by beets field name, for the groups the options take from it.</summary>
 public static class CatalogueTags
 {
+    /// <param name="genreSource">Which genres songs have, as the settings say: the catalogue's are written where they're used.</param>
     public static async Task<Dictionary<Guid, Dictionary<string, string>>> ForAsync(MelodexDbContext db, IReadOnlyList<LibraryFile> files, FormatOptions options,
-        CancellationToken ct)
+        GenreSource genreSource, CancellationToken ct)
     {
         var result = new Dictionary<Guid, Dictionary<string, string>>();
         bool titles = options.Titles == FormatSources.Catalogue, numbers = options.Numbers == FormatSources.Catalogue,
-            release = options.Release == FormatSources.Catalogue, identifiers = options.Identifiers == FormatSources.Catalogue;
-        if (!(titles || numbers || release || identifiers))
+            release = options.Release == FormatSources.Catalogue, identifiers = options.Identifiers == FormatSources.Catalogue,
+            genres = options.Genres == FormatSources.Catalogue && genreSource != GenreSource.File;
+        if (!(titles || numbers || release || identifiers || genres))
             return result;
 
         var trackIds = files.Select(f => f.TrackId).OfType<Guid>().Distinct().ToList();
@@ -367,6 +370,10 @@ public static class CatalogueTags
               .GroupBy(m => (m.EntityKind, m.EntityId, m.Provider)).ToDictionary(g => g.Key, g => g.First().Value)
             : [];
         string? Id(EntityKind kind, Guid entity, string provider = Providers.MusicBrainz) => ids.GetValueOrDefault((kind, entity, provider));
+        var albumIds = editions.Values.Select(e => e.AlbumId).Distinct().ToList();
+        var artistIds = editions.Values.Select(e => e.Album.ArtistId).Concat(tracks.Values.Select(t => t.ArtistId)).Distinct().ToList();
+        var albumGenres = genres ? await db.Albums.Where(a => albumIds.Contains(a.Id)).ToDictionaryAsync(a => a.Id, a => a.Genres, ct) : [];
+        var artistGenres = genres ? await db.Artists.Where(a => artistIds.Contains(a.Id)).ToDictionaryAsync(a => a.Id, a => a.Genres, ct) : [];
 
         foreach (var file in files)
         {
@@ -415,6 +422,15 @@ public static class CatalogueTags
                     Set("mb_releasegroupid", Id(EntityKind.Album, edition.AlbumId));
                     Set("mb_albumartistid", Id(EntityKind.Artist, edition.Album.ArtistId));
                 }
+            }
+            if (genres)
+            {
+                // Only where they're the catalogue's: a file's own are left as they are.
+                var own = SongGenres.Lines(file.Genres);
+                var song = SongGenres.Of(file.Genres, edition is null ? null : albumGenres.GetValueOrDefault(edition.AlbumId),
+                    artistGenres.GetValueOrDefault(edition?.Album.ArtistId ?? track.ArtistId), genreSource);
+                if (!song.SequenceEqual(own))
+                    Set("genres", string.Join('\n', song));
             }
             result[file.Id] = tags;
         }

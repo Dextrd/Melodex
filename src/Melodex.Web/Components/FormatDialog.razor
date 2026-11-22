@@ -131,11 +131,12 @@
         new("Track and disc numbers", "And how many there are", () => _options.Numbers, v => _options = _options with { Numbers = v }),
         new("Release details", "Dates, country, media, album type", () => _options.Release, v => _options = _options with { Release = v }),
         new("Identifiers", "MusicBrainz IDs, ISRC", () => _options.Identifiers, v => _options = _options with { Identifiers = v }),
+        new("Genres", "Up to three, where Settings uses the catalogue's for the song", () => _options.Genres, v => _options = _options with { Genres = v }),
         new("Cover", "The picture embedded in each file", () => _options.Artwork, v => _options = _options with { Artwork = v }, Artwork: true),
     ];
 
     private bool Nothing => !_options.Move && _options.Artwork == FormatSources.Keep
-                            && new[] { _options.Titles, _options.Numbers, _options.Release, _options.Identifiers }.All(s => s == FormatSources.Keep);
+                            && new[] { _options.Titles, _options.Numbers, _options.Release, _options.Identifiers, _options.Genres }.All(s => s == FormatSources.Keep);
 
     // What the format changes, as the end of "This rewrites N files in your music folder".
     private string Writes
@@ -143,7 +144,7 @@
         get
         {
             var parts = new List<string>();
-            if (new[] { _options.Titles, _options.Numbers, _options.Release, _options.Identifiers }.Any(s => s != FormatSources.Keep))
+            if (new[] { _options.Titles, _options.Numbers, _options.Release, _options.Identifiers, _options.Genres }.Any(s => s != FormatSources.Keep))
                 parts.Add("their tags");
             if (_options.Artwork != FormatSources.Keep)
                 parts.Add("their cover");

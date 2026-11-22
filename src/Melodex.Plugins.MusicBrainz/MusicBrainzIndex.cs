@@ -9,7 +9,7 @@ using Melodex.Contracts.Plugins.Index;
 namespace Melodex.Plugins.MusicBrainz;
 
 /// <summary>An index plugin instance talking to one MusicBrainz server.</summary>
-public sealed class MusicBrainzIndex : IIndexPlugin, IIsrcLookup, IRecordingAlbums
+public sealed class MusicBrainzIndex : IIndexPlugin, IIsrcLookup, IRecordingAlbums, IGenreLookup
 {
     private const int PageSize = 100;
 
@@ -210,6 +210,31 @@ public sealed class MusicBrainzIndex : IIndexPlugin, IIsrcLookup, IRecordingAlbu
                     Artist = PrimaryArtist(g.First().ReleaseGroup!.ArtistCredit ?? g.First().ArtistCredit ?? recording.ArtistCredit),
                     ArtistCredit = Credit(g.First().ReleaseGroup!.ArtistCredit ?? g.First().ArtistCredit ?? recording.ArtistCredit),
                 })
+                .ToList();
+        }
+        catch (HttpError e) when (e.Status is HttpStatusCode.NotFound or HttpStatusCode.BadRequest)
+        {
+            return [];
+        }
+    }
+
+    public Task<IReadOnlyList<IndexGenre>> GetAlbumGenresAsync(string albumId, CancellationToken cancellationToken) =>
+        Guarded(() => GenresAsync(albumId, async id => (await _query.LookupReleaseGroupAsync(id, Include.Genres, cancellationToken: cancellationToken)).Genres));
+
+    public Task<IReadOnlyList<IndexGenre>> GetArtistGenresAsync(string artistId, CancellationToken cancellationToken) =>
+        Guarded(() => GenresAsync(artistId, async id => (await _query.LookupArtistAsync(id, Include.Genres, cancellationToken: cancellationToken)).Genres));
+
+    // Its genres, the most voted for first, as MusicBrainz lists them alphabetically.
+    private static async Task<IReadOnlyList<IndexGenre>> GenresAsync(string entityId, Func<Guid, Task<IReadOnlyList<IGenre>?>> lookup)
+    {
+        if (!Guid.TryParse(entityId, out var id))
+            return [];
+        try
+        {
+            return (await lookup(id) ?? [])
+                .Where(g => !string.IsNullOrWhiteSpace(g.Name) && g.VoteCount > 0)
+                .Select(g => new IndexGenre(g.Name!.Trim().ToLowerInvariant(), g.VoteCount))
+                .OrderByDescending(g => g.Votes).ThenBy(g => g.Name, StringComparer.Ordinal)
                 .ToList();
         }
         catch (HttpError e) when (e.Status is HttpStatusCode.NotFound or HttpStatusCode.BadRequest)

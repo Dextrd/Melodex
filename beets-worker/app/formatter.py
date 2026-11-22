@@ -23,6 +23,8 @@ TEXT_FIELDS = {"title", "artist", "album", "albumartist", "country", "media", "a
                "isrc", "lyrics", "mb_trackid", "mb_releasetrackid", "mb_albumid", "mb_artistid", "mb_albumartistid",
                "mb_releasegroupid"}
 NUMBER_FIELDS = {"track", "tracktotal", "disc", "disctotal"}
+# Several values, one on each line, written as the format's own list of them.
+LIST_FIELDS = {"genres"}
 # Dates arrive as yyyy, yyyy-MM or yyyy-MM-dd and are written as their parts.
 DATE_FIELDS = {"date": ("year", "month", "day"), "original_date": ("original_year", "original_month", "original_day")}
 
@@ -42,7 +44,7 @@ class FormatFailed(Exception):
 
 def write_tags(full: Path, tags: dict[str, str], artwork: bytes | None, remove_artwork: bool) -> None:
     """Writes the given tags, leaving the rest as they are. An empty value clears the tag."""
-    unknown = [name for name in tags if name not in TEXT_FIELDS | NUMBER_FIELDS | DATE_FIELDS.keys()]
+    unknown = [name for name in tags if name not in TEXT_FIELDS | NUMBER_FIELDS | LIST_FIELDS | DATE_FIELDS.keys()]
     if unknown:
         raise FormatFailed(f"Melodex doesn't write the tag {', '.join(unknown)}.")
     if not tags and artwork is None and not remove_artwork:
@@ -71,6 +73,8 @@ def _write(full: Path, tags: dict[str, str], artwork: bytes | None, remove_artwo
                 setattr(media, field, part)
         elif name in NUMBER_FIELDS:
             setattr(media, name, int(value) if value else None)
+        elif name in LIST_FIELDS:
+            setattr(media, name, [v.strip() for v in value.splitlines() if v.strip()] or None)
         else:
             setattr(media, name, value or None)
     if artwork is not None:

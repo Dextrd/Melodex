@@ -35,6 +35,9 @@ public sealed record FormatOptions
     /// <summary>MusicBrainz IDs and the ISRC.</summary>
     public string Identifiers { get; init; } = FormatSources.Catalogue;
 
+    /// <summary>Genres: the catalogue's where the settings use them for the song, or the file's own where they don't (#229).</summary>
+    public string Genres { get; init; } = FormatSources.Catalogue;
+
     /// <summary>The cover embedded in each file.</summary>
     public string Artwork { get; init; } = FormatSources.Keep;
 

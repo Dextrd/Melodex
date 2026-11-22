@@ -48,6 +48,25 @@ public sealed class CatalogueService(MelodexDbContext db, IndexPlugins indexPlug
         return null;
     }
 
+    /// <summary>
+    /// An album's or artist's genres, the most voted for first, from the first catalogue in the user's order that has an
+    /// ID for it and gives any; empty when those asked have none, and null when no catalogue that gives genres knows it.
+    /// </summary>
+    public async Task<IReadOnlyList<IndexGenre>?> GenresAsync(EntityKind kind, Guid entityId, CancellationToken ct)
+    {
+        var ids = await ProviderIdsAsync(kind, entityId, ct);
+        IReadOnlyList<IndexGenre>? found = null;
+        foreach (var index in await IndexesAsync(ct))
+        {
+            if (index.Plugin is not IGenreLookup lookup || ids.FirstOrDefault(p => p.Provider == index.Provider) is not { } id)
+                continue;
+            found = kind == EntityKind.Album ? await lookup.GetAlbumGenresAsync(id.Value, ct) : await lookup.GetArtistGenresAsync(id.Value, ct);
+            if (found.Count > 0)
+                return found;
+        }
+        return found;
+    }
+
     // ---- Crosswalk ----
 
     public Task<Guid?> FindAsync(EntityKind kind, ProviderId id, CancellationToken ct) =>

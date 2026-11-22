@@ -5,7 +5,7 @@ go with the catalogue, the words of the songs, and music like what's played. Eac
 
 | Type | Answers | Runs | Contract | Reference plugin |
 | --- | --- | --- | --- | --- |
-| [Index plugin](index-plugins.md) | What exists | In process (.NET assembly), or [at an address](remote-plugins.md) | `IIndexPlugin` v1.0 | MusicBrainz |
+| [Index plugin](index-plugins.md) | What exists | In process (.NET assembly), or [at an address](remote-plugins.md) | `IIndexPlugin` v1.1 | MusicBrainz |
 | [Retrieval plugin](retrieval-plugins.md) | How music is fetched | Own container, over HTTP | [`retrieval-v1.openapi.yaml`](retrieval-v1.openapi.yaml) v1.0 | yt-dlp |
 | [Media-server connector](media-server-connectors.md) | Where music ends up | In process (.NET assembly), or [at an address](remote-plugins.md) | `IMediaServerConnector` v1.3 | Navidrome (Subsonic API) |
 | [Artwork plugin](artwork-plugins.md) | What it looks like | In process (.NET assembly), or [at an address](remote-plugins.md) | `IArtworkPlugin` v1.0 | Cover Art Archive, Wikimedia Commons, Deezer |

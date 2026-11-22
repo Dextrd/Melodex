@@ -1,4 +1,4 @@
-# Index plugins (contract v1.0)
+# Index plugins (contract v1.1)
 
 Index plugins answer **what exists**: artists, their albums, each album's editions and track listings. They fill
 the catalogue side of the comparison that produces the missing view. Code: `Melodex.Contracts.Plugins.Index`.
@@ -48,6 +48,17 @@ Each is an extra interface on the same class, declared in the manifest by name.
 | `upc-lookup` | `IUpcLookup` | Editions by barcode |
 | `external-ids` | — | The plugin fills `ExternalIds` with other providers' IDs |
 | `popularity` | `IPopularityProvider` | Track popularity from 0 to 1, for ordering |
+| `genres` | `IGenreLookup` | An album's and an artist's genres (1.1) |
+
+### Genres
+
+`IGenreLookup` has `GetAlbumGenresAsync(albumId)` and `GetArtistGenresAsync(artistId)`, each answering `IndexGenre`s
+(a name and a vote count), the most voted for first, or none. Give names in lower case, as MusicBrainz names genres
+(`trip hop`), and only genres, not other tags such as places or decades. The core asks after a scan, for each album
+and artist in the library it hasn't asked about in 90 days, from the first catalogue in the user's order that has an
+ID for it. It keeps the three most voted for, and songs whose files have no genres of their own take their album's, or
+else its artist's, as **Settings → General → File metadata** says. MusicBrainz's are those its users vote for, from
+`inc=genres`.
 
 ## Errors
 

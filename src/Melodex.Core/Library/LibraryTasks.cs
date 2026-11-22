@@ -11,7 +11,7 @@ namespace Melodex.Core.Library;
 
 /// <summary>
 /// Scans the music folder and matches new and changed files. Then, if the settings say so, it queues a catalogue update,
-/// finding lyrics for songs without them, and making the visualiser's bars for them.
+/// finding lyrics for songs without them, and making the visualiser's bars for them, and looking up new albums' genres.
 /// </summary>
 public sealed class LibraryScanTask(
     LibraryScanner scanner,
@@ -21,6 +21,7 @@ public sealed class LibraryScanTask(
     LyricsFinder lyrics,
     SettingsService settings,
     TaskQueue queue,
+    CatalogueService catalogue,
     MelodexDbContext db) : ITaskHandler
 {
     public const string TaskKind = "library-scan";
@@ -80,6 +81,9 @@ public sealed class LibraryScanTask(
         // New and changed lossless files are checked for lossy music passed off as lossless.
         if (await SpectrumTask.Unchecked(db).AnyAsync(ct))
             await queue.EnqueueAsync(SpectrumTask.TaskKind, null, ct);
+        // New albums and artists get the catalogue's genres, for songs whose files have none.
+        if (await GenresTask.WantedAsync(db, catalogue, ct))
+            await queue.EnqueueAsync(GenresTask.TaskKind, null, ct);
     }
 
     private static string Count(int n, string one, string many) => LibraryMatcher.Plural(n, one, many);

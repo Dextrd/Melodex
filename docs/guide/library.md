@@ -25,8 +25,9 @@ The Library opens on **For you**, made from what you play, and different for eve
 - **Your mixes**: up to four daily mixes, each around one of the artists you play most, lately counting most, with up
   to two others you play that are like them. They're mostly songs you have, by those artists and like them, with the
   [radio's](requests-and-listening.md#radio) share of songs you don't, and they're made again each day. Each is named
-  for its artists' genres, from the [discovery plugins](plugins.md#discovery): "Trip hop & dub", say, or "Trip hop mix"
-  when one genre fits best, and after its first artist when no plugin knows their genres. **Weekly
+  for its artists' [genres](#genres), from the catalogue, or the [discovery plugins](plugins.md#discovery) for an
+  artist it has none for: "Trip hop & dub", say, or "Trip hop mix" when one genre fits best, and after its first
+  artist when nothing knows their genres. **Weekly
   discoveries**, made each Monday, is only songs you don't have, like what you've played lately, with ListenBrainz's
   recommendations for you among them once your ListenBrainz account is linked. Mixes are picked as a radio picks its
   songs, so a song you skipped quickly stays out.
@@ -153,6 +154,22 @@ files without them are listed under *Incomplete metadata* on Review.
 **Settings → General → File metadata** shows matched music that way too, wherever its files have them: **Use your
 files' tags** for titles, artists and albums, and **Use your files' cover art** for covers. Each is on its own.
 
+### Genres
+
+Most files have no genre tags, so after a scan Melodex looks up the genres of each album and artist you have in the
+catalogue: on MusicBrainz, the three its users voted for most. An artist MusicBrainz has none for takes ListenBrainz's.
+They're looked up again every 90 days, as people go on voting. Under **Settings → General → File metadata**, choose
+which genres your songs have:
+
+- **Your files', or the catalogue's** (the default): a file's own genres where it has some; otherwise its album's from
+  the catalogue, or its artist's when the album has none.
+- **The catalogue's**: the catalogue's wherever it has some, and a file's own for the rest.
+- **Only your files'**: just what the files' tags say.
+
+[Subsonic players](subsonic-players.md) list songs and albums by these genres, and [daily mixes](#for-you) are
+named for their artists' genres from the catalogue before the discovery plugins'. [Formatting](#formatting) writes
+them into the files.
+
 ## What counts as missing
 
 **Settings → General → Missing view** has a choice for each kind of release, in one list: the main types (albums,
@@ -184,7 +201,8 @@ a deluxe edition, a compilation) is fetched once or for each, and whether owning
 
 **Format** rewrites files' tags and covers from the catalogue, and moves them to where your naming scheme says. It's on
 each artist, album and track page, and for the whole library in the Scan menu. It shows what will change first, and
-nothing is written until you confirm. Set the folder layout under **Settings → General**.
+nothing is written until you confirm. Set the folder layout under **Settings → General**. **Genres** writes the
+catalogue's [genres](#genres) into files where your settings use them for the song, and leaves a file's own alone.
 
 Moving files also leaves no folders behind with no music in them. A folder they leave with nothing but artwork, notes,
 rip logs and the like (or nothing at all, or only empty folders and the clutter computers leave, such as
