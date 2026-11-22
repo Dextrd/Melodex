@@ -239,7 +239,9 @@ Songs are mastered at very different volumes, so one song can be much louder tha
 your files, the player turns loud songs down and quiet ones up so they all play at about the same volume. Under
 **Settings → Playback → Even volume** choose **Each song**, the default, which suits playlists, radios and shuffle;
 **Each album**, which keeps an album's songs as loud as each other as they were made, so a quiet intro stays quiet; or
-**Off**. A song is never turned up so far that it would clip. Files that came with ReplayGain use theirs; for the rest,
+**Off**. A song is never turned up so far that it would clip. A browser can't play louder than its full volume, so
+songs are turned up only as far as the player's volume leaves room for: keep it below full, around three quarters,
+and turn your speakers up instead, and quiet songs come up as far as loud ones go down. Files that came with ReplayGain use theirs; for the rest,
 see [Even volume](library.md#even-volume). On iPhones and iPads the volume is the phone's own, which a web page can't
 set, so songs play as they are there.
 
