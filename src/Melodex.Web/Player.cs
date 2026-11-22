@@ -152,6 +152,9 @@ public sealed class Player : IAsyncDisposable
     private DotNetObjectReference<Player>? _self;
     private Timer? _poll;
     private int _starting;
+    // The start still finding where its song is, if one is: until it's loaded, what the song before does (ending, or
+    // running on into the one it had next) is no longer news, or the queue would move on past the chosen song.
+    private int _choosing;
 
     public Player(MelodexClient api, IJSRuntime js, ServerEvents events, Preferences prefs)
     {
@@ -702,6 +705,8 @@ public sealed class Player : IAsyncDisposable
         if (index != Current)
             _resumeAt = null;
         Current = index;
+        // Shown chosen at once, while it's found: quick skips each show, rather than all at once when they're done.
+        Changed?.Invoke();
         await StartAsync();
     }
 
@@ -885,53 +890,62 @@ public sealed class Player : IAsyncDisposable
     {
         // A newer start (a click, or the next track) wins over one still waiting on the API.
         var attempt = ++_starting;
-        while (Now is { } entry)
+        _choosing = attempt;
+        try
         {
-            var (url, mediaType, length) = await SourceAsync(entry);
-            if (attempt != _starting)
-                return;
-            if (url is not null)
+            while (Now is { } entry)
             {
-                var audio = await AudioAsync();
-                if (await audio.InvokeAsync<bool>("canPlay", mediaType))
+                var (url, mediaType, length) = await SourceAsync(entry);
+                if (attempt != _starting)
+                    return;
+                if (url is not null)
                 {
-                    Position = 0;
-                    _length = length;
-                    Duration = length ?? entry.DurationSeconds ?? 0;
-                    // Loaded ahead again as it plays: a start of the next song that this overtook took the spare with it.
-                    _prepared = null;
-                    Begin(entry, _resumeAt ?? 0);
-                    await audio.InvokeVoidAsync("load", url, new { title = entry.Title, artist = entry.ArtistCredit, album = entry.AlbumTitle, cover = entry.CoverUrl }, length);
-                    if (_visualising)
-                        _ = WarmNextAsync();
-                    if (_resumeAt is { } at)
+                    var audio = await AudioAsync();
+                    if (await audio.InvokeAsync<bool>("canPlay", mediaType))
                     {
-                        Position = at;
-                        await audio.InvokeVoidAsync("seek", at);
+                        Position = 0;
+                        _length = length;
+                        Duration = length ?? entry.DurationSeconds ?? 0;
+                        // Loaded ahead again as it plays: a start of the next song that this overtook took the spare with it.
+                        _prepared = null;
+                        Begin(entry, _resumeAt ?? 0);
+                        await audio.InvokeVoidAsync("load", url, new { title = entry.Title, artist = entry.ArtistCredit, album = entry.AlbumTitle, cover = entry.CoverUrl }, length);
+                        if (_visualising)
+                            _ = WarmNextAsync();
+                        if (_resumeAt is { } at)
+                        {
+                            Position = at;
+                            await audio.InvokeVoidAsync("seek", at);
+                        }
+                        _resumeAt = null;
+                        break;
                     }
-                    _resumeAt = null;
+                    entry.Unplayable = true;
+                    entry.Detail = $"Your browser can't play this file ({mediaType}).";
+                }
+                if (entry.Waiting)
+                {
+                    // Paused here until the server says it's ready; polling too, in case events are down. It's shown as what's
+                    // playing meanwhile, the phone's controls too.
+                    if (_audio is not null)
+                        await _audio.InvokeVoidAsync("hold", new { title = entry.Title, artist = entry.ArtistCredit, album = entry.AlbumTitle, cover = entry.CoverUrl },
+                            entry.DurationSeconds);
+                    Playing = false;
+                    _poll ??= new Timer(_ => _ = RefreshListeningAsync(), null, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(5));
                     break;
                 }
-                entry.Unplayable = true;
-                entry.Detail = $"Your browser can't play this file ({mediaType}).";
+                if (Current + 1 >= _queue.Count)
+                {
+                    await StopAsync();
+                    return;
+                }
+                Current++;
             }
-            if (entry.Waiting)
-            {
-                // Paused here until the server says it's ready; polling too, in case events are down. It's shown as what's
-                // playing meanwhile, the phone's controls too.
-                if (_audio is not null)
-                    await _audio.InvokeVoidAsync("hold", new { title = entry.Title, artist = entry.ArtistCredit, album = entry.AlbumTitle, cover = entry.CoverUrl },
-                        entry.DurationSeconds);
-                Playing = false;
-                _poll ??= new Timer(_ => _ = RefreshListeningAsync(), null, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(5));
-                break;
-            }
-            if (Current + 1 >= _queue.Count)
-            {
-                await StopAsync();
-                return;
-            }
-            Current++;
+        }
+        finally
+        {
+            if (_choosing == attempt)
+                _choosing = 0;
         }
         Changed?.Invoke();
     }
@@ -1368,6 +1382,8 @@ public sealed class Player : IAsyncDisposable
     [JSInvokable]
     public Task OnAdvanced(int token)
     {
+        if (_choosing != 0)
+            return Task.CompletedTask;
         if (token != _preparedToken || _prepared is not { } entry || _queue.IndexOf(entry) is var index && index < 0)
             return NextAsync();
         _starting++;
@@ -1383,11 +1399,13 @@ public sealed class Player : IAsyncDisposable
 
     /// <summary>A song finished: the same again when repeating one, otherwise the next.</summary>
     [JSInvokable]
-    public Task OnEnded() => Repeat == RepeatMode.One && Now is not null ? StartAsync() : NextAsync();
+    public Task OnEnded() => _choosing != 0 ? Task.CompletedTask : Repeat == RepeatMode.One && Now is not null ? StartAsync() : NextAsync();
 
     [JSInvokable]
     public Task OnError(string message)
     {
+        if (_choosing != 0)
+            return Task.CompletedTask;
         if (Now is { } entry)
         {
             entry.Unplayable = true;

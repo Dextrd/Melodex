@@ -418,7 +418,7 @@ const trail = [];
 
 function note(step) {
     trail.push(`${(performance.now() / 1000).toFixed(2)}s ${step}`);
-    if (trail.length > 60)
+    if (trail.length > 150)
         trail.shift();
 }
 
@@ -578,6 +578,17 @@ function split(data, bytes) {
     return bytes.slice(used);
 }
 
+// Only the songs in the stream are fetched: a phone has few connections to the server, and quick skips each left one
+// fetching (often waiting on the server making its copy), so what the player asked of the server waited behind them.
+// Those fetched already are kept.
+function prune() {
+    for (const [key, data] of fetched)
+        if (!data.complete && !data.failed && stream?.now.data !== data && stream?.next?.data !== data) {
+            data.controller.abort();
+            fetched.delete(key);
+        }
+}
+
 // More of a song came, or it failed: the stream it's in is kept full with it.
 function heard(data) {
     const s = stream;
@@ -605,6 +616,7 @@ function begin(url, meta, length) {
         from: null, stuck: 0, work: Promise.resolve(), object: URL.createObjectURL(source),
     };
     s.now.start = 0;
+    prune();
     // A ManagedMediaSource won't open without it: AirPlay would need the music from somewhere else.
     audio.disableRemotePlayback = true;
     note(`begin ${path(url)}`);
@@ -618,8 +630,27 @@ function begin(url, meta, length) {
     // Looked at every second too, whatever it's heard: a stream left short by quick seeks, or let go of while nothing
     // was said, is filled again.
     s.beat = setInterval(() => {
-        if (!audio.paused || audio.seeking)
-            pump(s);
+        if (audio.paused && !audio.seeking) {
+            s.still = 0;
+            return;
+        }
+        pump(s);
+        if (audio.currentTime !== s.last) {
+            s.last = audio.currentTime;
+            s.still = 0;
+            return;
+        }
+        // Not moving though it should be. With what it needs there, WebKit can sit after a seek until it's asked again:
+        // it's asked again. Without, it's said in the server's log, once.
+        s.still++;
+        if (s.still % 3 === 0 && ahead(s) > 0.5) {
+            note(`sat at ${audio.currentTime.toFixed(2)}, seeking ${audio.seeking}, ready ${audio.readyState}, with ${ranges(s.buffer?.buffered)}: asked again`);
+            audio.currentTime = audio.currentTime;
+        } else if (s.still === 8 && !s.told) {
+            s.told = true;
+            note(`sat at ${audio.currentTime.toFixed(2)}, seeking ${audio.seeking}, ready ${audio.readyState}, with ${ranges(s.buffer?.buffered)}`);
+            report("The stream stopped moving on this device.");
+        }
     }, 1000);
     // Not started a while after its song came, though asked to play: given up on, and played the old way. The server
     // may take a while to make the song's copy the first time.
@@ -674,6 +705,7 @@ function follow(url, meta, token, length) {
     }
     s.next = song(url, meta, token, length);
     s.next.start = s.now.end;
+    prune();
     pump(s);
 }
 
@@ -861,6 +893,11 @@ function edge(s, at) {
     } catch {
     }
     return end;
+}
+
+// How much of the stream there is from where it's playing.
+function ahead(s) {
+    return edge(s, audio.currentTime) - audio.currentTime;
 }
 
 /**
