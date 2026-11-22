@@ -1078,18 +1078,17 @@ td.actions > :is(.icon-button, .queue-menu, .song-menu) + .badge, td.actions > .
 /* "blank", not "empty": that's the padded "nothing here" card. */
 .cover.blank img { display: none; }
 .cover.loaded img { animation: fade-in .25s ease-out; }
-.cover.pending {
-    background: linear-gradient(100deg, var(--bg) 30%, var(--border) 50%, var(--bg) 70%) 0 0 / 300% 100%;
-    animation: shimmer 1.4s linear infinite;
+/* The shine sweeps across on a layer of its own, moved rather than repainted, so a page of them stays smooth. */
+.cover.pending::after, .shimmer-line::after {
+    content: ""; position: absolute; inset: 0; pointer-events: none;
+    background: linear-gradient(100deg, transparent 30%, var(--border) 50%, transparent 70%);
+    transform: translateX(-100%); animation: sweep 1.4s linear infinite; will-change: transform;
 }
+@keyframes sweep { to { transform: translateX(100%); } }
 /* Something still loading on a page that's otherwise there: lines shimmering where it will be. */
 .loading-card { display: flex; flex-direction: column; gap: .7rem; }
-.shimmer-line {
-    display: block; height: .9rem; border-radius: 4px;
-    background: linear-gradient(100deg, var(--bg) 30%, var(--border) 50%, var(--bg) 70%) 0 0 / 300% 100%;
-    animation: shimmer 1.4s linear infinite;
-}
-@media (prefers-reduced-motion: reduce) { .shimmer-line { animation: none; } }
+.shimmer-line { position: relative; overflow: hidden; display: block; height: .9rem; border-radius: 4px; background: var(--bg); }
+@media (prefers-reduced-motion: reduce) { .cover.pending::after, .shimmer-line::after { animation: none; transform: none; } }
 @keyframes shimmer { from { background-position: 100% 0; } to { background-position: 0 0; } }
 @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
 /* Something on its way: a blank where it'll go, shimmering like a cover does. */
@@ -1613,7 +1612,13 @@ input[type=search]:disabled { opacity: .6; }
 
 /* Playlists: a tree of folders, each playlist with a small cover; four album covers in a square once it has them. */
 .playlist-mosaic { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
-.playlist-mosaic img { position: static; width: 100%; height: 100%; }
+.playlist-mosaic .mosaic-part { position: relative; overflow: hidden; min-width: 0; min-height: 0; }
+.playlist-mosaic .mosaic-part img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+/* A part whose picture didn't load: hidden while it's asked after again, the placeholder once there's none. */
+.playlist-mosaic .mosaic-part svg { display: none; }
+.playlist-mosaic .mosaic-part img[data-failed] { opacity: 0; }
+.playlist-mosaic .mosaic-part.blank img { display: none; }
+.playlist-mosaic .mosaic-part.blank svg { display: block; }
 .playlist-mosaic.pending img { opacity: 0; }
 .playlist-mosaic.loaded img { animation: fade-in .25s ease-out; }
 .cover.small { width: 2.75rem; flex: none; }
@@ -1999,7 +2004,10 @@ a.toast-body:hover .toast-title { text-decoration: underline; }
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 /* Tiles and songs on their way (TileSlots, SongSlots): shaped as they'll be, shimmering. */
 .shimmer-line.small { height: .7rem; }
-.tile-slot { gap: .55rem; }
+.tile-slot { gap: .55rem; pointer-events: none; }
+.tile-slot:hover { border-color: var(--border); }
+.slot-row { display: flex; gap: 1rem; overflow: hidden; padding: .1rem 0; }
+.slot-row > .tile-slot { flex: 0 0 150px; }
 .tile-slot .cover, .song-slot .cover { border-color: transparent; }
 .song-slot { display: grid; grid-template-columns: 2.5rem 1fr; gap: 1rem; align-items: center; padding: .5rem .75rem; border-bottom: 1px solid var(--border); }
 .song-slot:last-child { border-bottom: none; }

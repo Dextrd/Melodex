@@ -7,14 +7,19 @@ const maxChecks = 150;
 let timer = null;
 
 window.melodexCoverFailed = function (img) {
+    // Not shown broken while it's asked after (a mosaic's parts show; a cover's picture waits hidden anyway).
+    img.dataset.failed = '';
     waiting.add(img);
     timer ??= setTimeout(check, every);
 };
 
 const path = img => new URL(img.src).pathname;
 
+// A cover's own placeholder shows, or a mosaic part's.
 function blank(img) {
-    img.parentElement?.classList.replace('pending', 'blank');
+    const holder = img.parentElement;
+    if (holder && !holder.classList.replace('pending', 'blank'))
+        holder.classList.add('blank');
 }
 
 async function check() {
@@ -54,7 +59,9 @@ async function check() {
 
 // A playlist's four covers show together once they're all in (or given up on), not one by one as each arrives.
 window.melodexMosaicPart = function (img) {
-    const mosaic = img.parentElement;
+    if (img.naturalWidth > 0)
+        delete img.dataset.failed;
+    const mosaic = img.closest('.playlist-mosaic');
     if (!mosaic || [...mosaic.querySelectorAll('img')].some(part => !part.complete))
         return;
     mosaic.classList.replace('pending', 'loaded');
