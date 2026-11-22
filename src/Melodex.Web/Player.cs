@@ -1043,7 +1043,7 @@ public sealed class Player : IAsyncDisposable
         Changed?.Invoke();
     }
 
-    /// <summary>Whether songs can run into each other in this browser: not on iPhones and iPads (#107).</summary>
+    /// <summary>Whether songs can run into each other in this browser: not on iPhones and iPads before iOS 17.1 (#107, #109).</summary>
     public async Task<bool> GaplessWorksAsync() => await (await AudioAsync()).InvokeAsync<bool>("gaplessWorks");
 
     private async Task<IJSObjectReference> AudioAsync()

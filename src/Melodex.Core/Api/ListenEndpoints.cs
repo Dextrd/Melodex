@@ -44,20 +44,21 @@ public static class ListenEndpoints
             .WithName("GetListening").WithSummary("One listen-now track, with a fresh stream URL while it's playable.")
             .Produces<ListenNowInfo>().Produces(StatusCodes.Status404NotFound);
 
-        listen.MapGet("/{id:guid}/stream", async (Guid id, long? exp, string? sig, [FromQuery(Name = "as")] string? asked, HttpContext http,
-                MelodexDbContext db, ListenNowService service, StreamSigner signer, WebmCopies webm, CancellationToken ct) =>
+        listen.MapGet("/{id:guid}/stream", async (Guid id, long? exp, string? sig, [FromQuery(Name = "as")] string? asked, string? keep, HttpContext http,
+                MelodexDbContext db, ListenNowService service, StreamSigner signer, StreamCopies copies, CancellationToken ct) =>
             {
                 if (!signer.Verify(ListenNowService.StreamPath(id), exp ?? 0, sig))
                     return Results.StatusCode(StatusCodes.Status403Forbidden);
                 if (await db.ListenNowItems.FindAsync([id], ct) is not { } item || service.FullPath(item) is not { } file || !File.Exists(file))
                     return Results.NotFound();
                 await service.TouchAsync(item, ct);
-                return await webm.ServeAsync(file, item.Codec, asked, ct);
+                return await copies.ServeAsync(file, item.Codec, asked, keep, ct);
             })
             .AllowAnyone()
             .WithName("StreamListening")
             .WithSummary("The file, with range requests for seeking. Needs the signature from its stream URL. Each play keeps it for the expiry setting from then. "
-                + "With as=webm, Opus in an Ogg file comes in WebM instead, for Safari, which gets its time wrong.")
+                + "With as=webm, Opus in an Ogg file comes in WebM instead, for Safari, which gets its time wrong. "
+                + "With as=mp4, the song comes in fragmented MP4, for Media Source Extensions: its own sound if it's AAC or named in keep (such as keep=flac,opus), otherwise AAC.")
             .Produces(StatusCodes.Status200OK).Produces(StatusCodes.Status206PartialContent).Produces(StatusCodes.Status403Forbidden).Produces(StatusCodes.Status404NotFound);
 
         foreach (var version in new[] { 2, 1 })
@@ -202,8 +203,8 @@ public static class ListenEndpoints
             .WithTags("Listen now").RequireScope(Scopes.Listen).WithName("GetPlayback")
             .WithSummary("How music is played: which songs run into each other without a gap, whether there's a visualiser, and when its bars are made.");
 
-        api.MapGet("/library/files/{id:guid}/stream", async (Guid id, long? exp, string? sig, [FromQuery(Name = "as")] string? asked, MelodexDbContext db,
-                StreamSigner signer, WebmCopies webm, Microsoft.Extensions.Options.IOptions<MelodexOptions> options, CancellationToken ct) =>
+        api.MapGet("/library/files/{id:guid}/stream", async (Guid id, long? exp, string? sig, [FromQuery(Name = "as")] string? asked, string? keep, MelodexDbContext db,
+                StreamSigner signer, StreamCopies copies, Microsoft.Extensions.Options.IOptions<MelodexOptions> options, CancellationToken ct) =>
             {
                 if (!signer.Verify(LibraryStreamPath(id), exp ?? 0, sig))
                     return Results.StatusCode(StatusCodes.Status403Forbidden);
@@ -213,12 +214,13 @@ public static class ListenEndpoints
                 var file = Path.GetFullPath(Path.Combine(root, row.Path));
                 if (!file.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.Ordinal) || !File.Exists(file))
                     return Results.NotFound();
-                return await webm.ServeAsync(file, null, asked, ct);
+                return await copies.ServeAsync(file, null, asked, keep, ct);
             })
             .WithTags("Library")
             .AllowAnyone()
             .WithName("StreamLibraryFile").WithSummary("A file from your music folder, with range requests for seeking. Needs the signature from its stream URL. "
-                + "With as=webm, Opus in an Ogg file comes in WebM instead, for Safari, which gets its time wrong.")
+                + "With as=webm, Opus in an Ogg file comes in WebM instead, for Safari, which gets its time wrong. "
+                + "With as=mp4, the song comes in fragmented MP4, for Media Source Extensions: its own sound if it's AAC or named in keep (such as keep=flac,opus), otherwise AAC.")
             .Produces(StatusCodes.Status200OK).Produces(StatusCodes.Status206PartialContent).Produces(StatusCodes.Status403Forbidden).Produces(StatusCodes.Status404NotFound);
 
         // ---- Events ----

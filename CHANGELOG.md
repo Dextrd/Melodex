@@ -87,6 +87,11 @@ What changed in each release of Melodex. Versions follow [semantic versioning](h
   16, 32 or 64 bands. The client guide describes the format (#102).
 - The API has `GET` and `PUT /schedules`, `POST /library/lyrics`, `POST /library/bars`, `POST /requests/retry-failed`
   and `POST /wishlist/get` (#112).
+- **Gapless playback on iPhones and iPads** (iOS 17.1 or later): the queue plays as one stream, each song added to the
+  end as soon as it's next, so songs run into each other as elsewhere, and skipping to the next one, from the lock screen
+  too, is a jump with nothing to load. Songs come in an MP4 file the server makes and keeps, like the WebM copies for
+  Safari: their own sound where the phone takes it, otherwise AAC at 256 kbps. Stream URLs take `as=mp4` and `keep` for
+  it (#109).
 
 ### Changed
 

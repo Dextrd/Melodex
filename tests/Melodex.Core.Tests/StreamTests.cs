@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Text;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Melodex.Core.Listening;
@@ -77,13 +78,13 @@ public sealed class StreamTests
             using (var ffmpeg = Process.Start(new ProcessStartInfo("ffmpeg", ["-v", "error", "-f", "lavfi", "-i", "sine=frequency=440:duration=7.5", "-c:a", "libopus", song])
                    { RedirectStandardError = true })!)
                 await ffmpeg.WaitForExitAsync();
-            var copies = new WebmCopies(Options.Create(new MelodexOptions { DataPath = Path.Combine(root, "data") }), NullLogger<WebmCopies>.Instance);
+            var copies = new StreamCopies(Options.Create(new MelodexOptions { DataPath = Path.Combine(root, "data") }), NullLogger<StreamCopies>.Instance);
 
-            Assert.True(WebmCopies.Needs(song));
-            Assert.True(WebmCopies.Needs("song.ogg", "opus"));
-            Assert.False(WebmCopies.Needs("song.ogg"));
-            Assert.False(WebmCopies.Needs("song.flac"));
-            Assert.False(WebmCopies.Needs("song.webm", "opus"));
+            Assert.True(StreamCopies.Needs(song));
+            Assert.True(StreamCopies.Needs("song.ogg", "opus"));
+            Assert.False(StreamCopies.Needs("song.ogg"));
+            Assert.False(StreamCopies.Needs("song.flac"));
+            Assert.False(StreamCopies.Needs("song.webm", "opus"));
 
             var copy = await copies.GetAsync(song, CancellationToken.None);
             Assert.NotNull(copy);
@@ -96,6 +97,50 @@ public sealed class StreamTests
             Assert.Equal(copy, await Task.WhenAll(copies.GetAsync(song, CancellationToken.None), copies.GetAsync(song, CancellationToken.None)).ContinueWith(t => t.Result.Distinct().Single()));
             Assert.Single(Directory.GetFiles(Path.GetDirectoryName(copy)!));
             Assert.True(File.GetLastWriteTimeUtc(copy) >= made);
+        }
+        finally
+        {
+            Directory.Delete(root, true);
+        }
+    }
+
+    // An iPhone plays the queue as one stream, each song appended in fragmented MP4: its own sound if the browser takes it
+    // that way, otherwise AAC (#109).
+    [FfmpegFact]
+    public async Task Songs_are_put_in_fragmented_mp4_keeping_their_sound_where_the_browser_takes_it()
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"melodex-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(root);
+        try
+        {
+            var song = Path.Combine(root, "song.flac");
+            using (var ffmpeg = Process.Start(new ProcessStartInfo("ffmpeg", ["-v", "error", "-f", "lavfi", "-i", "sine=frequency=440:duration=7.5", "-c:a", "flac", song])
+                   { RedirectStandardError = true })!)
+                await ffmpeg.WaitForExitAsync();
+            var copies = new StreamCopies(Options.Create(new MelodexOptions { DataPath = Path.Combine(root, "data") }), NullLogger<StreamCopies>.Instance);
+
+            Assert.Equal("flac", StreamCopies.Mp4Codec("flac", "opus, flac"));
+            Assert.Equal("aac", StreamCopies.Mp4Codec("flac", "opus"));
+            Assert.Equal("aac", StreamCopies.Mp4Codec("aac", null));
+            Assert.Equal("aac", StreamCopies.Mp4Codec("vorbis", "vorbis"));
+            Assert.Equal("audio/mp4; codecs=\"mp4a.40.2\"", StreamCopies.Mp4Type("aac"));
+
+            foreach (var sound in new[] { "flac", "aac" })
+            {
+                var copy = await copies.GetMp4Async(song, sound, CancellationToken.None);
+                Assert.NotNull(copy);
+                Assert.Equal(Path.Combine(root, "data", "mp4"), Path.GetDirectoryName(copy));
+                var bytes = await File.ReadAllBytesAsync(copy);
+                // Fragments, each with its own header, after an empty one to start.
+                Assert.True(Encoding.ASCII.GetString(bytes).Split("moof").Length > 3);
+                // Its sound and length, as ffprobe says: nothing that reads a whole MP4's header knows them.
+                using var ffprobe = Process.Start(new ProcessStartInfo("ffprobe", ["-v", "error", "-show_entries", "stream=codec_name,duration", "-of", "csv=p=0", copy])
+                    { RedirectStandardOutput = true })!;
+                var said = (await ffprobe.StandardOutput.ReadToEndAsync()).Trim().Split(',');
+                Assert.Equal(sound, said[0]);
+                Assert.InRange(double.Parse(said[1], System.Globalization.CultureInfo.InvariantCulture), 7.4, 7.6);
+            }
+            Assert.Equal(2, Directory.GetFiles(Path.Combine(root, "data", "mp4")).Length);
         }
         finally
         {

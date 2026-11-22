@@ -1,6 +1,6 @@
 // The audio element behind the player bar. Player.cs drives it and hears back about time, ends and errors. A second
 // one waits beside it with the next song loaded, while that runs on from this one with no gap (#1); as this one ends,
-// that one starts, and they swap places.
+// that one starts, and they swap places. On an iPhone, the queue is one stream in one element instead (#109): see below.
 let audio, spare;
 let player;
 let second = -1;
@@ -34,10 +34,12 @@ function element() {
         if (audio.seeking)
             return;
         // Once a second is plenty for a seek bar, and keeps calls into .NET down.
-        const now = Math.floor(audio.currentTime);
+        if (stream)
+            reach();
+        const now = Math.floor(here());
         if (now !== second) {
             second = now;
-            player.invokeMethodAsync("OnTime", audio.currentTime, Number.isFinite(audio.duration) ? audio.duration : 0);
+            player.invokeMethodAsync("OnTime", here(), songLength());
             position();
         }
         if (prepared && !watching && Number.isFinite(lengthOf(audio)) && lengthOf(audio) - audio.currentTime < 1.5)
@@ -45,8 +47,8 @@ function element() {
     });
     // Where a seek landed, at once, which may not be quite where it was asked for; the lyrics jump there too.
     on("seeked", () => {
-        second = Math.floor(audio.currentTime);
-        player.invokeMethodAsync("OnTime", audio.currentTime, Number.isFinite(audio.duration) ? audio.duration : 0);
+        second = Math.floor(here());
+        player.invokeMethodAsync("OnTime", here(), songLength());
         position();
         if (lyrics?.isConnected)
             light(true);
@@ -68,6 +70,8 @@ function element() {
         position();
     });
     on("durationchange", position);
+    // A stream run dry with more of it to come: what was in it may have been let go of to save memory.
+    on("waiting", () => { if (stream) stalled(); });
     on("error", () => {
         if (audio.getAttribute("src"))
             player.invokeMethodAsync("OnError", audio.error?.message || "The file couldn't be played.");
@@ -93,17 +97,22 @@ const actions = {
     // The next song is started at once if it's loaded already, as it is to run on without a gap: a locked phone runs the
     // page slowly, and asking for it first took a while (#103).
     nexttrack: () => {
-        if (prepared && !handing && !audio.paused)
+        if (stream?.next && ready(stream.next))
+            skip();
+        else if (stream)
+            player.invokeMethodAsync("OnRemote", "next");
+        else if (prepared && !handing && !audio.paused)
             handOff();
         else if (!handing)
             player.invokeMethodAsync("OnRemote", "next");
     },
     // Dragging along the phone's bar: once Melodex says which buttons it has, an iPhone offers only those.
     seekto: details => {
+        const to = (stream ? stream.now.start : 0) + details.seekTime;
         if (details.fastSeek && audio.fastSeek)
-            audio.fastSeek(details.seekTime);
+            audio.fastSeek(to);
         else
-            audio.currentTime = details.seekTime;
+            audio.currentTime = to;
     },
     // Said outright to be none: an iPhone otherwise offers buttons that jump 10 seconds, rather than previous and next
     // song (#99).
@@ -152,11 +161,11 @@ function start(length) {
 }
 
 function position() {
-    const length = lengthOf(audio);
+    const length = songLength();
     if (!("mediaSession" in navigator) || !navigator.mediaSession.setPositionState || !(length > 0) || !Number.isFinite(length))
         return;
     try {
-        navigator.mediaSession.setPositionState({ duration: length, playbackRate: audio.playbackRate || 1, position: Math.min(Math.max(audio.currentTime, 0), length) });
+        navigator.mediaSession.setPositionState({ duration: length, playbackRate: audio.playbackRate || 1, position: Math.min(Math.max(here(), 0), length) });
     } catch {
         // A length or time it won't take, for a moment while a song loads.
     }
@@ -176,11 +185,15 @@ function setMetadata(meta) {
 const ios = /iP(hone|od|ad)/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 
 export function gaplessWorks() {
-    return !ios;
+    return !ios || streams;
 }
 
 /** Loads the next song into the spare, to start as this one ends. */
 export function prepare(url, meta, token, length) {
+    if (stream) {
+        follow(url, meta, token, length);
+        return;
+    }
     if (ios) {
         // Its first byte only, so the server has it ready (a WebM copy made, for one) and it starts quickly.
         fetch(source(url), { headers: { Range: "bytes=0-0" } }).catch(() => { });
@@ -200,6 +213,10 @@ export function prepare(url, meta, token, length) {
 
 /** Forgets the song loaded ahead: the queue has changed, or it's no longer to run on from this one. */
 export function unprepare() {
+    if (stream?.next) {
+        drop(stream, stream.next);
+        stream.next = null;
+    }
     prepared = null;
     unwatch();
     if (spare.getAttribute("src")) {
@@ -302,6 +319,9 @@ function shortcut(e) {
 
 /** Whether the browser expects to play this type; an empty type is given the benefit of the doubt. */
 export function canPlay(type) {
+    // Anything goes in the stream: the server makes AAC of what the browser can't take.
+    if (streams)
+        return true;
     if (safari && /^audio\/ogg;\s*codecs="?opus/.test(type ?? ""))
         type = "audio/webm; codecs=opus";
     return !type || (audio ?? new Audio()).canPlayType(type) !== "";
@@ -315,12 +335,375 @@ function source(url) {
     return safari && url.includes("/stream?") ? url + "&as=webm" : url;
 }
 
+// ---- The queue as one stream, on iPhones (#109) ----
+
+// On an iPhone, a song started in another element took the lock screen's controls with it or didn't, as iOS chose
+// (#107), so songs there played one at a time, each loaded as the last ended, with a gap between. Now the queue is one
+// stream in the one element, through Media Source Extensions (ManagedMediaSource, from iOS 17.1): each song is fetched in
+// fragmented MP4 and added to the end, the next as soon as it's known, so it runs on with no gap and skipping to it is a
+// jump along the stream, with nothing to load. Where there's no ManagedMediaSource, songs play one at a time as before.
+// "melodex.stream" set to "on" in a browser's storage plays it this way in any browser with Media Source Extensions.
+const Source = window.ManagedMediaSource ?? (forced() ? window.MediaSource : undefined);
+const streams = !!Source && (ios || forced()) && Source.isTypeSupported('audio/mp4; codecs="mp4a.40.2"');
+// The sound this browser takes in MP4 as it is; the server makes AAC of anything else.
+const keeps = streams
+    ? Object.entries({ flac: "flac", opus: "opus", alac: "alac", mp3: "mp4a.6B" })
+        .filter(([, codec]) => Source.isTypeSupported(`audio/mp4; codecs="${codec}"`)).map(([name]) => name)
+    : [];
+// Songs that couldn't be added to the stream, by path: they're played on their own instead.
+const failed = new Set();
+// The stream: { source, buffer, type, now, next, end, from, songs, work, object }, from being where it's to start. Its
+// songs, the one playing and the one after, are each { url, meta, token, length, start, end, controller, added, dropped },
+// starting and ending at times along it. Songs are added one after another (songs, a promise of the last), and the
+// buffer changed one change at a time (work).
+let stream = null;
+// How much of a song is fetched before it's added: a few seconds of lossless sound.
+const CHUNK = 512 * 1024;
+
+function forced() {
+    try {
+        return localStorage.getItem("melodex.stream") === "on";
+    } catch {
+        return false;
+    }
+}
+
+function path(url) {
+    return url.split("?")[0];
+}
+
+// Where the song playing has got to, and how long it is; in the stream, from where it starts along it.
+function here() {
+    return stream ? stream.from ?? Math.max(audio.currentTime - stream.now.start, 0) : audio.currentTime;
+}
+
+function songLength() {
+    if (!stream) {
+        const length = lengthOf(audio);
+        return Number.isFinite(length) ? length : 0;
+    }
+    const song = stream.now;
+    return song.length > 0 ? song.length : song.end != null ? song.end - song.start : 0;
+}
+
+function song(url, meta, token, length) {
+    return { url, meta, token, length, start: null, end: null, controller: new AbortController(), added: false, dropped: false };
+}
+
+/** Starts a stream with this song. */
+function begin(url, meta, length) {
+    close();
+    const source = new Source();
+    const s = stream = {
+        source, buffer: null, type: null, now: song(url, meta, null, length), next: null, end: 0,
+        songs: Promise.resolve(), work: Promise.resolve(), object: URL.createObjectURL(source),
+    };
+    // A ManagedMediaSource won't open without it: AirPlay would need the music from somewhere else.
+    audio.disableRemotePlayback = true;
+    source.addEventListener("sourceopen", () => add(s, s.now), { once: true });
+    audio.src = s.object;
+}
+
+/** Ends the stream, as another song plays on its own or the music stops. */
+function close() {
+    const s = stream;
+    if (!s)
+        return;
+    stream = null;
+    s.now.controller.abort();
+    s.next?.controller.abort();
+    URL.revokeObjectURL(s.object);
+    audio.disableRemotePlayback = false;
+}
+
+/** The song to run on into after this one, added to the stream; one there already that isn't it is taken out first. */
+function follow(url, meta, token, length) {
+    const s = stream, next = s.next;
+    if (next && path(next.url) === path(url)) {
+        Object.assign(next, { meta, token, length });
+        return;
+    }
+    if (next)
+        drop(s, next);
+    // Played on its own when it comes.
+    s.next = failed.has(path(url)) ? null : song(url, meta, token, length);
+    if (s.next)
+        add(s, s.next);
+    else
+        finish(s);
+}
+
+function add(s, song) {
+    s.songs = s.songs.then(() => fill(s, song)).catch(() => { });
+}
+
+/** Takes the song after this one out of the stream, or stops it being added. */
+function drop(s, song) {
+    song.dropped = true;
+    song.controller.abort();
+    s.songs = s.songs.then(async () => {
+        if (song.start == null || stream !== s)
+            return;
+        await change(s, b => {
+            // What was half read of it is forgotten too; there's none once the stream's said to have ended.
+            if (s.source.readyState === "open")
+                b.abort();
+            b.remove(song.start, Infinity);
+            return true;
+        }).catch(() => { });
+        s.end = song.start;
+        finish(s);
+    });
+}
+
+/** Fetches a song and adds it to the end of the stream, a piece at a time as it comes. */
+async function fill(s, song) {
+    if (song.dropped || stream !== s)
+        return;
+    song.start = s.end;
+    s.filling = true;
+    try {
+        const response = await fetch(song.url + "&as=mp4" + (keeps.length ? "&keep=" + keeps.join(",") : ""), {
+            signal: song.controller.signal,
+            // Checked with the server each time, in case the song came as it is before its copy could be made.
+            cache: "no-cache",
+        });
+        const type = response.headers.get("Content-Type") ?? "";
+        if (!response.ok || !type.startsWith("audio/mp4") || !Source.isTypeSupported(type))
+            throw new Error(`Not a song for the stream: ${response.status} ${type}`);
+        await change(s, b => {
+            if (!b) {
+                s.buffer = s.source.addSourceBuffer(type);
+                s.buffer.mode = "segments";
+            } else if (s.type !== type)
+                b.changeType(type);
+            s.type = type;
+            // Each song's own time starts at nothing: it's moved along to where the last one ended.
+            s.buffer.timestampOffset = song.start;
+            return false;
+        });
+        const reader = response.body.getReader();
+        let parts = [], size = 0;
+        for (; ;) {
+            const { done, value } = await reader.read();
+            if (value) {
+                parts.push(value);
+                size += value.length;
+            }
+            if (size >= CHUNK || done && size) {
+                await append(s, song, join(parts, size));
+                if (!song.added && song === s.now && s.from != null) {
+                    audio.currentTime = song.start + s.from;
+                    s.from = null;
+                }
+                song.added = true;
+                parts = [];
+                size = 0;
+            }
+            if (done)
+                break;
+        }
+        song.end = s.end = endOf(s, song);
+        finish(s);
+    } catch (e) {
+        if (stream !== s || song.dropped)
+            return;
+        console.warn("Melodex: a song couldn't be added to the stream.", e);
+        failed.add(path(song.url));
+        if (song === s.now && !song.added) {
+            // Played on its own.
+            close();
+            audio.src = source(song.url);
+            play();
+            return;
+        }
+        // What came of it is taken out again; the next is played on its own when it comes, and what's here of this one
+        // plays to its end.
+        await change(s, b => {
+            // What was half read of it is forgotten too; there's none once the stream's said to have ended.
+            if (s.source.readyState === "open")
+                b.abort();
+            b.remove(song.start, Infinity);
+            return true;
+        }).catch(() => { });
+        if (song === s.next) {
+            s.next = null;
+            s.end = song.start;
+        } else
+            song.end = s.end = endOf(s, song);
+        finish(s);
+    } finally {
+        if (stream === s)
+            s.filling = false;
+    }
+}
+
+function join(parts, size) {
+    if (parts.length === 1)
+        return parts[0];
+    const bytes = new Uint8Array(size);
+    let at = 0;
+    for (const part of parts) {
+        bytes.set(part, at);
+        at += part.length;
+    }
+    return bytes;
+}
+
+// Added to the stream, once there's room: a browser keeps only so much, and what's been played is let go of for more.
+async function append(s, song, bytes) {
+    for (; ;) {
+        if (song.dropped || stream !== s)
+            throw new DOMException("No longer wanted.", "AbortError");
+        try {
+            await change(s, b => {
+                b.appendBuffer(bytes);
+                return true;
+            });
+            return;
+        } catch (e) {
+            if (e?.name !== "QuotaExceededError")
+                throw e;
+            const behind = audio.currentTime - 10, buffered = s.buffer.buffered;
+            if (buffered.length && buffered.start(0) < behind - 1)
+                await change(s, b => {
+                    b.remove(0, behind);
+                    return true;
+                });
+            else
+                await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+    }
+}
+
+/**
+ * Changes the buffer once the change before is done: act changes it, saying whether it began something that takes a
+ * while (adding or taking out), to be waited for.
+ */
+function change(s, act) {
+    const work = s.work.then(() => new Promise((resolve, reject) => {
+        if (stream !== s)
+            return reject(new DOMException("The stream has ended.", "AbortError"));
+        let began;
+        try {
+            began = act(s.buffer);
+        } catch (e) {
+            return reject(e);
+        }
+        if (!began)
+            return resolve();
+        const b = s.buffer;
+        const settle = ok => () => {
+            b.removeEventListener("updateend", end);
+            b.removeEventListener("error", error);
+            ok ? resolve() : reject(new Error("The stream couldn't take it."));
+        };
+        const end = settle(true), error = settle(false);
+        b.addEventListener("updateend", end);
+        b.addEventListener("error", error);
+    }));
+    s.work = work.catch(() => { });
+    return work;
+}
+
+// Where a song ends along the stream: the end of what's there of it.
+function endOf(s, song) {
+    const buffered = s.buffer.buffered;
+    for (let i = buffered.length - 1; i >= 0; i--)
+        if (buffered.end(i) > song.start)
+            return buffered.end(i);
+    return song.start + (song.length || 0);
+}
+
+// The stream's said to end with its last song, so the element ends there; another song added after starts it again.
+function finish(s) {
+    s.work.then(() => {
+        const last = s.next ?? s.now;
+        if (stream === s && last.end != null && s.source.readyState === "open" && !s.buffer?.updating)
+            try {
+                s.source.endOfStream();
+            } catch {
+                // Changed in the meantime: said again when it's done.
+            }
+    });
+}
+
+/** Whether the song's start is in the stream, to jump to. */
+function ready(song) {
+    if (song.start == null || !stream?.buffer)
+        return false;
+    try {
+        const buffered = stream.buffer.buffered;
+        for (let i = 0; i < buffered.length; i++)
+            if (buffered.start(i) <= song.start + 0.1 && buffered.end(i) > song.start + 0.5)
+                return true;
+    } catch {
+    }
+    return false;
+}
+
+// The stream's run on into the next song: it's the one playing now, and what came before is let go of.
+function reach() {
+    const next = stream.next;
+    if (next?.start != null && audio.currentTime >= next.start)
+        advance(false);
+}
+
+function advance(quiet) {
+    const s = stream, to = s.next;
+    s.now = to;
+    s.next = null;
+    second = -1;
+    setMetadata(to.meta);
+    position();
+    if (!quiet)
+        player.invokeMethodAsync("OnAdvanced", to.token);
+    if (to.start > 0)
+        change(s, b => {
+            b.remove(0, to.start);
+            return true;
+        }).catch(() => { });
+}
+
+/** Jumps to the next song, there in the stream already; quietly when Player.cs chose it. */
+function skip(quiet) {
+    audio.currentTime = stream.next.start;
+    advance(quiet);
+}
+
+// A stream run dry. While the song's still being fetched, it'll come; otherwise what was there was let go of to save
+// memory (an iPhone may), and the stream starts again from here.
+function stalled() {
+    const s = stream;
+    setTimeout(() => {
+        if (stream !== s || s.filling || audio.paused || audio.readyState > 2)
+            return;
+        const { now, next } = s, from = here();
+        begin(now.url, now.meta, now.length);
+        stream.now.token = now.token;
+        if (next)
+            follow(next.url, next.meta, next.token, next.length);
+        seek(from);
+        play();
+    }, 1500);
+}
+
 export function load(url, meta, length) {
     epoch++;
     lengths.set(audio, length);
     second = -1;
     unwatch();
-    audio.src = source(url);
+    if (streams && url.includes("/stream?") && !failed.has(path(url))) {
+        // The next song, there already: played on in the stream. Otherwise a new stream, starting with this one.
+        if (stream?.next && path(stream.next.url) === path(url) && ready(stream.next)) {
+            stream.next.meta = meta;
+            skip(true);
+        } else
+            begin(url, meta, length);
+    } else {
+        close();
+        audio.src = source(url);
+    }
     setMetadata(meta);
     controls(true);
     // From the start of the new song at once, rather than where the last one was until this one has loaded.
@@ -341,12 +724,17 @@ export function pause() {
 }
 
 export function seek(seconds) {
-    audio.currentTime = seconds;
+    // Before a stream has any of its song, where it's to start is kept until it does.
+    if (stream && !stream.now.added)
+        stream.from = seconds;
+    else
+        audio.currentTime = (stream ? stream.now.start : 0) + seconds;
 }
 
 export function stop() {
     epoch++;
     unprepare();
+    close();
     audio.pause();
     audio.removeAttribute("src");
     audio.load();
@@ -467,7 +855,7 @@ export function startVisualiser(target) {
             stopVisualiser();
             return;
         }
-        const src = audio.getAttribute("src");
+        const src = stream ? stream.now.url : audio.getAttribute("src");
         if (src)
             loadBars(src);
         const ratio = window.devicePixelRatio || 1;
@@ -480,7 +868,7 @@ export function startVisualiser(target) {
         g.setTransform(ratio, 0, 0, ratio, 0, 0);
         g.clearRect(0, 0, width, height);
         // Still while paused, falling away as they would.
-        spectrum(bars && barsSrc === src && !audio.paused ? audio.currentTime : -1);
+        spectrum(bars && barsSrc === src && !audio.paused ? here() : -1);
         // Mirrored from the middle out: bass in the centre. Each bar drawn is the loudest of the bands it covers, about
         // 40 Hz to 16 kHz on a logarithmic scale, as we hear pitch.
         const half = Math.max(8, Math.floor(width / 14));
@@ -543,7 +931,7 @@ export function followLyrics(container) {
 function seekToLine(e) {
     const line = e.target.closest("[data-time]");
     if (line && audio) {
-        audio.currentTime = Number(line.dataset.time);
+        seek(Number(line.dataset.time));
         userScrolledAt = 0;
         lastActive = -2;
         if (audio.paused)
@@ -556,7 +944,7 @@ function light(jump) {
     if (lines.length === 0 || !audio)
         return;
     // A little early, as people expect to see a line just before it's sung.
-    const now = audio.currentTime + 0.2;
+    const now = here() + 0.2;
     let active = -1;
     for (let i = 0; i < lines.length && Number(lines[i].dataset.time) <= now; i++)
         active = i;
