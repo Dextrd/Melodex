@@ -25,6 +25,13 @@ TEXT_FIELDS = {"title", "artist", "album", "albumartist", "country", "media", "a
 NUMBER_FIELDS = {"track", "tracktotal", "disc", "disctotal"}
 # Several values, one on each line, written as the format's own list of them.
 LIST_FIELDS = {"genres"}
+# ReplayGain (#23): gains in dB at the target loudness, peaks with 1 as full scale. Opus files take R128 tags instead, as
+# Opus says, which have no peaks.
+GAIN_FIELDS = {"replaygain_track_gain": "rg_track_gain", "replaygain_track_peak": "rg_track_peak",
+               "replaygain_album_gain": "rg_album_gain", "replaygain_album_peak": "rg_album_peak"}
+R128_FIELDS = {"replaygain_track_gain": "r128_track_gain", "replaygain_album_gain": "r128_album_gain"}
+# R128 gains are to -23 LUFS where ReplayGain's are to -18, and players add the 5 dB back.
+R128_OFFSET = 5.0
 # Dates arrive as yyyy, yyyy-MM or yyyy-MM-dd and are written as their parts.
 DATE_FIELDS = {"date": ("year", "month", "day"), "original_date": ("original_year", "original_month", "original_day")}
 
@@ -44,7 +51,7 @@ class FormatFailed(Exception):
 
 def write_tags(full: Path, tags: dict[str, str], artwork: bytes | None, remove_artwork: bool) -> None:
     """Writes the given tags, leaving the rest as they are. An empty value clears the tag."""
-    unknown = [name for name in tags if name not in TEXT_FIELDS | NUMBER_FIELDS | LIST_FIELDS | DATE_FIELDS.keys()]
+    unknown = [name for name in tags if name not in TEXT_FIELDS | NUMBER_FIELDS | LIST_FIELDS | DATE_FIELDS.keys() | GAIN_FIELDS.keys()]
     if unknown:
         raise FormatFailed(f"Melodex doesn't write the tag {', '.join(unknown)}.")
     if not tags and artwork is None and not remove_artwork:
@@ -75,6 +82,19 @@ def _write(full: Path, tags: dict[str, str], artwork: bytes | None, remove_artwo
             setattr(media, name, int(value) if value else None)
         elif name in LIST_FIELDS:
             setattr(media, name, [v.strip() for v in value.splitlines() if v.strip()] or None)
+        elif name in GAIN_FIELDS:
+            # Taken away, not set to nothing, which mediafile writes as 0 dB.
+            number = float(value) if value else None
+            opus = media.type == "opus"
+            field = R128_FIELDS.get(name) if opus else GAIN_FIELDS[name]
+            if opus:
+                delattr(media, GAIN_FIELDS[name])
+            if field is None:
+                continue
+            if number is None:
+                delattr(media, field)
+            else:
+                setattr(media, field, number - R128_OFFSET if opus else number)
         else:
             setattr(media, name, value or None)
     if artwork is not None:
