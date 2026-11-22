@@ -967,7 +967,10 @@ public sealed class Player : IAsyncDisposable
         if (!_fetching.TryGetValue(entry, out var fetching))
         {
             fetching = FetchAndKeepAsync(entry);
-            _fetching.AddOrUpdate(entry, fetching);
+            // One that's answered already (a song not yet asked for has nothing to fetch) has forgotten itself: kept, its
+            // answer would be given for ever, and the song passed over once it could play.
+            if (!fetching.IsCompleted)
+                _fetching.AddOrUpdate(entry, fetching);
         }
         return await fetching;
     }

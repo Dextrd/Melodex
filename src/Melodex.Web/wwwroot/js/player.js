@@ -426,7 +426,8 @@ function report(message) {
     fetch("api/v1/client-errors", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message, details: `${navigator.userAgent}\nKept as they are: ${keeps.join(", ") || "none"}\n${trail.join("\n")}`, page: location.pathname }),
+        // The latest steps, as the server keeps only the first 4,000 characters.
+        body: JSON.stringify({ message, details: `${navigator.userAgent}\nKept as they are: ${keeps.join(", ") || "none"}\n${trail.join("\n").slice(-3600)}`, page: location.pathname }),
     }).catch(() => { });
 }
 

@@ -112,6 +112,9 @@ What changed in each release of Melodex. Versions follow [semantic versioning](h
 
 ### Fixed
 
+- Starting a song you don't have, or skipping to one, no longer sometimes plays the song after it instead, or skips
+  songs on its own while they're fetched: a song not yet asked for was remembered as having nothing to play. And a song
+  chosen while another is still playing is no longer skipped past when that one ends first (#109).
 - Copy buttons work when Melodex is opened over plain http, such as at the server's own address at home, rather than
   showing an error: browsers only offer the clipboard to https pages, so the text is copied the older way (#7).
 
