@@ -83,13 +83,12 @@ public sealed class SubsonicLibrary(LibraryCache cache, IServiceScopeFactory sco
         var files = await db.LibraryFiles.AsNoTracking().Where(f => f.HiddenAt == null)
             .Select(f => new { f.Id, f.Size, f.BitrateKbps, f.BitDepth, f.SampleRate, f.Codec, f.Genres, f.TagsJson })
             .ToDictionaryAsync(f => f.Id, ct);
-        // Songs whose files have no genres take the catalogue's, for their album or else its artist, as the settings say.
-        var source = (await scope.ServiceProvider.GetRequiredService<SettingsService>().GetLibraryAsync(ct)).Genres;
-        var albumGenres = source == GenreSource.File ? [] : await db.Albums.AsNoTracking().Where(a => a.Genres != null && a.Genres != "")
+        // Songs whose files have no genres take the catalogue's, for their album or else its artist.
+        var albumGenres = await db.Albums.AsNoTracking().Where(a => a.Genres != null && a.Genres != "")
             .ToDictionaryAsync(a => a.Id, a => a.Genres, ct);
-        var artistGenres = source == GenreSource.File ? [] : await db.Artists.AsNoTracking().Where(a => a.Genres != null && a.Genres != "")
+        var artistGenres = await db.Artists.AsNoTracking().Where(a => a.Genres != null && a.Genres != "")
             .ToDictionaryAsync(a => a.Id, a => a.Genres, ct);
-        var albumArtists = source == GenreSource.File ? [] : albums.GroupBy(a => a.Album.Id).ToDictionary(g => g.Key, g => g.First().Album.ArtistId);
+        var albumArtists = albums.GroupBy(a => a.Album.Id).ToDictionary(g => g.Key, g => g.First().Album.ArtistId);
 
         static int? YearOf(string? date) => date is { Length: >= 4 } && int.TryParse(date[..4], out var year) ? year : null;
 
@@ -101,7 +100,7 @@ public sealed class SubsonicLibrary(LibraryCache cache, IServiceScopeFactory sco
             var tags = FileTags.Parse(file.TagsJson);
             var artist = track.AlbumId is { } album && albumArtists.TryGetValue(album, out var albumArtist) ? albumArtist : track.ArtistId;
             var genres = SongGenres.Of(file.Genres, track.AlbumId is { } a ? albumGenres.GetValueOrDefault(a) : null,
-                artist is { } r ? artistGenres.GetValueOrDefault(r) : null, source);
+                artist is { } r ? artistGenres.GetValueOrDefault(r) : null);
             songs.Add(new SubsonicSong(track, file.Size, file.BitrateKbps, file.BitDepth, file.SampleRate, file.Codec, YearOf(tags.Date), genres,
                 CreatedOf(track.FileId), tags.MusicBrainzRecordingId));
         }

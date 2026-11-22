@@ -184,9 +184,6 @@ public sealed record LibrarySettings
     /// <summary>Show covers from your files (an embedded picture, or one like folder.jpg beside them) rather than the catalogue's, wherever there's one.</summary>
     public bool PreferFileCovers { get; init; }
 
-    /// <summary>Which genres songs have: Subsonic players' genre lists, daily mix names and formatting go by them.</summary>
-    public GenreSource Genres { get; init; } = GenreSource.FileFirst;
-
     /// <summary>
     /// Update the catalogue after each scan: every library artist's discography, and the editions of their albums. It runs
     /// as its own task, and can be started from the Scan menu any time.
@@ -766,19 +763,6 @@ public enum LyricsKind
 
     /// <summary>A lyrics source said it has no words.</summary>
     Instrumental,
-}
-
-/// <summary>Which genres songs have (#229).</summary>
-public enum GenreSource
-{
-    /// <summary>The file's own, where it has some; otherwise the catalogue's, for its album, else its artist.</summary>
-    FileFirst,
-
-    /// <summary>The catalogue's, wherever it has some; otherwise the file's own.</summary>
-    Catalogue,
-
-    /// <summary>Only the file's own.</summary>
-    File,
 }
 
 /// <summary>Where lyrics found for the library are written.</summary>

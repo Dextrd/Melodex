@@ -119,7 +119,7 @@ public sealed class DiscoveryTests : IDisposable
     }
 
     [Fact]
-    public void Songs_have_their_files_genres_or_the_catalogues_as_the_settings_say()
+    public void Songs_have_their_files_genres_or_else_the_catalogues()
     {
         Assert.Equal("Trip Hop", SongGenres.Name("trip hop"));
         Assert.Equal("Drum and Bass", SongGenres.Name("drum and bass"));
@@ -128,13 +128,11 @@ public sealed class DiscoveryTests : IDisposable
         Assert.Equal("R&B", SongGenres.Name("r&b"));
 
         const string file = "Trip-Hop", album = "trip hop\nelectronic", artist = "electronic";
-        Assert.Equal(["Trip-Hop"], SongGenres.Of(file, album, artist, GenreSource.FileFirst));
-        Assert.Equal(["Trip Hop", "Electronic"], SongGenres.Of("", album, artist, GenreSource.FileFirst));
+        Assert.Equal(["Trip-Hop"], SongGenres.Of(file, album, artist));
+        Assert.Equal(["Trip Hop", "Electronic"], SongGenres.Of("", album, artist));
         // The artist's when the album has none.
-        Assert.Equal(["Electronic"], SongGenres.Of(null, "", artist, GenreSource.FileFirst));
-        Assert.Equal(["Trip Hop", "Electronic"], SongGenres.Of(file, album, artist, GenreSource.Catalogue));
-        Assert.Equal(["Trip-Hop"], SongGenres.Of(file, null, null, GenreSource.Catalogue));
-        Assert.Empty(SongGenres.Of(null, album, artist, GenreSource.File));
+        Assert.Equal(["Electronic"], SongGenres.Of(null, "", artist));
+        Assert.Empty(SongGenres.Of(null, null, null));
     }
 
     [Fact]

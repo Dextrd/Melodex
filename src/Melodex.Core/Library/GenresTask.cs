@@ -11,7 +11,7 @@ namespace Melodex.Core.Library;
 
 /// <summary>
 /// Songs' genres (#229). Most files have no genre tags, so the catalogue's are kept for each album and artist in the
-/// library, and a song has its file's own or those, as the settings say: its album's, else its artist's.
+/// library, and a song without its file's own has those: its album's, else its artist's.
 /// </summary>
 public static class SongGenres
 {
@@ -21,17 +21,14 @@ public static class SongGenres
     /// <summary>Genres kept one on a line, as files' and the catalogue's are.</summary>
     public static IReadOnlyList<string> Lines(string? genres) => (genres ?? "").Split('\n', StringSplitOptions.RemoveEmptyEntries);
 
-    /// <summary>A song's genres: its file's own, or its album's or else its artist's from the catalogue, as the settings say.</summary>
-    public static IReadOnlyList<string> Of(string? file, string? album, string? artist, GenreSource source)
+    /// <summary>A song's genres: its file's own, or where it has none, its album's or else its artist's from the catalogue.</summary>
+    public static IReadOnlyList<string> Of(string? file, string? album, string? artist)
     {
         var own = Lines(file);
-        if (source == GenreSource.File)
+        if (own.Count > 0)
             return own;
         var catalogue = Lines(album) is { Count: > 0 } ofAlbum ? ofAlbum : Lines(artist);
-        var named = catalogue.Select(Name).ToList();
-        return source == GenreSource.Catalogue
-            ? named.Count > 0 ? named : own
-            : own.Count > 0 ? own : named;
+        return catalogue.Select(Name).ToList();
     }
 
     /// <summary>Genres' words said as letters.</summary>

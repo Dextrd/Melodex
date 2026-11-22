@@ -158,13 +158,9 @@ files' tags** for titles, artists and albums, and **Use your files' cover art** 
 
 Most files have no genre tags, so after a scan Melodex looks up the genres of each album and artist you have in the
 catalogue: on MusicBrainz, the three its users voted for most. An artist MusicBrainz has none for takes ListenBrainz's.
-They're looked up again every 90 days, as people go on voting. Under **Settings → General → File metadata**, choose
-which genres your songs have:
-
-- **Your files', or the catalogue's** (the default): a file's own genres where it has some; otherwise its album's from
-  the catalogue, or its artist's when the album has none.
-- **The catalogue's**: the catalogue's wherever it has some, and a file's own for the rest.
-- **Only your files'**: just what the files' tags say.
+They're looked up again every 90 days, as people go on voting. A song has its file's own genres where it has some
+(what it came with, or what formatting wrote); otherwise its album's from the catalogue, or its artist's when the album
+has none.
 
 [Subsonic players](subsonic-players.md) list songs and albums by these genres, and [daily mixes](#for-you) are
 named for their artists' genres from the catalogue before the discovery plugins'. [Formatting](#formatting) writes
@@ -202,7 +198,7 @@ a deluxe edition, a compilation) is fetched once or for each, and whether owning
 **Format** rewrites files' tags and covers from the catalogue, and moves them to where your naming scheme says. It's on
 each artist, album and track page, and for the whole library in the Scan menu. It shows what will change first, and
 nothing is written until you confirm. Set the folder layout under **Settings → General**. **Genres** writes the
-catalogue's [genres](#genres) into files where your settings use them for the song, and leaves a file's own alone.
+catalogue's [genres](#genres) into files that have none of their own, and leaves a file's own alone.
 
 Moving files also leaves no folders behind with no music in them. A folder they leave with nothing but artwork, notes,
 rip logs and the like (or nothing at all, or only empty folders and the clutter computers leave, such as

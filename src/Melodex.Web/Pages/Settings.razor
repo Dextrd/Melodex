@@ -88,18 +88,6 @@ else
             </span>
         </label>
         <div class="muted small">Files you exclude from matching always show as their own tags and pictures say.</div>
-        <div class="muted small">Songs' genres, which Subsonic players list and daily mixes are named by:</div>
-        @foreach (var (source, name, hint) in GenreSources)
-        {
-            <label class="dialog-choice">
-                <input type="radio" name="genre-source" checked="@(_settings.Genres == source)" @onchange="() => Set(_settings with { Genres = source })" />
-                <span>
-                    <strong>@name</strong>
-                    <span class="muted small">@hint</span>
-                </span>
-            </label>
-        }
-        <div class="muted small">The catalogue's are the most voted for on MusicBrainz, up to three, for each song's album, or its artist when the album has none. Formatting writes the genres in use into the files.</div>
     </div>
 
     <h2 id="lyrics">Lyrics</h2>
@@ -213,13 +201,6 @@ else
         }
         _findingLyrics = false;
     }
-
-    private static readonly (GenreSource Source, string Name, string Hint)[] GenreSources =
-    [
-        (GenreSource.FileFirst, "Your files', or the catalogue's", "A file's own genres where it has some; the catalogue's for the rest."),
-        (GenreSource.Catalogue, "The catalogue's", "The catalogue's wherever it has some, over your files' own; a file's own for the rest."),
-        (GenreSource.File, "Only your files'", "Just what your files' genre tags say."),
-    ];
 
     private static readonly (LyricsStorage Storage, string Name, string Hint)[] LyricsStorages =
     [

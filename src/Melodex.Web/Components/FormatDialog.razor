@@ -131,7 +131,7 @@
         new("Track and disc numbers", "And how many there are", () => _options.Numbers, v => _options = _options with { Numbers = v }),
         new("Release details", "Dates, country, media, album type", () => _options.Release, v => _options = _options with { Release = v }),
         new("Identifiers", "MusicBrainz IDs, ISRC", () => _options.Identifiers, v => _options = _options with { Identifiers = v }),
-        new("Genres", "Up to three, where Settings uses the catalogue's for the song", () => _options.Genres, v => _options = _options with { Genres = v }),
+        new("Genres", "Up to three, for files with none of their own", () => _options.Genres, v => _options = _options with { Genres = v }),
         new("Cover", "The picture embedded in each file", () => _options.Artwork, v => _options = _options with { Artwork = v }, Artwork: true),
     ];
 

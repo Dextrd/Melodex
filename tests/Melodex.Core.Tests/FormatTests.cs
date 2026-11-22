@@ -113,7 +113,7 @@ public sealed class FormatTests(RequestFixture fixture)
     }
 
     [TestLibraryFact]
-    public async Task Genres_are_written_where_the_catalogues_are_used()
+    public async Task Catalogue_genres_are_written_to_files_without_their_own()
     {
         var album = await OwnedAlbumAsync("Discovery");
         // Kept as they would be from MusicBrainz, after any lookup the scan queued.
@@ -125,25 +125,13 @@ public sealed class FormatTests(RequestFixture fixture)
                 .ExecuteUpdateAsync(u => u.SetProperty(a => a.Genres, "french house\ndisco").SetProperty(a => a.GenresCheckedAt, DateTime.UtcNow));
         var scope2 = new FormatScope(FormatScopeKind.Album, album.Album.Id);
         var options = new FormatOptions { Titles = FormatSources.Keep, Numbers = FormatSources.Keep, Release = FormatSources.Keep, Identifiers = FormatSources.Keep };
-        var settings = await Api.GetLibrarySettingsAsync();
-        try
-        {
-            // The files have none of their own, so they're given the album's.
-            Assert.Equal(TaskState.Succeeded, (await WaitAsync(await Api.StartFormatAsync(new StartFormat(scope2, options)))).State);
-            Assert.All(fixture.Importer.Formats.Last().Files, f => Assert.Equal("French House\nDisco", f.Tags["genres"]));
+        // The files have none of their own, so they're given the album's.
+        Assert.Equal(TaskState.Succeeded, (await WaitAsync(await Api.StartFormatAsync(new StartFormat(scope2, options)))).State);
+        Assert.All(fixture.Importer.Formats.Last().Files, f => Assert.Equal("French House\nDisco", f.Tags["genres"]));
 
-            // Not when only the files' own are used, nor when genres are kept as they are.
-            await Api.SaveLibrarySettingsAsync(settings with { Genres = GenreSource.File });
-            Assert.Equal(TaskState.Succeeded, (await WaitAsync(await Api.StartFormatAsync(new StartFormat(scope2, options)))).State);
-            Assert.All(fixture.Importer.Formats.Last().Files, f => Assert.False(f.Tags.ContainsKey("genres")));
-            await Api.SaveLibrarySettingsAsync(settings);
-            Assert.Equal(TaskState.Succeeded, (await WaitAsync(await Api.StartFormatAsync(new StartFormat(scope2, options with { Genres = FormatSources.Keep })))).State);
-            Assert.All(fixture.Importer.Formats.Last().Files, f => Assert.False(f.Tags.ContainsKey("genres")));
-        }
-        finally
-        {
-            await Api.SaveLibrarySettingsAsync(settings);
-        }
+        // Not when genres are kept as they are.
+        Assert.Equal(TaskState.Succeeded, (await WaitAsync(await Api.StartFormatAsync(new StartFormat(scope2, options with { Genres = FormatSources.Keep })))).State);
+        Assert.All(fixture.Importer.Formats.Last().Files, f => Assert.False(f.Tags.ContainsKey("genres")));
     }
 
     [TestLibraryFact]

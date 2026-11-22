@@ -320,10 +320,6 @@ public sealed class SubsonicTests : IDisposable
             .SelectMany(s => s!["genres"]!.AsArray().Select(g => (string)g!["name"]!)).Distinct().ToList();
         Assert.Contains("Trip Hop", await GenresOfDummyAsync());
         Assert.Contains((await OkAsync("getGenres", key))["genres"]!["genre"]!.AsArray(), g => (string)g!["value"]! == "Trip Hop");
-
-        // Only the files' own, if that's what's asked for.
-        await _api.SaveLibrarySettingsAsync(await _api.GetLibrarySettingsAsync() with { Genres = GenreSource.File });
-        Assert.DoesNotContain("Trip Hop", await GenresOfDummyAsync());
     }
 
     private async Task WaitForAsync(string kind)

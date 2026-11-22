@@ -35,7 +35,7 @@ Anyone can make keys, each able to do only what they may themselves, so you need
 - **Search** across artists, albums and songs, every word you type matched, accents or not.
 - **Album lists**: newest, random, by name, by artist, by year, by genre, starred, and highest rated. Most played and
   recently played are empty for now.
-- **Genres**, from your songs' tags, or the catalogue's for songs without any, as [your settings say](library.md#genres).
+- **Genres**, from your songs' tags, or the catalogue's for songs without any ([genres](library.md#genres)).
   Files scanned before this version have theirs read on the next scan.
 - **Lyrics**, from the song's `.lrc` file or tags, synced line by line for players that show them so.
 - **Your playlists**, the same as in Melodex: a playlist made or changed in a player is changed in Melodex, and the
