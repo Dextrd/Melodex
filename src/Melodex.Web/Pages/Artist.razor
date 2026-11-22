@@ -26,6 +26,7 @@ else
             <div class="row muted small">
                 @if (_artist.Disambiguation is not null) { <span>@_artist.Disambiguation</span> }
                 @if (_artist.Country is not null) { <span>@_artist.Country</span> }
+                @if (_artist.Genres.Count > 0) { <span>@string.Join(", ", _artist.Genres)</span> }
                 @if (_glimpsed)
                 {
                     <span>@Owned owned</span><span class="placeholder short"></span>

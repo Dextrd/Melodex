@@ -110,6 +110,7 @@ builder.Services.AddScoped<ITaskHandler, CatalogueUpdateTask>();
 builder.Services.AddScoped<ITaskHandler, FormatTask>();
 builder.Services.AddScoped<ITaskHandler, LyricsTask>();
 builder.Services.AddScoped<ITaskHandler, SpectrumTask>();
+builder.Services.AddScoped<ITaskHandler, GenresTask>();
 builder.Services.AddScoped<ITaskHandler, BarsTask>();
 builder.Services.AddScoped<ITaskHandler, ImportTask>();
 builder.Services.AddHostedService<TaskWorker>();

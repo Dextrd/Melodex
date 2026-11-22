@@ -74,6 +74,7 @@ else
             <div class="row muted small">
                 <a href="artists/@track.ArtistId">@track.ArtistCredit</a>
                 @if (track.DurationSeconds is not null) { <span>@Format.Duration(track.DurationSeconds)</span> }
+                @if (track.Genres.Count > 0) { <span>@string.Join(", ", track.Genres)</span> }
                 <StatusBadge Track="@(owned ? TrackStatus.Owned : track.Ignored ? TrackStatus.Ignored : TrackStatus.Missing)" />
                 <ProviderIds Ids="track.Ids" Entity="recording" />
             </div>

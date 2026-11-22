@@ -214,6 +214,16 @@ def test_formatting_without_a_template_leaves_files_where_they_are(client, roots
 
 
 @pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="needs ffmpeg")
+def test_formatting_writes_genres_one_on_each_line_as_several(client, roots):
+    library = roots[1]
+    silent_flac(library / "a" / "song.flac", title="old")
+    client.post("/v1/format", json={"files": [{"path": "a/song.flac", "tags": {"genres": "Trip Hop\nElectronic"}}]})
+    assert MediaFile(library / "a" / "song.flac").genres == ["Trip Hop", "Electronic"]
+    client.post("/v1/format", json={"files": [{"path": "a/song.flac", "tags": {"genres": ""}}]})
+    assert not MediaFile(library / "a" / "song.flac").genres
+
+
+@pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="needs ffmpeg")
 def test_formatting_writes_a_copy_that_takes_the_files_place(client, roots):
     library = roots[1]
     song = library / "a" / "song.flac"

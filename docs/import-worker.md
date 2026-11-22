@@ -114,7 +114,7 @@ out every value from its catalogue; the worker only writes them.
 
 | Field | Meaning |
 | --- | --- |
-| `files[].tags` | Tags to write, by beets field name. The rest stay as they are, and an empty value clears one. Melodex writes `title`, `artist`, `album`, `albumartist`, `track`, `tracktotal`, `disc`, `disctotal`, `date` and `original_date` (as `yyyy`, `yyyy-MM` or `yyyy-MM-dd`), `country`, `media`, `albumtype`, `label`, `catalognum`, `isrc`, `lyrics` and the `mb_*` IDs; any other name fails that file. |
+| `files[].tags` | Tags to write, by beets field name. The rest stay as they are, and an empty value clears one. Melodex writes `title`, `artist`, `album`, `albumartist`, `track`, `tracktotal`, `disc`, `disctotal`, `date` and `original_date` (as `yyyy`, `yyyy-MM` or `yyyy-MM-dd`), `country`, `media`, `albumtype`, `label`, `catalognum`, `isrc`, `lyrics`, `genres` (one on each line, written as several) and the `mb_*` IDs; any other name fails that file. |
 | `files[].artwork` | The key of an image in `artwork` to embed as the front cover, replacing what's there. Omit it to leave the embedded art. |
 | `files[].removeArtwork` | Take the embedded art out. |
 | `files[].lrc` | Lyrics to write to an `.lrc` file beside the file, with its name. Omit it to leave any there. |

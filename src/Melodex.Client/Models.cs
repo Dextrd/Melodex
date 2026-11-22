@@ -301,6 +301,9 @@ public sealed record ArtistDetail(
 
     /// <summary>Songs of theirs you have that aren't on any album the catalogue lists.</summary>
     public IReadOnlyList<LibraryTrack> Songs { get; init; } = [];
+
+    /// <summary>Their genres from the catalogue, or else the ones their songs you have are tagged with, the most common first.</summary>
+    public IReadOnlyList<string> Genres { get; init; } = [];
 }
 
 /// <summary>Which releases the missing view shows for one artist.</summary>
@@ -351,6 +354,9 @@ public sealed record AlbumDetail(
 {
     /// <summary>Its editions are being fetched: look again shortly for them.</summary>
     public bool Fetching { get; init; }
+
+    /// <summary>Its songs' genres you have, the most common first; the catalogue's when you have none of it.</summary>
+    public IReadOnlyList<string> Genres { get; init; } = [];
 }
 
 public sealed record EditionSummary(
@@ -710,7 +716,11 @@ public sealed record TrackDetail(
     IReadOnlyList<ProviderId> Ids,
     string? CoverUrl,
     IReadOnlyList<TrackAppearance> Appearances,
-    IReadOnlyList<TrackFile> Files);
+    IReadOnlyList<TrackFile> Files)
+{
+    /// <summary>Its file's own genres, or else its album's or its artist's from the catalogue.</summary>
+    public IReadOnlyList<string> Genres { get; init; } = [];
+}
 
 /// <summary>An edition the song is on, and where on it.</summary>
 /// <param name="Title">The song's title on this edition, which can differ from the recording's.</param>

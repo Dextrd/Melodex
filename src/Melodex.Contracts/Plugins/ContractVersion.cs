@@ -26,7 +26,7 @@ public readonly record struct ContractVersion(int Major, int Minor)
 public static class ContractVersions
 {
     /// <summary>Index plugins: what exists.</summary>
-    public static readonly ContractVersion Index = new(1, 0);
+    public static readonly ContractVersion Index = new(1, 1);
 
     /// <summary>Retrieval plugins: how music is fetched (HTTP contract).</summary>
     public static readonly ContractVersion Retrieval = new(1, 0);

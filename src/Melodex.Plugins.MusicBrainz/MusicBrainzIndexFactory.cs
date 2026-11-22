@@ -26,7 +26,7 @@ public sealed class MusicBrainzIndexFactory : IPluginFactory
         ContractVersion = ContractVersions.Index.ToString(),
         Description = "Catalogue data from MusicBrainz, the open music encyclopedia.",
         Homepage = "https://musicbrainz.org",
-        Capabilities = [IndexCapabilities.IsrcLookup, IndexCapabilities.RecordingAlbums],
+        Capabilities = [IndexCapabilities.IsrcLookup, IndexCapabilities.RecordingAlbums, IndexCapabilities.Genres],
         Provider = Providers.MusicBrainz,
         Access = new PluginAccess { Network = ["musicbrainz.org (or the server set in its settings)"] },
         MaxRequestsPerSecond = 1,

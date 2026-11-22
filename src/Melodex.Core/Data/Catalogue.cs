@@ -32,6 +32,15 @@ public class Artist
     /// <summary>Its own quality setting over the profile's: null to inherit, "never" never to upgrade, or a cutoff's step key.</summary>
     public string? QualityOverride { get; set; }
 
+    /// <summary>
+    /// Its genres from the catalogue, or from discovery plugins when it has none, the most voted for first, up to three, each on a line of its own and in lower case
+    /// as MusicBrainz names them: empty for none, null until they've been looked up (#229).
+    /// </summary>
+    public string? Genres { get; set; }
+
+    /// <summary>When its genres were last looked up; null if never.</summary>
+    public DateTime? GenresCheckedAt { get; set; }
+
     public List<Album> Albums { get; set; } = [];
 }
 
@@ -62,6 +71,15 @@ public class Album
 
     /// <summary>When the editions and track listings were last fetched; null if never.</summary>
     public DateTime? EditionsRefreshedAt { get; set; }
+
+    /// <summary>
+    /// Its genres from the catalogue, the most voted for first, up to three, each on a line of its own and in lower case
+    /// as MusicBrainz names them: empty for none, null until they've been looked up (#229).
+    /// </summary>
+    public string? Genres { get; set; }
+
+    /// <summary>When its genres were last looked up; null if never.</summary>
+    public DateTime? GenresCheckedAt { get; set; }
 
     public List<Edition> Editions { get; set; } = [];
 }

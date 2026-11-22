@@ -3,14 +3,14 @@ using Melodex.Contracts.Catalogue;
 namespace Melodex.Contracts.Plugins.Index;
 
 /// <summary>
-/// Index plugin contract (version 1.0): answers what exists. All IDs passed in and returned are in the
+/// Index plugin contract (version 1.1): answers what exists. All IDs passed in and returned are in the
 /// plugin's own scheme. Caching and rate limiting live in the core, so implementations should call their
 /// upstream service directly and not cache on their own.
 /// </summary>
 /// <remarks>
 /// Methods return <c>null</c> when an entity doesn't exist and throw for anything else, such as network
 /// failures or upstream errors. Optional features are separate interfaces (<see cref="IIsrcLookup"/>,
-/// <see cref="IUpcLookup"/>, <see cref="IPopularityProvider"/>), each matched by a capability
+/// <see cref="IUpcLookup"/>, <see cref="IPopularityProvider"/>, <see cref="IGenreLookup"/>), each matched by a capability
 /// name in the manifest. Pictures come from artwork plugins (<see cref="Artwork.IArtworkPlugin"/>).
 /// </remarks>
 public interface IIndexPlugin : IPlugin
@@ -97,6 +97,21 @@ public interface IPopularityProvider
     Task<IReadOnlyDictionary<string, double>> GetTrackPopularityAsync(IReadOnlyCollection<string> trackIds, CancellationToken cancellationToken);
 }
 
+/// <summary>Optional: albums' and artists' genres. Capability <see cref="IndexCapabilities.Genres"/> (contract 1.1).</summary>
+public interface IGenreLookup
+{
+    /// <summary>The album's genres, the most voted for first; empty when it has none or isn't known.</summary>
+    Task<IReadOnlyList<IndexGenre>> GetAlbumGenresAsync(string albumId, CancellationToken cancellationToken);
+
+    /// <summary>The artist's genres, the most voted for first; empty when they have none or aren't known.</summary>
+    Task<IReadOnlyList<IndexGenre>> GetArtistGenresAsync(string artistId, CancellationToken cancellationToken);
+}
+
+/// <summary>A genre a catalogue gives an album or artist.</summary>
+/// <param name="Name">The genre, in lower case as MusicBrainz names them, such as <c>trip hop</c>.</param>
+/// <param name="Votes">How many people gave it, or another measure of how well it fits: higher fits better.</param>
+public sealed record IndexGenre(string Name, int Votes);
+
 /// <summary>Capability names an index plugin can declare in its manifest.</summary>
 public static class IndexCapabilities
 {
@@ -114,4 +129,7 @@ public static class IndexCapabilities
 
     /// <summary>Implements <see cref="IPopularityProvider"/>.</summary>
     public const string Popularity = "popularity";
+
+    /// <summary>Implements <see cref="IGenreLookup"/> (contract 1.1).</summary>
+    public const string Genres = "genres";
 }

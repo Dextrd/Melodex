@@ -9,6 +9,7 @@ using Melodex.Contracts.Catalogue;
 using Melodex.Contracts.Plugins;
 using Melodex.Contracts.Plugins.Discovery;
 using Melodex.Core.Data;
+using Melodex.Core.Library;
 using Melodex.Core.Listening;
 using Melodex.Core.Plugins;
 using Melodex.Core.Tests.Support;
@@ -115,6 +116,23 @@ public sealed class DiscoveryTests : IDisposable
         Assert.Equal("UK garage", MixService.Genre("uk garage", true));
         Assert.Equal("EDM", MixService.Genre("edm", false));
         Assert.Equal("drum and bass", MixService.Genre("drum and bass", false));
+    }
+
+    [Fact]
+    public void Songs_have_their_files_genres_or_else_the_catalogues()
+    {
+        Assert.Equal("Trip Hop", SongGenres.Name("trip hop"));
+        Assert.Equal("Drum and Bass", SongGenres.Name("drum and bass"));
+        Assert.Equal("Post-Punk", SongGenres.Name("post-punk"));
+        Assert.Equal("UK Garage", SongGenres.Name("uk garage"));
+        Assert.Equal("R&B", SongGenres.Name("r&b"));
+
+        const string file = "Trip-Hop", album = "trip hop\nelectronic", artist = "electronic";
+        Assert.Equal(["Trip-Hop"], SongGenres.Of(file, album, artist));
+        Assert.Equal(["Trip Hop", "Electronic"], SongGenres.Of("", album, artist));
+        // The artist's when the album has none.
+        Assert.Equal(["Electronic"], SongGenres.Of(null, "", artist));
+        Assert.Empty(SongGenres.Of(null, null, null));
     }
 
     [Fact]

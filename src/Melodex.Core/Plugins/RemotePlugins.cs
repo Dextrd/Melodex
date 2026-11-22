@@ -96,7 +96,7 @@ public sealed class RemotePluginException(string message, bool unavailable) : Ex
 }
 
 public sealed class RemoteIndexPlugin(HttpClient http, JsonElement settings, PluginManifest manifest)
-    : RemotePlugin(http, settings, manifest), IIndexPlugin, IIsrcLookup, IRecordingAlbums
+    : RemotePlugin(http, settings, manifest), IIndexPlugin, IIsrcLookup, IRecordingAlbums, IGenreLookup
 {
     public async Task<IndexSearchResults> SearchAsync(IndexSearchQuery query, CancellationToken cancellationToken) =>
         await CallAsync<IndexSearchQuery, IndexSearchResults>("v1/search", query, cancellationToken) ?? IndexSearchResults.Empty;
@@ -120,6 +120,16 @@ public sealed class RemoteIndexPlugin(HttpClient http, JsonElement settings, Plu
         Declares(IndexCapabilities.RecordingAlbums)
             ? ListAsync<IdInput, IndexAlbum>("v1/recording-albums", new IdInput(recordingId), cancellationToken)
             : Task.FromResult<IReadOnlyList<IndexAlbum>>([]);
+
+    public Task<IReadOnlyList<IndexGenre>> GetAlbumGenresAsync(string albumId, CancellationToken cancellationToken) =>
+        Declares(IndexCapabilities.Genres)
+            ? ListAsync<IdInput, IndexGenre>("v1/album-genres", new IdInput(albumId), cancellationToken)
+            : Task.FromResult<IReadOnlyList<IndexGenre>>([]);
+
+    public Task<IReadOnlyList<IndexGenre>> GetArtistGenresAsync(string artistId, CancellationToken cancellationToken) =>
+        Declares(IndexCapabilities.Genres)
+            ? ListAsync<IdInput, IndexGenre>("v1/artist-genres", new IdInput(artistId), cancellationToken)
+            : Task.FromResult<IReadOnlyList<IndexGenre>>([]);
 
     protected override Exception Failure(string message, bool unavailable) =>
         unavailable ? new IndexUnavailableException(message) : base.Failure(message, unavailable);

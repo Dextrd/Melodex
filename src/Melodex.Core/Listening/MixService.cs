@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Melodex.Client;
 using Melodex.Core.Data;
+using Melodex.Core.Library;
 using Melodex.Core.Playlists;
 
 namespace Melodex.Core.Listening;
@@ -160,7 +161,9 @@ public sealed class MixService(MelodexDbContext db, PlayService plays, Discovery
         var seeded = groups.Select(group => (Group: group, Seeds: songs
             .Where(s => !s.Local && s.ArtistId is { } a && group.Any(g => g.Id == a)).Select(s => s.Id).Take(SeedSongs).ToList())).ToList();
         await WarmAsync(seeded.SelectMany(g => g.Seeds), (d, id, c) => d.SimilarSongsAsync(id, RadioService.Asked, c), ct);
-        await WarmAsync(groups.SelectMany(g => g.Select(a => a.Id)), (d, id, c) => d.ArtistGenresAsync(id, c), ct);
+        var mixed = groups.SelectMany(g => g.Select(a => a.Id)).ToList();
+        var kept = await db.Artists.Where(a => mixed.Contains(a.Id) && a.Genres != null && a.Genres != "").Select(a => a.Id).ToListAsync(ct);
+        await WarmAsync(mixed.Except(kept), (d, id, c) => d.ArtistGenresAsync(id, c), ct);
         var mixes = new List<Mix>();
         var named = new HashSet<string>();
         foreach (var (group, seeds) in seeded)
@@ -186,7 +189,7 @@ public sealed class MixService(MelodexDbContext db, PlayService plays, Discovery
     {
         var scores = new Dictionary<string, double>();
         for (var i = 0; i < group.Count; i++)
-            foreach (var (genre, score) in await discovery.ArtistGenresAsync(group[i].Id, ct))
+            foreach (var (genre, score) in await ArtistGenresAsync(group[i].Id, ct))
                 scores[genre] = scores.GetValueOrDefault(genre) + score * (i == 0 ? 1 : 0.5);
         var genres = scores.OrderByDescending(g => g.Value).ToList();
         if (genres.FirstOrDefault(g => !named.Contains(g.Key)) is not { Key: not null } first)
@@ -196,15 +199,23 @@ public sealed class MixService(MelodexDbContext db, PlayService plays, Discovery
         return second.Key is null ? $"{Genre(first.Key, true)} mix" : $"{Genre(first.Key, true)} & {Genre(second.Key, false)}";
     }
 
+    /// <summary>
+    /// An artist's genres, the most fitting first: those the library keeps from the catalogue (#229), else the discovery
+    /// plugins'.
+    /// </summary>
+    private async Task<IReadOnlyList<(string Name, double Score)>> ArtistGenresAsync(Guid artistId, CancellationToken ct)
+    {
+        var kept = SongGenres.Lines(await db.Artists.Where(a => a.Id == artistId).Select(a => a.Genres).FirstOrDefaultAsync(ct));
+        return kept.Count > 0 ? kept.Select((genre, i) => (genre, 1 - i * 0.2)).ToList() : await discovery.ArtistGenresAsync(artistId, ct);
+    }
+
     // How well a second genre has to fit, against the first, to be in a mix's name.
     private const double NearlyAsWell = 0.6;
-
-    private static readonly HashSet<string> Initials = ["edm", "idm", "ebm", "uk", "us", "r&b", "dnb"];
 
     /// <summary>A genre as it reads in a name: "trip hop" as "Trip hop" first, "UK garage" and "EDM" as they're said.</summary>
     public static string Genre(string genre, bool first)
     {
-        var words = genre.Split(' ').Select(w => Initials.Contains(w) ? w.ToUpperInvariant() : w).ToArray();
+        var words = genre.Split(' ').Select(w => SongGenres.Initials.Contains(w) ? w.ToUpperInvariant() : w).ToArray();
         if (first && words.Length > 0 && words[0].Length > 0)
             words[0] = char.ToUpperInvariant(words[0][0]) + words[0][1..];
         return string.Join(' ', words);

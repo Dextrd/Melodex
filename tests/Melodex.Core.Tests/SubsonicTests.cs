@@ -296,6 +296,45 @@ public sealed class SubsonicTests : IDisposable
     }
 
     [TestLibraryFact]
+    public async Task Songs_without_genre_tags_have_the_catalogues_as_the_settings_say()
+    {
+        await ScanAsync();
+        await WaitForAsync("library-genres");
+        var key = $"apiKey={(await _api.CreateApiKeyAsync(new CreateApiKey("Player", [UserPermissions.Listen]))).Key}";
+        Guid dummy;
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<Melodex.Core.Data.MelodexDbContext>();
+            var album = db.Albums.Single(a => a.Title == "Dummy");
+            dummy = album.Id;
+            // The most voted for on MusicBrainz, up to three, in lower case as it names them.
+            var kept = Melodex.Core.Library.SongGenres.Lines(album.Genres);
+            Assert.InRange(kept.Count, 1, 3);
+            Assert.Contains("trip hop", kept);
+            Assert.NotNull(album.GenresCheckedAt);
+        }
+
+        // A file with none of its own has its album's, named as tags have them.
+        async Task<IReadOnlyList<string>> GenresOfDummyAsync() =>
+            (await OkAsync("getAlbum", key, $"id={dummy}"))["album"]!["song"]!.AsArray()
+            .SelectMany(s => s!["genres"]!.AsArray().Select(g => (string)g!["name"]!)).Distinct().ToList();
+        Assert.Contains("Trip Hop", await GenresOfDummyAsync());
+        Assert.Contains((await OkAsync("getGenres", key))["genres"]!["genre"]!.AsArray(), g => (string)g!["value"]! == "Trip Hop");
+
+        // And its page shows them.
+        Assert.Contains("Trip Hop", (await _api.GetAlbumAsync(dummy))!.Genres);
+    }
+
+    private async Task WaitForAsync(string kind)
+    {
+        var deadline = DateTime.UtcNow + TimeSpan.FromMinutes(3);
+        while (DateTime.UtcNow < deadline && (await _api.ListTasksAsync(active: true)).Any(t => t.Kind == kind))
+            await Task.Delay(100);
+        var last = (await _api.ListTasksAsync()).Where(t => t.Kind == kind).MaxBy(t => t.CreatedAt);
+        Assert.True(last is { State: TaskState.Succeeded }, last?.Error ?? $"No {kind} task ran");
+    }
+
+    [TestLibraryFact]
     public async Task Players_keep_your_playlists()
     {
         await ScanAsync();

@@ -83,6 +83,12 @@ public sealed class SubsonicLibrary(LibraryCache cache, IServiceScopeFactory sco
         var files = await db.LibraryFiles.AsNoTracking().Where(f => f.HiddenAt == null)
             .Select(f => new { f.Id, f.Size, f.BitrateKbps, f.BitDepth, f.SampleRate, f.Codec, f.Genres, f.TagsJson })
             .ToDictionaryAsync(f => f.Id, ct);
+        // Songs whose files have no genres take the catalogue's, for their album or else its artist.
+        var albumGenres = await db.Albums.AsNoTracking().Where(a => a.Genres != null && a.Genres != "")
+            .ToDictionaryAsync(a => a.Id, a => a.Genres, ct);
+        var artistGenres = await db.Artists.AsNoTracking().Where(a => a.Genres != null && a.Genres != "")
+            .ToDictionaryAsync(a => a.Id, a => a.Genres, ct);
+        var albumArtists = albums.GroupBy(a => a.Album.Id).ToDictionary(g => g.Key, g => g.First().Album.ArtistId);
 
         static int? YearOf(string? date) => date is { Length: >= 4 } && int.TryParse(date[..4], out var year) ? year : null;
 
@@ -92,7 +98,9 @@ public sealed class SubsonicLibrary(LibraryCache cache, IServiceScopeFactory sco
             if (!files.TryGetValue(track.FileId, out var file))
                 continue;
             var tags = FileTags.Parse(file.TagsJson);
-            var genres = (file.Genres ?? "").Split('\n', StringSplitOptions.RemoveEmptyEntries);
+            var artist = track.AlbumId is { } album && albumArtists.TryGetValue(album, out var albumArtist) ? albumArtist : track.ArtistId;
+            var genres = SongGenres.Of(file.Genres, track.AlbumId is { } a ? albumGenres.GetValueOrDefault(a) : null,
+                artist is { } r ? artistGenres.GetValueOrDefault(r) : null);
             songs.Add(new SubsonicSong(track, file.Size, file.BitrateKbps, file.BitDepth, file.SampleRate, file.Codec, YearOf(tags.Date), genres,
                 CreatedOf(track.FileId), tags.MusicBrainzRecordingId));
         }
@@ -109,8 +117,7 @@ public sealed class SubsonicLibrary(LibraryCache cache, IServiceScopeFactory sco
             var year = YearOf(summary.FirstReleaseDate);
             if (year is not null)
                 own = own.Select(s => s with { Year = year }).ToList();
-            var genres = own.SelectMany(s => s.Genres).GroupBy(g => g, StringComparer.OrdinalIgnoreCase)
-                .OrderByDescending(g => g.Count()).Select(g => g.Key).ToList();
+            var genres = SongGenres.Common(own.Select(s => s.Genres));
             albumList.Add(new SubsonicAlbum(summary.Id, summary.Title, summary.ArtistId, summary.ArtistCredit.Length > 0 ? summary.ArtistCredit : artistName,
                 year ?? own.Select(s => s.Year).FirstOrDefault(y => y is not null), summary.CoverUrl, own, genres,
                 summary.Ids.FirstOrDefault(i => i.Provider == "musicbrainz")?.Value, summary.Type, summary.SecondaryTypes,

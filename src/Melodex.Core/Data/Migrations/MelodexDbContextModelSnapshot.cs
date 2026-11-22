@@ -36,6 +36,12 @@ namespace Melodex.Core.Data.Migrations
                     b.Property<string>("FirstReleaseDate")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("Genres")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("GenresCheckedAt")
+                        .HasColumnType("TEXT");
+
                     b.Property<bool?>("HasOfficialRelease")
                         .HasColumnType("INTEGER");
 
@@ -126,6 +132,12 @@ namespace Melodex.Core.Data.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<string>("Disambiguation")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Genres")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("GenresCheckedAt")
                         .HasColumnType("TEXT");
 
                     b.Property<bool>("InLibrary")

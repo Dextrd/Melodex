@@ -814,6 +814,7 @@ public static class LibraryEndpoints
                 FormatTask.TaskKind => FormatTask.Title(t.PayloadJson),
                 LyricsTask.TaskKind => LyricsTask.Title,
                 SpectrumTask.TaskKind => SpectrumTask.Title,
+                GenresTask.TaskKind => GenresTask.Title,
                 BarsTask.TaskKind => BarsTask.Title(t.PayloadJson),
                 Tools.ImportTask.TaskKind => Tools.ImportTask.Title(t.PayloadJson is null ? null : imports.GetValueOrDefault(JsonSerializer.Deserialize<Guid>(t.PayloadJson))),
                 _ => t.Kind,

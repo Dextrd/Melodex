@@ -30,6 +30,7 @@ else
                 <a href="artists/@album.ArtistId">@album.ArtistCredit</a>
                 <span>@Format.Year(album.FirstReleaseDate)</span>
                 <span>@Format.TypeLabel(album.Type)@(album.SecondaryTypes.Count > 0 ? $" · {Format.Secondary(album.SecondaryTypes)}" : "")</span>
+                @if (_album is { Genres.Count: > 0 } shown) { <span>@string.Join(", ", shown.Genres)</span> }
                 <StatusBadge Album="album.Status" PartlyCovered="album.PartlyCovered" />
                 @if (album.HiddenByDefault) { <span class="badge neutral">Hidden by default</span> }
                 @if (album.Ignored) { <span class="badge neutral">Ignored</span> }
