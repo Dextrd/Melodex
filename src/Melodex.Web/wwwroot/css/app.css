@@ -1198,7 +1198,7 @@ button .spinner { width: .85rem; height: .85rem; vertical-align: -2px; margin-ri
    it shows, cut off by the picture's edges. A ring the colour of the tile round it reads as a gap cut into the picture.
    Pointed at, it grows, ring and all, from its centre. */
 .mix-corner {
-    --mix-r: 2.35rem; --mix-in: .45rem; --mix-gap: 5px;
+    --mix-r: 2.1rem; --mix-in: .4rem; --mix-gap: 5px;
     position: absolute; top: calc(.75rem + 1px); right: calc(.75rem + 1px); width: 3.7rem; height: 3.7rem;
     overflow: hidden; border-top-right-radius: 6px; pointer-events: none;
 }
@@ -1209,8 +1209,8 @@ button .spinner { width: .85rem; height: .85rem; vertical-align: -2px; margin-ri
     transition: transform .25s cubic-bezier(.2, .8, .2, 1);
 }
 /* The icon sits in the part that shows, toward the picture. */
-.mix-corner > .mix-play svg { width: 1.2rem; height: 1.2rem; transform: translate(-.8rem, .8rem); }
-.mix-corner > .mix-play:hover:not(:disabled), .mix-corner > .mix-play:focus-visible { transform: scale(1.14); filter: brightness(1.1); }
+.mix-corner > .mix-play svg { width: 1.4rem; height: 1.4rem; transform: translate(-.65rem, .65rem); }
+.mix-corner > .mix-play:hover:not(:disabled), .mix-corner > .mix-play:focus-visible { transform: scale(1.2); filter: brightness(1.1); }
 @media (prefers-reduced-motion: reduce) { .mix-corner > .mix-play { transition: none; } }
 /* The button in the tile's corner, and its menu below it, as wide as it needs; songmenu.js keeps it on screen whichever
    column the tile is in. More specific than .song-menu's own place in a row, which comes later. */
