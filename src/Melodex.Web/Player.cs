@@ -1250,6 +1250,8 @@ public sealed class Player : IAsyncDisposable
     // and when this browser saved it, so its own save isn't taken for another's.
     private string? _lastKept;
     private DateTime? _savedAt;
+    // Pick-ups started, so only the latest is taken up (#232).
+    private int _pickUps;
     private Task? _saving;
     private bool _saveAgain;
 
@@ -1322,8 +1324,11 @@ public sealed class Player : IAsyncDisposable
     {
         if (_owner is null || Playing || _starting > 0)
             return;
+        // A tab in the background can be held back from taking up the answers till it's shown again, then take them up
+        // one after another: each but the latest is out of date, and would replay another device's playback (#232).
+        var pickUp = ++_pickUps;
         var queue = await LoadQueueAsync();
-        if (Playing || queue is not null && queue.ChangedAt == _savedAt)
+        if (pickUp != _pickUps || Playing || queue is not null && queue.ChangedAt == _savedAt)
             return;
         if (queue is null)
         {
@@ -1337,7 +1342,8 @@ public sealed class Player : IAsyncDisposable
         if (Kept(queue.Items, queue.Current, queue.Position, queue.Ordered) == _lastKept)
             return;
         await StopForPickUpAsync();
-        Adopt(queue);
+        if (pickUp == _pickUps)
+            Adopt(queue);
     }
 
     // What's loaded in the audio element belongs to the queue being replaced.
