@@ -36,6 +36,9 @@ function element() {
             note(`${name} at ${el.currentTime.toFixed(2)}, ready ${el.readyState}${el.error ? `, error ${el.error.code} ${el.error.message}` : ""}`);
             if (name === "playing")
                 stream.started = true;
+            // Wherever it's gone, the stream's filled from there.
+            if (name === "seeking")
+                pump(stream);
             if (name === "error")
                 report("The stream hit an error on this device.");
         });
@@ -44,8 +47,10 @@ function element() {
         if (audio.seeking)
             return;
         // Once a second is plenty for a seek bar, and keeps calls into .NET down.
-        if (stream)
+        if (stream) {
             reach();
+            pump(stream);
+        }
         const now = Math.floor(here());
         if (now !== second) {
             second = now;
@@ -80,8 +85,8 @@ function element() {
         position();
     });
     on("durationchange", position);
-    // A stream run dry with more of it to come: what was in it may have been let go of to save memory.
-    on("waiting", () => { if (stream) stalled(); });
+    // A stream run dry: what was in it may have been let go of to save memory, and it's given it again.
+    on("waiting", () => { if (stream) pump(stream); });
     on("error", () => {
         if (audio.getAttribute("src"))
             player.invokeMethodAsync("OnError", audio.error?.message || "The file couldn't be played.");
@@ -223,10 +228,8 @@ export function prepare(url, meta, token, length) {
 
 /** Forgets the song loaded ahead: the queue has changed, or it's no longer to run on from this one. */
 export function unprepare() {
-    if (stream?.next) {
-        drop(stream, stream.next);
-        stream.next = null;
-    }
+    if (stream)
+        dropNext(stream);
     prepared = null;
     unwatch();
     if (spare.getAttribute("src")) {
@@ -349,9 +352,11 @@ function source(url) {
 
 // On an iPhone, a song started in another element took the lock screen's controls with it or didn't, as iOS chose
 // (#107), so songs there played one at a time, each loaded as the last ended, with a gap between. Now the queue is one
-// stream in the one element, through Media Source Extensions (ManagedMediaSource, from iOS 17.1): each song is fetched in
-// fragmented MP4 and added to the end, the next as soon as it's known, so it runs on with no gap and skipping to it is a
-// jump along the stream, with nothing to load. Where there's no ManagedMediaSource, songs play one at a time as before.
+// stream in the one element, through Media Source Extensions (ManagedMediaSource, from iOS 17.1): each song is fetched
+// in fragmented MP4, in pieces of two seconds or so, and the stream is kept full a minute or so on from where it's
+// playing, running on from one song's last piece into the next's first with no gap. An iPhone holds only a couple of
+// minutes of it, and lets go of what it likes, so the pieces are kept here and given it again as they're needed: after a
+// seek, or once it's let go of them. Where there's no ManagedMediaSource, songs play one at a time as before.
 // "melodex.stream" set to "on" in a browser's storage plays it this way in any browser with Media Source Extensions.
 const Source = window.ManagedMediaSource ?? (forced() ? window.MediaSource : undefined);
 const streams = !!Source && (ios || forced()) && Source.isTypeSupported('audio/mp4; codecs="mp4a.40.2"');
@@ -360,17 +365,21 @@ const keeps = streams
     ? Object.entries({ flac: "flac", opus: "opus", alac: "alac", mp3: "mp4a.6B" })
         .filter(([, codec]) => Source.isTypeSupported(`audio/mp4; codecs="${codec}"`)).map(([name]) => name)
     : [];
-// Songs that couldn't be added to the stream, by path: they're played on their own instead.
+// Songs that couldn't be fetched for the stream, by path: they're played on their own instead.
 const failed = new Set();
-// The stream: { source, buffer, type, now, next, end, from, songs, work, object }, from being where it's to start. Its
-// songs, the one playing and the one after, are each { url, meta, token, length, start, end, controller, added, dropped },
-// starting and ending at times along it. Songs are added one after another (songs, a promise of the last), and the
-// buffer changed one change at a time (work).
-let stream = null;
-// How much of a song is fetched before it's added: a few seconds of lossless sound.
-const CHUNK = 512 * 1024;
 // Given up on for this visit, once a stream didn't start: songs play one at a time instead.
 let unstreamable = false;
+// How many seconds of the stream are kept ahead of where it's playing, and behind. Less is kept ahead once it's full.
+const AHEAD = 60, BEHIND = 10;
+// Songs fetched for the stream, by path, the latest last: the playing one, the next and the one before, so going back or
+// on to them needs nothing fetched again. Each is { type, init, pieces: [{ t, bytes }], complete, failed }, the pieces
+// with when in the song they start.
+const fetched = new Map();
+// The stream: { source, buffer, type, open, now, next, run, ahead, from, work, object }, from being where it's to start
+// once it can. Its songs, the one playing and the one after, are each { url, meta, token, length, data, start, end,
+// added }, starting and ending at times along it; run is the song and piece to add next to carry on from the last.
+// The buffer's changed one change at a time (work).
+let stream = null;
 // The stream's last few steps, put in the server's log if a song doesn't start in it: there's no seeing a phone's
 // console without a computer beside it.
 const trail = [];
@@ -416,23 +425,163 @@ function songLength() {
 }
 
 function song(url, meta, token, length) {
-    return { url, meta, token, length, start: null, end: null, controller: new AbortController(), added: false, dropped: false };
+    return { url, meta, token, length, data: get(url), start: null, end: null, added: false };
 }
+
+// ---- Fetching songs, a piece at a time ----
+
+/** The song's pieces, fetched already or as they come. */
+function get(url) {
+    const key = path(url);
+    let data = fetched.get(key);
+    fetched.delete(key);
+    if (!data || data.failed) {
+        data = { type: null, init: null, pieces: [], complete: false, failed: null, controller: new AbortController() };
+        download(url, data);
+    }
+    fetched.set(key, data);
+    for (const [old, kept] of fetched) {
+        if (fetched.size <= 3)
+            break;
+        if (kept === data || stream && (stream.now.data === kept || stream.next?.data === kept))
+            continue;
+        kept.controller.abort();
+        fetched.delete(old);
+    }
+    return data;
+}
+
+async function download(url, data) {
+    try {
+        const response = await fetch(url + "&as=mp4" + (keeps.length ? "&keep=" + keeps.join(",") : ""), {
+            signal: data.controller.signal,
+            // Checked with the server each time, in case the song came as it is before its copy could be made.
+            cache: "no-cache",
+        });
+        const type = response.headers.get("Content-Type") ?? "";
+        note(`fetching ${path(url)}: ${response.status} ${type}`);
+        if (!response.ok || !type.startsWith("audio/mp4") || !Source.isTypeSupported(type))
+            throw new Error(`Not a song for the stream: ${response.status} ${type}`);
+        data.type = type;
+        const reader = response.body.getReader();
+        let held = new Uint8Array(0);
+        for (; ;) {
+            const { done, value } = await reader.read();
+            if (value) {
+                held = split(data, held.length ? join([held, value], held.length + value.length) : value);
+                heard(data);
+            }
+            if (done)
+                break;
+        }
+        data.complete = true;
+        note(`fetched ${path(url)}: ${data.pieces.length} pieces`);
+    } catch (e) {
+        data.failed = e;
+        if (e?.name !== "AbortError") {
+            failed.add(path(url));
+            note(`couldn't fetch ${path(url)}: ${e?.name} ${e?.message}`);
+            report("A song couldn't be fetched for the stream.");
+        }
+    }
+    heard(data);
+}
+
+// MP4's boxes: a 4-byte size (or 1, and an 8-byte one after the name) and a 4-letter name.
+function boxes(bytes, from, to, each) {
+    const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    let at = from;
+    while (to - at >= 8) {
+        let size = view.getUint32(at), header = 8;
+        if (size === 1) {
+            if (to - at < 16)
+                break;
+            size = Number(view.getBigUint64(at + 8));
+            header = 16;
+        }
+        if (size < header || to - at < size)
+            break;
+        if (each(String.fromCharCode(...bytes.subarray(at + 4, at + 8)), at, at + header, at + size, view) === false)
+            break;
+        at += size;
+    }
+    return at;
+}
+
+/** The box at this path of names within these bytes: [start of its contents, its end], or null. */
+function find(bytes, names, from = 0, to = bytes.length) {
+    let found = null;
+    boxes(bytes, from, to, (name, start, body, end) => {
+        if (name !== names[0])
+            return true;
+        found = names.length === 1 ? [body, end] : find(bytes, names.slice(1), body, end);
+        return false;
+    });
+    return found;
+}
+
+// Takes the whole boxes from the bytes fetched so far: the first part (ftyp and moov) and the pieces (moof and mdat);
+// what's left is kept for when the rest of it comes.
+function split(data, bytes) {
+    const used = boxes(bytes, 0, bytes.length, (name, start, body, end, view) => {
+        const box = bytes.slice(start, end);
+        if (name === "ftyp")
+            data.head = box;
+        else if (name === "moov") {
+            data.init = data.head ? join([data.head, box], data.head.length + box.length) : box;
+            // mdhd: its version, then times as long as it says, then the timescale.
+            const mdhd = find(box, ["moov", "trak", "mdia", "mdhd"]);
+            data.timescale = mdhd ? view.getUint32(start + mdhd[0] + (box[mdhd[0]] === 1 ? 20 : 12)) : 1000;
+        } else if (name === "moof")
+            data.moof = box;
+        else if (name === "mdat" && data.moof) {
+            // tfdt: when the piece starts, in the timescale.
+            const tfdt = find(data.moof, ["moof", "traf", "tfdt"]);
+            const moof = new DataView(data.moof.buffer);
+            const time = !tfdt ? 0 : data.moof[tfdt[0]] === 1 ? Number(moof.getBigUint64(tfdt[0] + 4)) : moof.getUint32(tfdt[0] + 4);
+            data.pieces.push({ t: time / (data.timescale || 1000), bytes: join([data.moof, box], data.moof.length + box.length) });
+            data.moof = null;
+        }
+    });
+    return bytes.slice(used);
+}
+
+// More of a song came, or it failed: the stream it's in is kept full with it.
+function heard(data) {
+    const s = stream;
+    if (!s)
+        return;
+    if (data.failed && data.failed.name !== "AbortError") {
+        if (s.now.data === data && !s.now.added)
+            alone(s.now.url);
+        else if (s.next?.data === data)
+            dropNext(s);
+        return;
+    }
+    if (s.now.data === data || s.next?.data === data)
+        pump(s);
+}
+
+// ---- The stream ----
 
 /** Starts a stream with this song. */
 function begin(url, meta, length) {
     close();
     const source = new Source();
     const s = stream = {
-        source, buffer: null, type: null, now: song(url, meta, null, length), next: null, end: 0,
-        songs: Promise.resolve(), work: Promise.resolve(), object: URL.createObjectURL(source),
+        source, buffer: null, type: null, open: false, now: song(url, meta, null, length), next: null, run: null, ahead: AHEAD,
+        from: null, stuck: 0, work: Promise.resolve(), object: URL.createObjectURL(source),
     };
+    s.now.start = 0;
     // A ManagedMediaSource won't open without it: AirPlay would need the music from somewhere else.
     audio.disableRemotePlayback = true;
     note(`begin ${path(url)}`);
     for (const name of ["sourceopen", "sourceended", "sourceclose", "startstreaming", "endstreaming"])
         source.addEventListener(name, () => note(`${name}${stream === s ? "" : " (old stream)"}`));
-    source.addEventListener("sourceopen", () => add(s, s.now), { once: true });
+    source.addEventListener("sourceopen", () => {
+        s.open = true;
+        pump(s);
+    }, { once: true });
     audio.src = s.object;
     // Not started a while after its song came, though asked to play: given up on, and played the old way. The server
     // may take a while to make the song's copy the first time.
@@ -441,20 +590,14 @@ function begin(url, meta, length) {
             return;
         if (!s.now.added)
             return watch();
-        giveUp(s, "A song didn't start in the stream on this device; it's played on its own instead.");
+        note("given up");
+        report("A song didn't start in the stream on this device; it's played on its own instead.");
+        unstreamable = true;
+        const from = here();
+        alone(s.now.url);
+        seek(from);
     }, 15000);
     watch();
-}
-
-function giveUp(s, message) {
-    note("given up");
-    report(message);
-    unstreamable = true;
-    const { url } = s.now, from = here();
-    close();
-    audio.src = source(url);
-    seek(from);
-    play();
 }
 
 /** Ends the stream, as another song plays on its own or the music stops. */
@@ -464,13 +607,19 @@ function close() {
         return;
     stream = null;
     clearTimeout(s.watchdog);
-    s.now.controller.abort();
-    s.next?.controller.abort();
+    clearTimeout(s.retry);
     URL.revokeObjectURL(s.object);
     audio.disableRemotePlayback = false;
 }
 
-/** The song to run on into after this one, added to the stream; one there already that isn't it is taken out first. */
+// The song played on its own, the old way.
+function alone(url) {
+    close();
+    audio.src = source(url);
+    play();
+}
+
+/** The song to run on into after this one; one there already that isn't it is taken out first. */
 function follow(url, meta, token, length) {
     const s = stream, next = s.next;
     if (next && path(next.url) === path(url)) {
@@ -478,169 +627,198 @@ function follow(url, meta, token, length) {
         return;
     }
     if (next)
-        drop(s, next);
+        dropNext(s);
     // Played on its own when it comes.
-    s.next = failed.has(path(url)) ? null : song(url, meta, token, length);
-    if (s.next)
-        add(s, s.next);
-    else
+    if (failed.has(path(url))) {
         finish(s);
-}
-
-function add(s, song) {
-    s.songs = s.songs.then(() => fill(s, song)).catch(() => { });
-}
-
-/** Takes the song after this one out of the stream, or stops it being added. */
-function drop(s, song) {
-    song.dropped = true;
-    song.controller.abort();
-    s.songs = s.songs.then(async () => {
-        if (song.start == null || stream !== s)
-            return;
-        await change(s, b => {
-            // What was half read of it is forgotten too; there's none once the stream's said to have ended.
-            if (s.source.readyState === "open")
-                b.abort();
-            b.remove(song.start, Infinity);
-            return true;
-        }).catch(() => { });
-        s.end = song.start;
-        finish(s);
-    });
-}
-
-/** Fetches a song and adds it to the end of the stream, a piece at a time as it comes. */
-async function fill(s, song) {
-    if (song.dropped || stream !== s)
         return;
-    song.start = s.end;
-    s.filling = true;
-    try {
-        const response = await fetch(song.url + "&as=mp4" + (keeps.length ? "&keep=" + keeps.join(",") : ""), {
-            signal: song.controller.signal,
-            // Checked with the server each time, in case the song came as it is before its copy could be made.
-            cache: "no-cache",
-        });
-        const type = response.headers.get("Content-Type") ?? "";
-        note(`fetched ${path(song.url)}: ${response.status} ${type}, from ${song.start.toFixed(2)}`);
-        if (!response.ok || !type.startsWith("audio/mp4") || !Source.isTypeSupported(type))
-            throw new Error(`Not a song for the stream: ${response.status} ${type}`);
-        await change(s, b => {
-            if (!b) {
-                s.buffer = s.source.addSourceBuffer(type);
-                s.buffer.mode = "segments";
-                s.buffer.addEventListener("bufferedchange", e => note(`let go of ${ranges(e.removedRanges)}, now ${ranges(s.buffer.buffered)}`));
-            } else if (s.type !== type)
-                b.changeType(type);
-            s.type = type;
-            // Each song's own time starts at nothing: it's moved along to where the last one ended.
-            s.buffer.timestampOffset = song.start;
-            return false;
-        });
-        const reader = response.body.getReader();
-        let parts = [], size = 0;
-        for (; ;) {
-            const { done, value } = await reader.read();
-            if (value) {
-                parts.push(value);
-                size += value.length;
-            }
-            if (size >= CHUNK || done && size) {
-                await append(s, song, join(parts, size));
-                if (!song.added && song === s.now && s.from != null) {
-                    audio.currentTime = song.start + s.from;
-                    s.from = null;
-                }
-                song.added = true;
-                parts = [];
-                size = 0;
-            }
-            if (done)
-                break;
-        }
-        song.end = s.end = endOf(s, song);
-        note(`added ${path(song.url)}, to ${song.end.toFixed(2)}; there's ${ranges(s.buffer.buffered)}`);
-        finish(s);
-    } catch (e) {
-        if (stream !== s || song.dropped)
-            return;
-        console.warn("Melodex: a song couldn't be added to the stream.", e);
-        note(`couldn't add ${path(song.url)}: ${e?.name} ${e?.message}`);
-        report("A song couldn't be added to the stream.");
-        failed.add(path(song.url));
-        if (song === s.now && !song.added) {
-            // Played on its own.
-            close();
-            audio.src = source(song.url);
-            play();
-            return;
-        }
-        // What came of it is taken out again; the next is played on its own when it comes, and what's here of this one
-        // plays to its end.
-        await change(s, b => {
-            // What was half read of it is forgotten too; there's none once the stream's said to have ended.
-            if (s.source.readyState === "open")
-                b.abort();
-            b.remove(song.start, Infinity);
+    }
+    s.next = song(url, meta, token, length);
+    s.next.start = s.now.end;
+    pump(s);
+}
+
+/** Takes the song after this one out of the stream. */
+function dropNext(s) {
+    const next = s.next;
+    if (!next)
+        return;
+    s.next = null;
+    if (s.run?.song === next)
+        s.run = null;
+    if (next.start != null && next.added)
+        change(s, b => {
+            b.remove(next.start, Infinity);
             return true;
         }).catch(() => { });
-        if (song === s.next) {
-            s.next = null;
-            s.end = song.start;
-        } else
-            song.end = s.end = endOf(s, song);
-        finish(s);
+    finish(s);
+}
+
+/**
+ * Keeps the stream full from where it's playing: what's there runs on, a piece at a time, as far ahead as it holds;
+ * what's well behind is let go of. Once at a time; asked again while it's at it, it goes round again.
+ */
+async function pump(s) {
+    if (s.pumping) {
+        s.again = true;
+        return;
+    }
+    s.pumping = true;
+    try {
+        do {
+            s.again = false;
+            await fill(s);
+        } while (s.again && stream === s);
+    } catch (e) {
+        if (stream === s) {
+            note(`couldn't add to the stream: ${e?.name} ${e?.message}`);
+            report("The stream couldn't take a song on this device.");
+        }
     } finally {
-        if (stream === s)
-            s.filling = false;
+        s.pumping = false;
     }
 }
 
-function ranges(r) {
-    const out = [];
-    for (let i = 0; r && i < r.length; i++)
-        out.push(`${r.start(i).toFixed(2)}–${r.end(i).toFixed(2)}`);
-    return out.join(", ") || "nothing";
-}
-
-function join(parts, size) {
-    if (parts.length === 1)
-        return parts[0];
-    const bytes = new Uint8Array(size);
-    let at = 0;
-    for (const part of parts) {
-        bytes.set(part, at);
-        at += part.length;
-    }
-    return bytes;
-}
-
-// Added to the stream, once there's room: a browser keeps only so much, and what's been played is let go of for more.
-async function append(s, song, bytes) {
+async function fill(s) {
     for (; ;) {
-        if (song.dropped || stream !== s)
-            throw new DOMException("No longer wanted.", "AbortError");
-        try {
+        if (stream !== s || !s.open)
+            return;
+        const at = s.from ?? audio.currentTime;
+        const buffered = s.buffer?.buffered;
+        const end = edge(s, at);
+        // Well behind, or cut off ahead of what runs on from here (left from before a seek): let go of.
+        if (buffered?.length && buffered.start(0) < at - BEHIND - 5) {
             await change(s, b => {
-                b.appendBuffer(bytes);
+                b.remove(0, at - BEHIND);
                 return true;
             });
+            continue;
+        }
+        if (buffered?.length && buffered.end(buffered.length - 1) > end + 0.2) {
+            const after = [...Array(buffered.length).keys()].map(i => buffered.start(i)).find(start => start > end + 0.15);
+            if (after != null) {
+                await change(s, b => {
+                    b.remove(after, Infinity);
+                    return true;
+                });
+                continue;
+            }
+        }
+        // As long as its songs, so a seek can go past what's there yet.
+        const length = Math.max(...[s.now, s.next].map(song => song?.start != null && song.length > 0 ? song.start + song.length : 0));
+        if (s.source.readyState === "open" && length > 0 && !(s.source.duration >= length) && !s.buffer?.updating) {
+            await change(s, () => {
+                s.source.duration = length;
+                return false;
+            });
+            continue;
+        }
+        if (end - at >= s.ahead)
             return;
+        const place = locate(s, end);
+        if (!place) {
+            finish(s);
+            return;
+        }
+        const { song, index } = place, data = song.data, piece = data.pieces[index];
+        // Not fetched yet: here again when it is.
+        if (!piece || !data.init)
+            return;
+        try {
+            // A run from somewhere new starts with the song's first part, its time moved along to where it starts.
+            if (s.run?.song !== song || s.run.index !== index)
+                await change(s, b => {
+                    if (!b) {
+                        b = s.buffer = s.source.addSourceBuffer(data.type);
+                        b.mode = "segments";
+                        b.addEventListener("bufferedchange", e => {
+                            if (e.removedRanges?.length)
+                                note(`let go of ${ranges(e.removedRanges)}, now ${ranges(b.buffered)}`);
+                        });
+                    } else if (s.type !== data.type)
+                        b.changeType(data.type);
+                    s.type = data.type;
+                    b.timestampOffset = song.start;
+                    b.appendBuffer(data.init);
+                    return true;
+                });
+            await change(s, b => {
+                b.appendBuffer(piece.bytes);
+                return true;
+            });
         } catch (e) {
             if (e?.name !== "QuotaExceededError")
                 throw e;
-            note("full");
-            const behind = audio.currentTime - 10, buffered = s.buffer.buffered;
-            if (buffered.length && buffered.start(0) < behind - 1)
-                await change(s, b => {
-                    b.remove(0, behind);
-                    return true;
-                });
-            else
-                await new Promise(resolve => setTimeout(resolve, 1000));
+            // Full: less is kept ahead from now on, and it's tried again in a moment.
+            s.ahead = Math.max(10, Math.min(s.ahead, end - at) - 5);
+            s.run = null;
+            note(`full at ${end.toFixed(2)}: ${s.ahead.toFixed(0)}s kept ahead`);
+            clearTimeout(s.retry);
+            s.retry = setTimeout(() => pump(s), 1000);
+            return;
+        }
+        s.run = { song, index: index + 1 };
+        // A piece that didn't go where it was meant to would be added for ever: left until something changes.
+        if (edge(s, at) <= end + 0.01 && ++s.stuck > 3) {
+            note(`stuck at ${end.toFixed(2)}`);
+            s.stuck = 0;
+            return;
+        }
+        if (!song.added) {
+            song.added = true;
+            note(`added ${path(song.url)} from ${(song.start + piece.t).toFixed(2)}`);
+        }
+        if (s.from != null && song === s.now && audio.readyState > 0) {
+            audio.currentTime = song.start + s.from;
+            s.from = null;
+        }
+        // Its last piece: it ends where that does, and the next starts there.
+        if (index + 1 === data.pieces.length && data.complete && song.end == null) {
+            song.end = edge(s, song.start + piece.t);
+            if (song === s.now && s.next)
+                s.next.start = song.end;
+            note(`${path(song.url)} ends at ${song.end.toFixed(2)}`);
         }
     }
+}
+
+/** The song and piece to add to carry on from this time along the stream; null if there's nothing more. */
+function locate(s, end) {
+    const run = s.run;
+    if (run && (run.song === s.now || run.song === s.next)) {
+        const { song, index } = run, pieces = song.data.pieces;
+        if (index < pieces.length && Math.abs(song.start + pieces[index].t - end) < 0.5)
+            return run;
+        // Waiting for more of it.
+        if (index >= pieces.length && !song.data.complete && pieces.length && end > song.start + pieces[pieces.length - 1].t)
+            return run;
+    }
+    for (const song of [s.now, s.next]) {
+        if (!song || song.start == null || end < song.start - 0.1 || song.end != null && end >= song.end - 0.1)
+            continue;
+        const rel = end - song.start, pieces = song.data.pieces;
+        let index = 0;
+        while (index + 1 < pieces.length && pieces[index + 1].t <= rel + 0.05)
+            index++;
+        // Past the last piece there is of it, there's more to come.
+        if (pieces.length && index === pieces.length - 1 && !song.data.complete && pieces[index].t + 2.5 < rel)
+            index = pieces.length;
+        return { song, index };
+    }
+    return null;
+}
+
+/** Where what's there from this time on runs to: the time itself if there's nothing. Gaps of a moment don't count. */
+function edge(s, at) {
+    let end = at;
+    try {
+        const buffered = s.buffer.buffered;
+        for (let i = 0; i < buffered.length; i++)
+            if (buffered.start(i) <= end + 0.15 && buffered.end(i) > end)
+                end = buffered.end(i);
+    } catch {
+    }
+    return end;
 }
 
 /**
@@ -673,20 +851,28 @@ function change(s, act) {
     return work;
 }
 
-// Where a song ends along the stream: the end of what's there of it.
-function endOf(s, song) {
-    const buffered = s.buffer.buffered;
-    for (let i = buffered.length - 1; i >= 0; i--)
-        if (buffered.end(i) > song.start)
-            return buffered.end(i);
-    return song.start + (song.length || 0);
+function ranges(r) {
+    const out = [];
+    for (let i = 0; r && i < r.length; i++)
+        out.push(`${r.start(i).toFixed(2)}–${r.end(i).toFixed(2)}`);
+    return out.join(", ") || "nothing";
 }
 
-// The stream's said to end with its last song, so the element ends there; another song added after starts it again.
+function join(parts, size) {
+    const bytes = new Uint8Array(size);
+    let at = 0;
+    for (const part of parts) {
+        bytes.set(part, at);
+        at += part.length;
+    }
+    return bytes;
+}
+
+// The stream's said to end with its last song, so the element ends there; more added after starts it again.
 function finish(s) {
     s.work.then(() => {
         const last = s.next ?? s.now;
-        if (stream === s && last.end != null && s.source.readyState === "open" && !s.buffer?.updating)
+        if (stream === s && s.open && last.end != null && s.source.readyState === "open" && !s.buffer?.updating)
             try {
                 s.source.endOfStream();
             } catch {
@@ -695,21 +881,12 @@ function finish(s) {
     });
 }
 
-/** Whether the song's start is in the stream, to jump to. */
+/** Whether the next song's start is in the stream, to jump to. */
 function ready(song) {
-    if (song.start == null || !stream?.buffer)
-        return false;
-    try {
-        const buffered = stream.buffer.buffered;
-        for (let i = 0; i < buffered.length; i++)
-            if (buffered.start(i) <= song.start + 0.1 && buffered.end(i) > song.start + 0.5)
-                return true;
-    } catch {
-    }
-    return false;
+    return song.start != null && !!stream && edge(stream, song.start) > song.start + 0.5;
 }
 
-// The stream's run on into the next song: it's the one playing now, and what came before is let go of.
+// The stream's run on into the next song: it's the one playing now.
 function reach() {
     const next = stream.next;
     if (next?.start != null && audio.currentTime >= next.start)
@@ -725,50 +902,12 @@ function advance(quiet) {
     position();
     if (!quiet)
         player.invokeMethodAsync("OnAdvanced", to.token);
-    if (to.start > 0)
-        change(s, b => {
-            b.remove(0, to.start);
-            return true;
-        }).catch(() => { });
 }
 
 /** Jumps to the next song, there in the stream already; quietly when Player.cs chose it. */
 function skip(quiet) {
     audio.currentTime = stream.next.start;
     advance(quiet);
-}
-
-// A stream run dry. While the song's still being fetched, it'll come; otherwise what was there was let go of to save
-// memory (an iPhone may), and the stream starts again from here.
-// How much of the stream there is from here on.
-function ahead(s) {
-    try {
-        const buffered = s.buffer.buffered, at = audio.currentTime;
-        for (let i = 0; i < buffered.length; i++)
-            if (buffered.start(i) <= at + 0.1 && buffered.end(i) > at)
-                return buffered.end(i) - at;
-    } catch {
-    }
-    return 0;
-}
-
-function stalled() {
-    const s = stream;
-    setTimeout(() => {
-        if (stream !== s || s.filling || !s.now.added || audio.paused || audio.readyState > 2 || ahead(s) > 1)
-            return;
-        note(`ran dry at ${audio.currentTime.toFixed(2)}; there's ${ranges(s.buffer?.buffered)}`);
-        if (s.rebuilt)
-            return giveUp(s, "The stream ran dry on this device; songs are played on their own instead.");
-        const { now, next } = s, from = here();
-        begin(now.url, now.meta, now.length);
-        stream.now.token = now.token;
-        stream.rebuilt = true;
-        if (next)
-            follow(next.url, next.meta, next.token, next.length);
-        seek(from);
-        play();
-    }, 1500);
 }
 
 export function load(url, meta, length) {
@@ -810,7 +949,7 @@ export function pause() {
 
 export function seek(seconds) {
     // Before a stream has any of its song, where it's to start is kept until it does.
-    if (stream && !stream.now.added)
+    if (stream && (!stream.open || audio.readyState === 0))
         stream.from = seconds;
     else
         audio.currentTime = (stream ? stream.now.start : 0) + seconds;
