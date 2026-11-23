@@ -92,6 +92,9 @@ What changed in each release of Melodex. Versions follow [semantic versioning](h
   too, is a jump with nothing to load. Songs come in an MP4 file the server makes and keeps, like the WebM copies for
   Safari: their own sound where the phone takes it, otherwise AAC at 256 kbps. Stream URLs take `as=mp4` and `keep` for
   it (#109).
+- **Import from Apple Music** on the Tools page, from the copy of your data Apple gives you (no Apple account linked):
+  your favourite songs and library songs become playlists, and so does each playlist you made. Only Apple Music's
+  library and favourites are read from the zip, and importing a later copy brings only what's new (#25).
 
 ### Changed
 

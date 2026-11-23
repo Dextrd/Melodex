@@ -266,6 +266,60 @@ public sealed class ImportTests : IDisposable
     }
 
     [Fact]
+    public void An_apple_export_gives_its_favourites_library_and_playlists_from_the_zips_inside_it()
+    {
+        const string tracks = """
+            [
+              {"Content Type": "Song", "Track Identifier": 101, "Title": "Glory Box", "Artist": "Portishead", "Album": "Dummy", "Track Duration": 306000,
+               "Playlist Only Track": false, "Apple Music Track Identifier": 5001},
+              {"Content Type": "Song", "Track Identifier": 102, "Title": "Da Funk", "Artist": "Daft Punk", "Album": "Homework", "Track Duration": 328000,
+               "Playlist Only Track": true, "Apple Music Track Identifier": 5002, "Track Like Rating": "liked", "Favorite Status - Track": true},
+              {"Content Type": "Song", "Track Identifier": 103, "Title": "Teardrop", "Artist": "Massive Attack", "Album": "Mezzanine", "Track Duration": 330000,
+               "Playlist Only Track": true}
+            ]
+            """;
+        const string playlists = """
+            [
+              {"Container Type": "Favorites Playlist", "Container Identifier": 2, "Title": "Favorite Songs", "Playlist Item Identifiers": [102]},
+              {"Container Type": "Playlist", "Container Identifier": 7, "Title": "Evening", "Playlist Item Identifiers": [103, 101]}
+            ]
+            """;
+        const string favourites = "\"Favorite Type\",\"Item Reference\",\"Item Description\",\"Last Modified\",Preference\n"
+            + "Song,5002,\"Daft Punk - Da Funk\",2026-11-15T01:47:03Z,LIKE\nSong,5009,\"Air - La Femme d'Argent\",2026-11-15T01:47:09Z,LIKE\n"
+            + "Artist,77,\"Air\",2026-11-15T01:47:10Z,LIKE\n";
+        const string folder = "Apple_Media_Services/Apple Music Activity/";
+        var inner = Zip([
+            (folder + "Apple Music Library Tracks.json.zip", Zip([("Apple Music Library Tracks.json", System.Text.Encoding.UTF8.GetBytes(tracks))])),
+            (folder + "Apple Music Library Playlists.json.zip", Zip([("Apple Music Library Playlists.json", System.Text.Encoding.UTF8.GetBytes(playlists))])),
+            (folder + "Apple Music - Favorites.csv", System.Text.Encoding.UTF8.GetBytes(favourites)),
+            // Not opened: only Apple Music's library and favourites are read.
+            ("Apple_Media_Services/Apple Media Services/Billing Information History.csv", "Video ID,Song Title\nx,Not music\n"u8.ToArray()),
+        ]);
+        var outer = Zip([("Apple Media Services information Part 1 of 2/Apple_Media_Services.zip", inner)]);
+
+        var export = ServiceExports.Read([("Apple Media Services information Part 1 of 2.zip", outer)])!;
+        Assert.Equal(ImportFormat.AppleMusic, export.Service);
+        Assert.Equal([("liked", 2), ("library", 1), ("playlist:Evening", 2)], export.Lists.Select(l => (l.Key, l.Items.Count)));
+        Assert.Equal([("Da Funk", "Daft Punk", "apple:song:5002"), ("La Femme d'Argent", "Air", "apple:song:5009")],
+            export.Lists[0].Items.Select(i => (i.Song.Title, i.Song.Artist, i.Id)));
+        Assert.Equal(new ImportSong("Glory Box", "Portishead", "Dummy", 306), export.Lists[1].Items[0].Song);
+        // Playlists in their own order; a song of only your own has its library ID.
+        Assert.Equal(["apple:library:103", "apple:song:5001"], export.Lists[2].Items.Select(i => i.Id));
+
+        static byte[] Zip(IEnumerable<(string Name, byte[] Bytes)> files)
+        {
+            using var bytes = new MemoryStream();
+            using (var zip = new System.IO.Compression.ZipArchive(bytes, System.IO.Compression.ZipArchiveMode.Create, leaveOpen: true))
+                foreach (var (name, data) in files)
+                {
+                    using var entry = zip.CreateEntry(name).Open();
+                    entry.Write(data);
+                }
+            return bytes.ToArray();
+        }
+    }
+
+    [Fact]
     public void A_deezer_export_gives_its_favourites_and_playlists_and_leaves_the_rest_unread()
     {
         var export = ServiceExports.Read([("deezer-data_1.xlsx", DeezerXlsx(more: false, isrcs: true))])!;
