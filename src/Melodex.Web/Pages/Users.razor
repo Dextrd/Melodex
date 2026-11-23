@@ -13,7 +13,7 @@
 @if (!Auth.May(UserPermissions.Users))
 {
     <div class="empty card">
-        You can't manage users. To change your own username or password, open <a href="account">your account</a>.
+        You can't manage users. To change your own username or password, open <a href="settings/account">your account</a>.
     </div>
 }
 else if (_users is null)

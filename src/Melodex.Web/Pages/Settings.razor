@@ -3,10 +3,12 @@
 @inject MelodexClient Api
 @inject TaskNotices Tasks
 
-<PageTitle>Settings · Melodex</PageTitle>
+<PageTitle>Library settings · Melodex</PageTitle>
+
+@* How the library is matched, shown and filled in: the Library section of Settings (#238). *@
 
 
-@if (_settings is null || _fetch is null || _log is null)
+@if (_settings is null)
 {
     <Loading />
 }
@@ -119,68 +121,12 @@ else
         }
     </div>
 
-    <h2>Fetching</h2>
-    <div class="card settings-card">
-        <div class="field">
-            <label class="field-label" for="path-template">Folder layout for new albums</label>
-            <input id="path-template" type="text" style="width: 100%; max-width: 32rem;" @bind="_fetchTemplate" @bind:after="Changed" />
-            <div class="muted small">
-                A <a href="https://beets.readthedocs.io/en/stable/reference/pathformat.html" target="_blank" rel="noopener noreferrer">beets path format</a>.
-                The default, <code>@FetchSettings.DefaultPathTemplate</code>, gives <code>Portishead/Dummy/11 Glory Box.opus</code>.
-                A track for an album you already have goes next to that album's files instead.
-                @if (_fetchTemplate != FetchSettings.DefaultPathTemplate)
-                {
-                    <button class="link small" @onclick="() => { _fetchTemplate = FetchSettings.DefaultPathTemplate; Changed(); }">Use the default</button>
-                }
-            </div>
-        </div>
-        <div class="setting-line">
-            Fetch
-            <NumberField Min="1" Max="8" Label="Fetches at once" Value="_fetch.ParallelFetches" ValueChanged="n => SetFetch(_fetch with { ParallelFetches = n })" />
-            at once
-        </div>
-        <div class="setting-line">
-            Accept a file within
-            <NumberField Min="0" Max="120" Label="Seconds" Value="_fetch.DurationToleranceSeconds" ValueChanged="n => SetFetch(_fetch with { DurationToleranceSeconds = n })" />
-            seconds or
-            <NumberField Min="0" Max="50" Label="Percent" Value="_fetch.DurationTolerancePercent" ValueChanged="n => SetFetch(_fetch with { DurationTolerancePercent = n })" />
-            % of the song's length, whichever is more
-        </div>
-        <div class="muted small">A file further off is probably a different version, such as a live take or a radio edit.</div>
-        <div class="setting-line">
-            Try
-            <NumberField Min="1" Max="5" Label="Results per source" Value="_fetch.CandidatesPerPlugin" ValueChanged="n => SetFetch(_fetch with { CandidatesPerPlugin = n })" />
-            of each source's best results, best first whichever source they're from
-        </div>
-        <div class="muted small">How long listen-now tracks are kept is under <a href="settings/playback">Playback</a>.</div>
-    </div>
-
-    <h2>Log</h2>
-    <div class="card settings-card">
-        <div class="setting-line">
-            Show the last
-            <NumberField Min="1" Max="90" Label="Days" Value="_log!.MemoryDays" ValueChanged="n => SetLog(_log with { MemoryDays = n })" />
-            days on the Log page
-        </div>
-        <div class="setting-line">
-            Keep backup files for
-            <NumberField Min="1" Max="3650" Label="Days" Value="_log.FileDays" ValueChanged="n => SetLog(_log with { FileDays = n })" />
-            days
-        </div>
-        <div class="muted small">Every entry is written to a file per day under <code>data/logs</code> as it happens, so a restart loses nothing. Older files are deleted.</div>
-        <div class="setting-line">
-            Keep tasks' lists for
-            <NumberField Min="1" Max="3650" Label="Days" Value="_log.TaskDays" ValueChanged="n => SetLog(_log with { TaskDays = n })" />
-            days
-        </div>
-        <div class="muted small">What each scan, format, lyrics search and catalogue update did, row by row, as Activity shows it. A task's list is written under <code>data/tasks</code> when it finishes.</div>
-    </div>
-
     <AutoSave @ref="_saver" Save="SaveAsync" />
 
-    <p class="muted small">Plugins (sources, the media server and the catalogue) are set up under <a href="settings/plugins">Plugins</a>.</p>
-
-    <FactoryResetPanel />
+    <p class="muted small">
+        Where new albums go and how they're fetched are under <a href="settings/fetching">Fetching</a>; plugins (sources, the media server and the
+        catalogue) under <a href="settings/plugins">Plugins</a>.
+    </p>
 }
 
 @code {
@@ -210,9 +156,6 @@ else
     ];
 
     private LibrarySettings? _settings;
-    private FetchSettings? _fetch;
-    private LogSettings? _log;
-    private string _fetchTemplate = "";
     private AutoSave? _saver;
 
     private static readonly (DuplicateTracks, string, string)[] DuplicateOptions =
@@ -228,9 +171,6 @@ else
     protected override async Task OnInitializedAsync()
     {
         _settings = await Api.GetLibrarySettingsAsync();
-        _fetch = await Api.GetFetchSettingsAsync();
-        _log = await Api.GetLogSettingsAsync();
-        _fetchTemplate = _fetch.PathTemplate;
     }
 
     private bool IsDefaultShowing => Enum.GetValues<ReleaseKind>().All(k => _settings!.ShowingOf(k) == ReleaseKinds.Default(k));
@@ -249,24 +189,7 @@ else
         Changed();
     }
 
-    private void SetFetch(FetchSettings fetch)
-    {
-        _fetch = fetch;
-        Changed();
-    }
-
-    private void SetLog(LogSettings log)
-    {
-        _log = log;
-        Changed();
-    }
-
     private void Changed() => _saver?.Changed();
 
-    private async Task SaveAsync()
-    {
-        await Api.SaveLibrarySettingsAsync(_settings!);
-        await Api.SaveFetchSettingsAsync(_fetch! with { PathTemplate = _fetchTemplate });
-        await Api.SaveLogSettingsAsync(_log!);
-    }
+    private Task SaveAsync() => Api.SaveLibrarySettingsAsync(_settings!);
 }

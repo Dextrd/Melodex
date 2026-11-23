@@ -1385,13 +1385,30 @@ svg.flip { transform: scaleY(-1); }
 .settings-nav a { padding: .45rem .75rem; border-radius: 6px; color: var(--muted); text-decoration: none; }
 .settings-nav a:hover { background: var(--surface); color: var(--text); }
 .settings-nav a.active { background: var(--surface); color: var(--text); font-weight: 600; box-shadow: inset 3px 0 0 var(--accent); }
+/* Your account first, as a large button with your initial and name (#238); the rest in titled groups. */
+.settings-nav a.settings-account { display: flex; align-items: center; gap: .65rem; padding: .6rem .7rem; margin-bottom: .5rem; color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: 10px; }
+.settings-nav a.settings-account:hover { border-color: var(--accent); }
+.settings-nav a.settings-account.active { border-color: var(--accent); box-shadow: none; }
+.settings-account .avatar { flex: none; width: 2.6rem; height: 2.6rem; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; background: var(--accent); color: var(--accent-text); font-size: 1.15rem; }
+.settings-account-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
+.settings-group { display: flex; flex-direction: column; gap: .15rem; margin-top: .6rem; }
+.settings-group h2 { margin: 0 0 .15rem; padding: 0 .75rem; font-size: .72rem; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.settings-tabs { display: flex; gap: .25rem; flex-wrap: wrap; margin-bottom: 1rem; border-bottom: 1px solid var(--border); }
+.settings-tabs a { padding: .45rem .8rem; color: var(--muted); text-decoration: none; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.settings-tabs a:hover { color: var(--text); }
+.settings-tabs a.active { color: var(--text); font-weight: 600; border-bottom-color: var(--accent); }
+.log-retention { margin-bottom: 1rem; }
+.log-retention > summary { cursor: pointer; color: var(--muted); margin-bottom: .5rem; }
 .settings-body > :first-child { margin-top: 0; }
 @media (max-width: 720px) {
     .settings-page { grid-template-columns: minmax(0, 1fr); gap: .75rem; }
-    /* Every section in sight, on as many lines as it takes. */
+    /* Every page in sight, on as many lines as it takes, without the groups' titles. */
     .settings-nav { flex-direction: row; flex-wrap: wrap; position: static; }
     .settings-nav a { padding: .4rem .6rem; }
     .settings-nav a.active { box-shadow: inset 0 -2px 0 var(--accent); }
+    .settings-nav a.settings-account { flex: 1 0 100%; margin-bottom: .25rem; }
+    .settings-group { display: contents; }
+    .settings-group h2 { display: none; }
 }
 
 /* Signing in, and the first run's setup */

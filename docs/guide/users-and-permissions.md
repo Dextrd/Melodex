@@ -15,8 +15,8 @@ three tabs, saved together:
   playlists. The one in use is marked; the others' logins are kept for switching to them. Each login is checked with
   its server when you save, and a tab with something to fix is marked.
 
-Anyone can change their own account under **Your account**, in the account menu at the top right: the same three
-tabs, for themselves. Changing their username or password needs their current password, and a new password signs
+Anyone can change their own account under **Your account**, at the top of Settings or in the account menu at the top
+right: the same three tabs, for themselves. Changing their username or password needs their current password, and a new password signs
 them out everywhere else.
 
 ## What each permission allows
@@ -38,7 +38,7 @@ Someone who just listens needs Browse and Listen. Buttons for what someone may n
 
 ## API keys
 
-Apps use a key from **Settings → API**. Anyone signed in can make keys there, as many as they like, but each can do only
+Apps use a key from **Settings → Your account → API keys**. Anyone signed in can make keys there, as many as they like, but each can do only
 what its maker may. A key belongs to whoever made it and can never do more than they may: if their
 permissions shrink, or they're removed, so does the key. **Everything you may do** gives a key all its owner's
 permissions, now and later. See the [client guide](../client-guide.md) for the API itself.

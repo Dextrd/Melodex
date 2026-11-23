@@ -98,6 +98,11 @@ What changed in each release of Melodex. Versions follow [semantic versioning](h
 
 ### Changed
 
+- **Settings in sections**: your account comes first, as a large button with your initial and name, holding your
+  account, your look (**Appearance**) and your **API keys** as tabs. The rest are under **Library**, **Downloads**,
+  **Server** and **Melodex**. **General** is gone: its library settings are the **Library** page, the folder layout
+  and fetching have a **Fetching** page, how long logs are kept is on the **Log** page, and resetting Melodex is on
+  **About**. The old `/account` link still opens your account (#238).
 - **Retrieval plugins have repositories of their own**, `dextrd/melodex-retriever-<name>`, each with its own releases
   and image, which keeps its name. Each README has the lines to add to your compose file. Melodex's own compose file
   is just Melodex now: the core and the beets worker, with no plugins and no `COMPOSE_PROFILES`. The guide's Plugins

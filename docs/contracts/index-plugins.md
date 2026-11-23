@@ -57,7 +57,7 @@ Each is an extra interface on the same class, declared in the manifest by name.
 (`trip hop`), and only genres, not other tags such as places or decades. The core asks after a scan, for each album
 and artist in the library it hasn't asked about in 90 days, from the first catalogue in the user's order that has an
 ID for it. It keeps the three most voted for, and songs whose files have no genres of their own take their album's, or
-else its artist's, as **Settings → General → File metadata** says. MusicBrainz's are those its users vote for, from
+else its artist's, as **Settings → Library → File metadata** says. MusicBrainz's are those its users vote for, from
 `inc=genres`.
 
 ## Errors

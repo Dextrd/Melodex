@@ -59,7 +59,7 @@
             <input type="checkbox" checked="@_options.Move" @onchange="e => _options = _options with { Move = (bool)e.Value! }" />
             <span>
                 <strong>Move and rename the files</strong>
-                <span class="muted small">To where an import would put them now, going by their new tags: <code>@_plan.PathTemplate</code>. The layout is set in <a href="settings">Settings</a>.</span>
+                <span class="muted small">To where an import would put them now, going by their new tags: <code>@_plan.PathTemplate</code>. The layout is set under <a href="settings/fetching">Fetching</a> in Settings.</span>
             </span>
         </label>
         @if (_options.Move)

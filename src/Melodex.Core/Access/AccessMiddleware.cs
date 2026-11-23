@@ -81,7 +81,7 @@ public static class AccessMiddleware
         {
             await Problem(http, StatusCodes.Status403Forbidden, "Not allowed",
                 caller.Kind == CallerKind.Key
-                    ? $"This key can't do that: it needs the {scope} permission, and its owner needs it too. Keys are made under Settings → API."
+                    ? $"This key can't do that: it needs the {scope} permission, and its owner needs it too. Keys are made under Settings → Your account → API keys."
                     : scope == Scopes.Admin ? "Only the admin can do that." : $"You can't do that: it needs the {scope} permission, which the admin can give you.",
                 "scope-required", scope);
             return;

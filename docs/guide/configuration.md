@@ -17,18 +17,23 @@ Variables named `Navidex__…`, from before the rename, still work; a `Melodex__
 
 ## In the web app
 
-| Settings section | Holds |
-| --- | --- |
-| **General** | Songs on more than one release, the missing view (each kind of release shown, hidden, or for new songs only), matching, file metadata, lyrics, the folder layout, and fetching |
-| **Quality** | The [quality profile](requests-and-listening.md#quality) and [upgrades](requests-and-listening.md#upgrades) |
-| **Scheduled tasks** | What runs on its own, and when: see [Scheduled tasks](#scheduled-tasks) |
-| **Playback** | Which songs play [without a gap](requests-and-listening.md#gapless-playback), when [the visualiser](requests-and-listening.md#the-visualiser)'s bars are made, if at all, how long listen-now songs are kept, how much of a [radio](requests-and-listening.md#radio) is songs you don't have, and whether radios carry on when a queue runs out |
-| **Log** | Recent activity, and how long logs are kept |
-| **Plugins** | See [Plugins](plugins.md) |
-| **Users**, **API**, **Webhooks** | See [Users and permissions](users-and-permissions.md) and the [client guide](../client-guide.md) |
-| **Appearance** | See [Appearance](appearance.md) |
-| **Help** | This guide |
-| **About** | The version, links to GitHub, and who made Melodex |
+Settings opens with **your account** at the top: a large button with your initial and name. It holds what's only
+yours, in three tabs: **Account** (your login, media-server logins and [scrobbling](library.md#history)),
+**Appearance** (see [Appearance](appearance.md)) and **API keys** (see the [client guide](../client-guide.md)). Below it
+the rest are in sections, each page shown to whoever may use it:
+
+| Section | Page | Holds |
+| --- | --- | --- |
+| Library | **Library** | Songs on more than one release, the missing view (each kind of release shown, hidden, or for new songs only), matching, file metadata, and lyrics |
+| | **Quality** | The [quality profile](requests-and-listening.md#quality) and [upgrades](requests-and-listening.md#upgrades) |
+| | **Playback** | Which songs play [without a gap](requests-and-listening.md#gapless-playback), when [the visualiser](requests-and-listening.md#the-visualiser)'s bars are made, if at all, how long listen-now songs are kept, how much of a [radio](requests-and-listening.md#radio) is songs you don't have, and whether radios carry on when a queue runs out |
+| Downloads | **Fetching** | The folder layout for new albums, how many fetches run at once, and how close a file must be to the song's length |
+| | **Scheduled tasks** | What runs on its own, and when: see [Scheduled tasks](#scheduled-tasks) |
+| Server | **Plugins** | See [Plugins](plugins.md) |
+| | **Users**, **Webhooks** | See [Users and permissions](users-and-permissions.md) and the [client guide](../client-guide.md) |
+| | **Log** | Recent activity, and how long logs are kept |
+| Melodex | **Help** | This guide |
+| | **About** | The version, links to GitHub, who made Melodex, and for the admin, resetting it |
 
 ## Scheduled tasks
 
@@ -36,7 +41,7 @@ Variables named `Navidex__…`, from before the rename, still work; a `Melodex__
 times, and below each the tasks it runs: tick a task to put it on that schedule. A task is on one schedule at most, so
 ticking it on one takes it off another; one on none only runs when you start it.
 
-- **Scan the library**: read new and changed files and match them, then whatever **Settings → General** says follows a scan.
+- **Scan the library**: read new and changed files and match them, then whatever **Settings → Library** says follows a scan.
 - **Update the catalogue**: look up every library artist's discography.
 - **Check lossless files**: look for lossy music passed off as lossless in files not checked yet.
 - **Look for missing lyrics**: look again for songs without lyrics.

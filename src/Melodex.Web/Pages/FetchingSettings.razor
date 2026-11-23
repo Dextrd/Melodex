@@ -1,0 +1,74 @@
+@page "/settings/fetching"
+@layout SettingsLayout
+@inject MelodexClient Api
+
+<PageTitle>Fetching · Melodex</PageTitle>
+
+@* Where fetched music goes and how a file is picked: the Downloads section of Settings, with the scheduled tasks (#238). *@
+@if (_fetch is null)
+{
+    <Loading />
+}
+else
+{
+    <h2>New albums and fetching</h2>
+    <div class="card settings-card">
+        <div class="field">
+            <label class="field-label" for="path-template">Folder layout for new albums</label>
+            <input id="path-template" type="text" style="width: 100%; max-width: 32rem;" @bind="_fetchTemplate" @bind:after="Changed" />
+            <div class="muted small">
+                A <a href="https://beets.readthedocs.io/en/stable/reference/pathformat.html" target="_blank" rel="noopener noreferrer">beets path format</a>.
+                The default, <code>@FetchSettings.DefaultPathTemplate</code>, gives <code>Portishead/Dummy/11 Glory Box.opus</code>.
+                A track for an album you already have goes next to that album's files instead.
+                @if (_fetchTemplate != FetchSettings.DefaultPathTemplate)
+                {
+                    <button class="link small" @onclick="() => { _fetchTemplate = FetchSettings.DefaultPathTemplate; Changed(); }">Use the default</button>
+                }
+            </div>
+        </div>
+        <div class="setting-line">
+            Fetch
+            <NumberField Min="1" Max="8" Label="Fetches at once" Value="_fetch.ParallelFetches" ValueChanged="n => SetFetch(_fetch with { ParallelFetches = n })" />
+            at once
+        </div>
+        <div class="setting-line">
+            Accept a file within
+            <NumberField Min="0" Max="120" Label="Seconds" Value="_fetch.DurationToleranceSeconds" ValueChanged="n => SetFetch(_fetch with { DurationToleranceSeconds = n })" />
+            seconds or
+            <NumberField Min="0" Max="50" Label="Percent" Value="_fetch.DurationTolerancePercent" ValueChanged="n => SetFetch(_fetch with { DurationTolerancePercent = n })" />
+            % of the song's length, whichever is more
+        </div>
+        <div class="muted small">A file further off is probably a different version, such as a live take or a radio edit.</div>
+        <div class="setting-line">
+            Try
+            <NumberField Min="1" Max="5" Label="Results per source" Value="_fetch.CandidatesPerPlugin" ValueChanged="n => SetFetch(_fetch with { CandidatesPerPlugin = n })" />
+            of each source's best results, best first whichever source they're from
+        </div>
+        <div class="muted small">How long listen-now tracks are kept is under <a href="settings/playback">Playback</a>.</div>
+    </div>
+
+    <AutoSave @ref="_saver" Save="SaveAsync" />
+}
+
+@code {
+    private FetchSettings? _fetch;
+    private string _fetchTemplate = "";
+    private AutoSave? _saver;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _fetch = await Api.GetFetchSettingsAsync();
+        _fetchTemplate = _fetch.PathTemplate;
+    }
+
+    // Each change is saved in a moment, with whatever else changes meanwhile.
+    private void SetFetch(FetchSettings fetch)
+    {
+        _fetch = fetch;
+        Changed();
+    }
+
+    private void Changed() => _saver?.Changed();
+
+    private Task SaveAsync() => Api.SaveFetchSettingsAsync(_fetch! with { PathTemplate = _fetchTemplate });
+}

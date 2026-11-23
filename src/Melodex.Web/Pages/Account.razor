@@ -1,11 +1,12 @@
+@page "/settings/account"
 @page "/account"
+@layout SettingsLayout
 @inject AuthState Auth
 
 <PageTitle>Your account · Melodex</PageTitle>
 
 @* Your own login, what you may do, and your login on each media server: the page version of editing a user. Below
-   it, the ListenBrainz and Last.fm accounts your plays are sent to, and your radio settings. *@
-<h1>Your account</h1>
+   it, the ListenBrainz and Last.fm accounts your plays are sent to. It heads Settings, with your look and API keys. *@
 @if (Auth.Status is { } status)
 {
     <p class="muted">
