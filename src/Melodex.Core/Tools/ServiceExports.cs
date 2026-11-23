@@ -35,7 +35,7 @@ public static class ServiceExports
             else
                 unpacked.Add((name, bytes));
         }
-        return Spotify(unpacked) ?? YouTubeMusic(unpacked) ?? Deezer(unpacked);
+        return Spotify(unpacked) ?? YouTubeMusic(unpacked) ?? Deezer(unpacked) ?? AppleMusic(unpacked);
     }
 
     private static bool IsSpreadsheet(byte[] bytes)
@@ -51,17 +51,27 @@ public static class ServiceExports
         }
     }
 
-    private static IEnumerable<(string Name, byte[] Bytes)> Unzip(byte[] bytes)
+    // Zips inside zips are opened too, as Apple's are, this many deep.
+    private const int Nested = 3;
+
+    private static IEnumerable<(string Name, byte[] Bytes)> Unzip(byte[] bytes, int depth = 0)
     {
         using var zip = new ZipArchive(new MemoryStream(bytes), ZipArchiveMode.Read);
         foreach (var entry in zip.Entries)
         {
-            if (entry.Length is 0 or > MaxEntry || !new[] { ".json", ".csv", ".xlsx" }.Any(e => entry.Name.EndsWith(e, StringComparison.OrdinalIgnoreCase)))
+            var nested = entry.Name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase);
+            if (entry.Length is 0 or > MaxEntry || nested && depth >= Nested
+                || !nested && !new[] { ".json", ".csv", ".xlsx" }.Any(e => entry.Name.EndsWith(e, StringComparison.OrdinalIgnoreCase))
+                || !nested && IsApple(entry.FullName) && !AppleFiles.Any(f => entry.Name.Equals(f, StringComparison.OrdinalIgnoreCase)))
                 continue;
             using var stream = entry.Open();
             using var copy = new MemoryStream();
             stream.CopyTo(copy);
-            yield return (entry.FullName, copy.ToArray());
+            if (!nested)
+                yield return (entry.FullName, copy.ToArray());
+            else
+                foreach (var inner in Unzip(copy.ToArray(), depth + 1))
+                    yield return ($"{entry.FullName}/{inner.Name}", inner.Bytes);
         }
     }
 
@@ -252,6 +262,127 @@ public static class ServiceExports
             link is not null && System.Text.RegularExpressions.Regex.Match(link, @"deezer\.com/(?:[a-z]{2}/)?(track|album|playlist)/(\d+)") is { Success: true } m
                 ? $"{DeezerPrefix}{m.Groups[1].Value}:{m.Groups[2].Value}"
                 : null;
+    }
+
+    // ---- Apple Music ----
+
+    /// <summary>The prefix of a line's ID for an Apple Music song: "apple:song:290286598", or "apple:library:…" for one of your own.</summary>
+    public const string ApplePrefix = "apple:";
+
+    // The only files of Apple's copy that are read; the rest (purchases, payments, devices, listening and the like) are
+    // left in the zip unopened.
+    private static readonly string[] AppleFiles = ["Apple Music Library Tracks.json", "Apple Music Library Playlists.json", "Apple Music - Favorites.csv"];
+
+    private static bool IsApple(string path) =>
+        path.Contains("Apple Media Services", StringComparison.OrdinalIgnoreCase) || path.Contains("Apple_Media_Services", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Apple's copy of your data (privacy.apple.com → Request a copy of your data → Apple Media Services information): a
+    /// zip, holding another, Apple_Media_Services.zip, whose "Apple Music Activity" folder has your library as zipped JSON.
+    /// Only three files are read: "Apple Music Library Tracks.json" (each song in your library or a playlist: Title,
+    /// Artist, Album, Track Duration in milliseconds, Playlist Only Track, Favorite Status - Track, its Track Identifier,
+    /// and its Apple Music Track Identifier in the catalogue), "Apple Music Library Playlists.json" (each playlist's Title,
+    /// Container Type and its songs' Track Identifiers) and "Apple Music - Favorites.csv" (Favorite Type, Item Reference,
+    /// the catalogue's ID, Item Description, "Artist - Title", and Preference). Loved albums and artists are left out:
+    /// Apple's copy names an album without its artist, and artists are follows, not music to import.
+    /// </summary>
+    private static ServiceExport? AppleMusic(IReadOnlyList<(string Name, byte[] Bytes)> files)
+    {
+        List<JsonElement>? tracks = null, containers = null;
+        List<IReadOnlyList<string>>? favourites = null;
+        foreach (var (path, bytes) in files)
+        {
+            var name = Path.GetFileName(path.Replace('\\', '/'));
+            if (name.EndsWith(".csv", StringComparison.OrdinalIgnoreCase))
+            {
+                var rows = ListParser.CsvRows(System.Text.Encoding.UTF8.GetString(bytes).TrimStart('\uFEFF')).Where(r => r.Any(c => c.Length > 0)).ToList();
+                if (rows.Count > 0 && rows[0].Count > 3 && rows[0][0].Trim() == "Favorite Type" && rows[0][1].Trim() == "Item Reference")
+                    favourites = rows;
+                continue;
+            }
+            if (!name.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
+                continue;
+            JsonElement root;
+            try
+            {
+                root = JsonDocument.Parse(bytes).RootElement;
+            }
+            catch (JsonException)
+            {
+                continue;
+            }
+            var rowsOf = Items(root).ToList();
+            if (rowsOf.Any(r => r.TryGetProperty("Track Identifier", out _) && r.TryGetProperty("Title", out _)))
+                tracks = rowsOf;
+            else if (rowsOf.Any(r => r.TryGetProperty("Container Type", out _) && r.TryGetProperty("Playlist Item Identifiers", out _)))
+                containers = rowsOf;
+        }
+        if (tracks is null && containers is null && favourites is null)
+            return null;
+
+        var songs = new Dictionary<string, (ServiceItem Item, bool InLibrary, bool Loved)>();
+        foreach (var track in tracks ?? [])
+        {
+            if (Number(track, "Track Identifier") is not { } own || Text(track, "Content Type") is { } type && type != "Song")
+                continue;
+            var id = Number(track, "Apple Music Track Identifier") is { } catalogue ? $"{ApplePrefix}song:{catalogue}" : $"{ApplePrefix}library:{own}";
+            var seconds = Number(track, "Track Duration") is { } ms && long.TryParse(ms, out var length) && length > 0 ? length / 1000.0 : (double?)null;
+            if (Text(track, "Title") is not { } title)
+                continue;
+            var loved = track.TryGetProperty("Favorite Status - Track", out var favourite) && favourite.ValueKind == JsonValueKind.True
+                        || Text(track, "Track Like Rating") == "liked";
+            var inLibrary = !(track.TryGetProperty("Playlist Only Track", out var only) && only.ValueKind == JsonValueKind.True);
+            songs[own] = (new ServiceItem(new ImportSong(title, Text(track, "Artist"), Text(track, "Album"), seconds), id), inLibrary, loved);
+        }
+
+        var lists = new List<ServiceListData>();
+        // Loved songs: those marked so in the library, those in the Favourite Songs playlist, and those Favorites.csv names.
+        var liked = songs.Values.Where(s => s.Loved).Select(s => s.Item).ToList();
+        foreach (var container in containers ?? [])
+            if (Text(container, "Container Type") == "Favorites Playlist")
+                liked.AddRange(Ids(container).Select(i => songs.GetValueOrDefault(i).Item).OfType<ServiceItem>());
+        if (favourites is not null)
+        {
+            var header = favourites[0].Select(c => c.Trim()).ToList();
+            int Column(string column) => header.FindIndex(c => c.Equals(column, StringComparison.OrdinalIgnoreCase));
+            var (kind, reference, description, preference) = (Column("Favorite Type"), Column("Item Reference"), Column("Item Description"), Column("Preference"));
+            foreach (var row in favourites.Skip(1))
+            {
+                if (Cell(row, kind) != "Song" || Cell(row, preference) is { } said && said != "LIKE" || Cell(row, description) is not { } text)
+                    continue;
+                // "Artist - Title".
+                var dash = text.IndexOf(" - ", StringComparison.Ordinal);
+                var song = dash > 0 ? new ImportSong(text[(dash + 3)..].Trim(), text[..dash].Trim(), null, null) : new ImportSong(text, null, null, null);
+                liked.Add(new ServiceItem(song, Cell(row, reference) is { } catalogue ? $"{ApplePrefix}song:{catalogue}" : null));
+            }
+        }
+        liked = liked.DistinctBy(i => i.Id ?? i.Song.Title).ToList();
+        if (liked.Count > 0)
+            lists.Add(new ServiceListData("liked", "Favourite songs", ServiceListKind.Liked, liked));
+        if (songs.Values.Where(s => s.InLibrary).Select(s => s.Item).ToList() is { Count: > 0 } library)
+            lists.Add(new ServiceListData("library", "Library songs", ServiceListKind.Playlist, library));
+        var keys = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var container in containers ?? [])
+        {
+            if (Text(container, "Container Type") != "Playlist")
+                continue;
+            var title = Text(container, "Title") ?? "Playlist";
+            var key = $"playlist:{title}";
+            for (var n = 2; !keys.Add(key); n++)
+                key = $"playlist:{title} ({n})";
+            lists.Add(new ServiceListData(key, key["playlist:".Length..], ServiceListKind.Playlist,
+                Ids(container).Select(i => songs.GetValueOrDefault(i).Item).OfType<ServiceItem>().ToList()));
+        }
+        return new ServiceExport(ImportFormat.AppleMusic, lists);
+
+        static IEnumerable<string> Ids(JsonElement container) =>
+            container.TryGetProperty("Playlist Item Identifiers", out var ids) && ids.ValueKind == JsonValueKind.Array
+                ? ids.EnumerateArray().Select(i => i.ValueKind == JsonValueKind.Number ? i.GetRawText() : i.GetString() ?? "")
+                : [];
+        static string? Number(JsonElement element, string property) =>
+            element.TryGetProperty(property, out var value) && value.ValueKind == JsonValueKind.Number ? value.GetRawText()
+            : value.ValueKind == JsonValueKind.String && value.GetString()?.Trim() is { Length: > 0 } text ? text : null;
+        static string? Cell(IReadOnlyList<string> row, int index) => index >= 0 && index < row.Count && row[index].Trim() is { Length: > 0 } cell ? cell : null;
     }
 
     // A playlist's item: a track, or a file of the listener's own ("spotify:local:Artist:Album:Title:Seconds"). Episodes

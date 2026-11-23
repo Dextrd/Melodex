@@ -10,6 +10,7 @@ public static class ServiceNames
         ImportFormat.Spotify => "Spotify",
         ImportFormat.YouTubeMusic => "YouTube Music",
         ImportFormat.Deezer => "Deezer",
+        ImportFormat.AppleMusic => "Apple Music",
         ImportFormat.M3u => "M3U",
         ImportFormat.Csv => "CSV",
         _ => "pasted",

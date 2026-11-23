@@ -97,6 +97,9 @@ What changed in each release of Melodex. Versions follow [semantic versioning](h
   up or down by it, for each song or each album as chosen under **Settings → Playback**, to -18 LUFS or a loudness you
   choose, and Subsonic players get it as OpenSubsonic's `replayGain`. Files that have ReplayGain already are left as
   they are unless you ask. The API has `POST /library/replaygain`, and songs' play info carries their gains (#23).
+- **Import from Apple Music** on the Tools page, from the copy of your data Apple gives you (no Apple account linked):
+  your favourite songs and library songs become playlists, and so does each playlist you made. Only Apple Music's
+  library and favourites are read from the zip, and importing a later copy brings only what's new (#25).
 
 ### Changed
 

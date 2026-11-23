@@ -20,6 +20,9 @@ public enum ImportSource
 
     /// <summary>A playlist, favourite tracks or favourite albums from Deezer's copy of your personal data.</summary>
     Deezer,
+
+    /// <summary>Apple's copy of your Apple Music data: a playlist, favourite songs or the songs in your library.</summary>
+    AppleMusic,
 }
 
 /// <summary>How far an import has got.</summary>
