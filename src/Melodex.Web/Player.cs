@@ -195,6 +195,9 @@ public sealed class Player : IAsyncDisposable
 
     /// <summary>There's a song to go on to: a later one, or the first again when repeating.</summary>
     public bool HasNext => Current + 1 < _queue.Count || Repeat != RepeatMode.Off && _queue.Count > 0;
+
+    /// <summary>There's a song to go back to: the one playing, from its start, or the last one once the queue has run out (#241).</summary>
+    public bool HasPrevious => _queue.Count > 0;
     public bool Playing { get; private set; }
     public double Position { get; private set; }
     public double Duration { get; private set; }
@@ -691,7 +694,13 @@ public sealed class Player : IAsyncDisposable
     public async Task PreviousAsync()
     {
         Trace("previous");
-        if (Position > 3 && _audio is not null)
+        if (Now is null)
+        {
+            // The queue ran out: back to its last song.
+            if (_queue.Count > 0)
+                await JumpAsync(_queue.Count - 1);
+        }
+        else if (Position > 3 && _audio is not null)
             await SeekAsync(0);
         else
             await JumpAsync(Current == 0 && Repeat != RepeatMode.Off ? _queue.Count - 1 : Math.Max(Current - 1, 0));
