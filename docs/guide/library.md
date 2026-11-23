@@ -56,9 +56,9 @@ you've played most this week, this month, this year or all time. Take a play out
 own history.
 
 To send your plays to [ListenBrainz](https://listenbrainz.org) or [Last.fm](https://www.last.fm) too, link them under
-**Scrobbling** on your account page. ListenBrainz takes the user token from your ListenBrainz settings. Last.fm asks you
-to allow Melodex and sends you back; it needs an API key the admin makes once at
-[last.fm/api/account/create](https://www.last.fm/api/account/create) and enters under **Settings → Playback**. Plays
+**Scrobbling** on your account page: it lists the services the admin set up as [scrobbling plugins](plugins.md#scrobbling).
+ListenBrainz takes the user token from your ListenBrainz settings. Last.fm asks you to allow Melodex and sends you
+back. Plays
 that can't be sent, because the service is down or the link no longer works, wait and are sent once it's back or
 linked again. Only plays from after linking are sent.
 

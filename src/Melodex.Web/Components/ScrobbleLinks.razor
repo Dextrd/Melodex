@@ -4,61 +4,69 @@
 @inject ServerEvents Events
 
 @*
-    Your ListenBrainz and Last.fm accounts (#2), on Your account: linked, every song you play is sent there too. ListenBrainz
-    takes the user token from its settings; Last.fm sends you there to allow Melodex, and back to the Last.fm page here.
+    Your accounts on the scrobbling services the admin set up (#2, #236), on Your account: linked, every song you play is
+    sent there too. Some take a token you paste, such as ListenBrainz's; others, such as Last.fm, send you to allow
+    Melodex and back to a page here that finishes linking.
 *@
-@if (_status is null)
+@if (_services is null)
 {
     <Loading Inline="true" />
+}
+else if (_services.Count == 0)
+{
+    <p class="muted small">There's nowhere to send plays yet: the admin adds scrobbling services, such as ListenBrainz and Last.fm, in Settings → Plugins.</p>
 }
 else
 {
     <div class="scrobble-links">
-        <div class="scrobble-link">
-            <div>
-                <strong>ListenBrainz</strong>
-                @if (Link(ScrobbleService.ListenBrainz) is { } brainz)
+        @foreach (var service in _services)
+        {
+            <div class="scrobble-link" @key="service.Id">
+                <strong>@service.Name</strong>
+                @if (service.Linked is { } link)
                 {
-                    @Linked(brainz)
+                    <div class="muted small">
+                        Linked as <strong>@link.Username</strong>.
+                        @if (link.LastSentAt is { } sent) { <span>Last sent @Format.Ago(sent).</span> }
+                        @if (link.Waiting > 0) { <span>@Format.Count(link.Waiting, "play waits", "plays wait") to be sent.</span> }
+                    </div>
+                    @if (link.Error is { } error) { <div class="error small">@error</div> }
+                    <div class="row"><button type="button" disabled="@_busy" @onclick="() => UnlinkAsync(service)">Unlink</button></div>
+                }
+                else if (service.Link == ScrobbleLinkKind.Web)
+                {
+                    <div class="muted small">@service.Name asks you to allow Melodex, then sends you back here.</div>
+                    <div class="row"><button type="button" class="primary" disabled="@_busy" @onclick="() => GoLinkAsync(service)">Link @service.Name</button></div>
                 }
                 else
                 {
                     <div class="muted small">
-                        Free and open, run by the MetaBrainz Foundation. Copy your user token from
-                        <a href="https://listenbrainz.org/settings/" target="_blank" rel="noopener">your ListenBrainz settings</a>.
+                        Paste the token from your
+                        @if (service.Homepage is { } home)
+                        {
+                            <a href="@home" target="_blank" rel="noopener">@service.Name</a>
+                        }
+                        else
+                        {
+                            @service.Name
+                        }
+                        account's settings.
                     </div>
                     <div class="row">
-                        <input type="password" autocomplete="off" placeholder="User token" aria-label="ListenBrainz user token" @bind="_token" @bind:event="oninput" />
-                        <button type="button" class="primary" disabled="@(_busy || _token.Trim().Length == 0)" @onclick="LinkListenBrainzAsync">Link</button>
+                        <input type="password" autocomplete="off" placeholder="Token" aria-label="@($"{service.Name} token")"
+                               value="@Token(service)" @oninput="e => SetToken(service, e)" />
+                        <button type="button" class="primary" disabled="@(_busy || Token(service).Trim().Length == 0)" @onclick="() => LinkAsync(service)">Link</button>
                     </div>
                 }
             </div>
-        </div>
-        <div class="scrobble-link">
-            <div>
-                <strong>Last.fm</strong>
-                @if (Link(ScrobbleService.LastFm) is { } lastFm)
-                {
-                    @Linked(lastFm)
-                }
-                else if (_status.LastFmApiKey is { } key)
-                {
-                    <div class="muted small">Last.fm asks you to allow Melodex, then sends you back here.</div>
-                    <div class="row"><a class="btn primary" href="@LastFmHref(key)">Link Last.fm</a></div>
-                }
-                else
-                {
-                    <div class="muted small">The admin hasn't set a Last.fm API key yet, which linking needs: it's in Settings → Playback.</div>
-                }
-            </div>
-        </div>
+        }
     </div>
-    @if (_error is not null) { <div class="error small" role="alert">@_error</div> }
 }
+@if (_error is not null) { <div class="error small" role="alert">@_error</div> }
 
 @code {
-    private ScrobbleStatus? _status;
-    private string _token = "";
+    private IReadOnlyList<ScrobbleService>? _services;
+    private readonly Dictionary<Guid, string> _tokens = [];
     private bool _busy;
     private string? _error;
 
@@ -72,41 +80,33 @@ else
     {
         try
         {
-            _status = await Api.GetScrobblingAsync();
+            _services = await Api.GetScrobblingAsync();
         }
         catch (Exception e) when (e is HttpRequestException or MelodexApiException)
         {
             _error = e.Message;
-            _status ??= new ScrobbleStatus([], null);
+            _services ??= [];
         }
     }
 
-    private ScrobbleLink? Link(ScrobbleService service) => _status?.Links.FirstOrDefault(l => l.Service == service);
+    private string Token(ScrobbleService service) => _tokens.GetValueOrDefault(service.Id, "");
 
-    // Last.fm sends you back to the page that finishes linking, with its token.
-    private string LastFmHref(string key) =>
-        $"https://www.last.fm/api/auth/?api_key={Uri.EscapeDataString(key)}&cb={Uri.EscapeDataString(Nav.ToAbsoluteUri("account/lastfm").ToString())}";
+    private void SetToken(ScrobbleService service, ChangeEventArgs e) => _tokens[service.Id] = e.Value?.ToString() ?? "";
 
-    private RenderFragment Linked(ScrobbleLink link) => @<text>
-        <div class="muted small">
-            Linked as <strong>@link.Username</strong>.
-            @if (link.LastSentAt is { } sent) { <span>Last sent @Format.Ago(sent).</span> }
-            @if (link.Waiting > 0) { <span>@Format.Count(link.Waiting, "play waits", "plays wait") to be sent.</span> }
-        </div>
-        @if (link.Error is { } error) { <div class="error small">@error</div> }
-        <div class="row"><button type="button" disabled="@_busy" @onclick="() => UnlinkAsync(link.Service)">Unlink</button></div>
-    </text>;
-
-    private async Task LinkListenBrainzAsync()
+    private Task LinkAsync(ScrobbleService service) => RunAsync(async () =>
     {
-        await RunAsync(async () =>
-        {
-            await Api.LinkListenBrainzAsync(_token);
-            _token = "";
-        });
-    }
+        await Api.LinkScrobblingAsync(service.Id, Token(service));
+        _tokens.Remove(service.Id);
+    });
 
-    private Task UnlinkAsync(ScrobbleService service) => RunAsync(() => Api.UnlinkScrobblingAsync(service));
+    // The service sends you back to the page that finishes linking, with its token.
+    private Task GoLinkAsync(ScrobbleService service) => RunAsync(async () =>
+    {
+        var url = await Api.GetScrobbleLinkPageAsync(service.Id, Nav.ToAbsoluteUri($"account/scrobbling/{service.Id}").ToString());
+        Nav.NavigateTo(url, forceLoad: true);
+    });
+
+    private Task UnlinkAsync(ScrobbleService service) => RunAsync(() => Api.UnlinkScrobblingAsync(service.Id));
 
     private async Task RunAsync(Func<Task> action)
     {

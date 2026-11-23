@@ -1,6 +1,6 @@
 # Plugins at an address
 
-Catalogue, artwork, lyrics, discovery and media-server plugins are usually .NET assemblies loaded into Melodex. Each can also run
+Catalogue, artwork, lyrics, discovery, scrobbling and media-server plugins are usually .NET assemblies loaded into Melodex. Each can also run
 on its own, in any language, and be reached at an address, as [retrieval plugins](retrieval-plugins.md) always are.
 They're added under **Settings → Plugins → Add → Add your own plugin…** in the section for their kind. Melodex then
 uses one exactly as it would one loaded in process: the same contract version, capabilities and rules as on the page
@@ -12,6 +12,7 @@ for its kind.
 | Artwork | [`IArtworkPlugin`](artwork-plugins.md) | Artwork v1.0 |
 | Lyrics | [`ILyricsPlugin`](lyrics-plugins.md) | Lyrics v1.1 |
 | Discovery | [`IDiscoveryPlugin`](discovery-plugins.md) | Discovery v1.1 |
+| Scrobbling | [`IScrobblingPlugin`](scrobbling-plugins.md) | Scrobbling v1.0 |
 | Media server | [`IMediaServerConnector`](media-server-connectors.md) | Connector v1.3 |
 
 The models are the ones in `Melodex.Contracts`, serialized as the retrieval contract's are: camelCase names, enums as
@@ -80,6 +81,19 @@ Declare `artists`, `albums` and `editions` for what the plugin can picture; it's
 | `POST /v1/similar-recordings` | `{ "recording": DiscoveryRecording, "count" }` | `DiscoveredRecording[]`, closest first. Only with `similar-recordings`. |
 | `POST /v1/recommendations` | `{ "listener": DiscoveryListener, "count" }` | `DiscoveredRecording[]`, best first. Only with `recommendations`. |
 | `POST /v1/artist-genres` | `{ "artist": DiscoveryArtist, "count" }` | `DiscoveredGenre[]`, the most fitting first. Only with `artist-genres` (1.1). |
+
+## Scrobbling
+
+| Call | Input | Answers |
+| --- | --- | --- |
+| `POST /v1/link-page` | `{ "callback": "https://…" }` | `{ "url": "https://…" }`, where to send someone to allow Melodex. Only with `link-web`. |
+| `POST /v1/link` | `{ "token": "…" }` | `LinkedAccount`: `{ "name", "secret" }`. A token the service doesn't take is a refusal with the code `bad-token`. |
+| `POST /v1/scrobble` | `{ "secret", "listens": Listen[] }` | Any 2xx |
+| `POST /v1/now-playing` | `{ "secret", "listen": Listen }` | Any 2xx. Only with `now-playing`. |
+
+From `scrobble`, a refusal with the code `link-refused` means the service no longer takes the account's link, so nothing
+more is sent until it's linked again; `rejected` means it turned the plays down, so they aren't sent again. Any other
+refusal has them tried again later.
 
 ## Media server
 

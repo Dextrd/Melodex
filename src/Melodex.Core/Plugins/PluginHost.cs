@@ -10,6 +10,7 @@ using Melodex.Contracts.Plugins.Discovery;
 using Melodex.Contracts.Plugins.Index;
 using Melodex.Contracts.Plugins.Lyrics;
 using Melodex.Contracts.Plugins.Remote;
+using Melodex.Contracts.Plugins.Scrobbling;
 using Melodex.Core.Data;
 using Melodex.Plugins.Deezer;
 using Melodex.Plugins.ListenBrainz;
@@ -376,6 +377,51 @@ public sealed class DiscoveryPlugins(MelodexDbContext db, PluginHost host)
             });
         }
         db.Settings.Add(new Setting { Key = DefaultsSetting, ValueJson = JsonSerializer.Serialize(new[] { ListenBrainzFactory.PluginId }) });
+        await db.SaveChangesAsync();
+    }
+}
+
+/// <summary>The scrobbling plugins that are on (#236), which people link their accounts with and plays are sent through.</summary>
+public sealed class ScrobblingPlugins(MelodexDbContext db, PluginHost host)
+{
+    public const string DefaultsSetting = "scrobbling.defaults";
+
+    public async Task<IReadOnlyList<(PluginInstance Instance, IScrobblingPlugin Plugin, PluginManifest Manifest)>> GetAsync(CancellationToken ct)
+    {
+        var instances = await db.PluginInstances.Where(p => p.Type == PluginType.Scrobbling && p.Enabled).OrderBy(p => p.Priority).ToListAsync(ct);
+        var plugins = new List<(PluginInstance, IScrobblingPlugin, PluginManifest)>();
+        foreach (var instance in instances)
+            if (await GetAsync(instance, ct) is { } found)
+                plugins.Add((instance, found.Plugin, found.Manifest));
+        return plugins;
+    }
+
+    /// <summary>One that's set up, as it runs; null when it can't, such as after its plugin was taken out of the plugins folder.</summary>
+    public async Task<(IScrobblingPlugin Plugin, PluginManifest Manifest)?> GetAsync(PluginInstance instance, CancellationToken ct)
+    {
+        if (instance.Type != PluginType.Scrobbling || host.ManifestOf(instance) is not { } manifest)
+            return null;
+        return await host.ResolveAsync(db, instance, ct) is { } running ? (host.Get<IScrobblingPlugin>(running), manifest) : null;
+    }
+
+    /// <summary>Sets up ListenBrainz once, as it needs nothing from the admin, so people can link it out of the box. Removing it sticks.</summary>
+    public static async Task EnsureDefaultAsync(MelodexDbContext db, PluginCatalog catalog)
+    {
+        if (await db.Settings.FindAsync(DefaultsSetting) is not null)
+            return;
+        if (catalog.Find(ListenBrainzScrobblingFactory.PluginId) is { } found && !await db.PluginInstances.AnyAsync(p => p.Type == PluginType.Scrobbling))
+        {
+            db.PluginInstances.Add(new PluginInstance
+            {
+                PluginId = found.Manifest.Id,
+                Type = PluginType.Scrobbling,
+                Name = found.Manifest.Name,
+                Priority = 0,
+                ContractVersion = found.Manifest.ContractVersion,
+                SettingsJson = SettingsSchema.Defaults(found.Manifest.SettingsSchema).ToJsonString(),
+            });
+        }
+        db.Settings.Add(new Setting { Key = DefaultsSetting, ValueJson = JsonSerializer.Serialize(new[] { ListenBrainzScrobblingFactory.PluginId }) });
         await db.SaveChangesAsync();
     }
 }

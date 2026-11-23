@@ -441,8 +441,7 @@ Each person's own, from the web player and Subsonic players alike:
   whichever comes first. A song in the library needs only `trackId` (and `fileId`, if you know which file); any other
   needs `title` and `artistCredit` too. `playedAt` is when it started, now if left out; `source` says what it was
   played from (`{"kind": "playlist", "id": ..., "name": ...}`); `client` names your app. The same song again within 30
-  seconds is the same play, and the one already recorded comes back. Linked ListenBrainz and Last.fm accounts get it
-  too.
+  seconds is the same play, and the one already recorded comes back. Linked scrobbling accounts get it too.
 - `PUT /plays/now` with the same body says what you've started: Subsonic players' now playing shows it, and linked
   accounts are told.
 - `GET /plays` (`read` scope) lists your plays, latest first, with `skip` and `take` (at most 500), and the `total`.
@@ -450,8 +449,15 @@ Each person's own, from the web player and Subsonic players alike:
   `year` or `all`) and `take`.
 - `DELETE /plays/{id}` takes one out.
 
-Linking accounts is for a signed-in person, in the web app (`/account/scrobbling`); the admin sets the Last.fm API
-key and secret with `PUT /settings/scrobbling`.
+Scrobbling accounts, for a signed-in person:
+
+- `GET /account/scrobbling` lists the scrobbling services the admin set up, each with its `id`, how it's linked
+  (`link`: `token` or `web`) and your account on it (`linked`: its `username`, when plays were last sent, any
+  `error`, and how many plays are `waiting`).
+- `PUT /account/scrobbling/{id}` with `{"token": ...}` links your account: with a token you pasted, or for a `web`
+  one, the token the service sent you back with. `POST /account/scrobbling/{id}/link-page` with `{"callback": ...}`
+  says where to send you to allow Melodex; the service sends you back to the callback with `token` in the address.
+- `DELETE /account/scrobbling/{id}` unlinks it.
 
 ## Similar music and recommendations
 
