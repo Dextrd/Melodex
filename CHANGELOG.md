@@ -122,6 +122,8 @@ What changed in each release of Melodex. Versions follow [semantic versioning](h
 
 ### Fixed
 
+- An artist, album or song page opened from Review, Activity or a link shows the Library as the page you're on in the top
+  bar, where nothing was (#240).
 - Starting a song you don't have, or skipping to one, no longer sometimes plays the song after it instead, or skips
   songs on its own while they're fetched: a song not yet asked for was remembered as having nothing to play. And a song
   chosen while another is still playing is no longer skipped past when that one ends first (#109).
