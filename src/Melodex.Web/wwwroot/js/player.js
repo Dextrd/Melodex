@@ -242,7 +242,7 @@ export function volumeWorks() {
 
 /** Loads the next song into the spare, to start as this one ends. */
 export function prepare(url, meta, token, length, level = 1) {
-    levels.set(spare, level);
+    songLevels.set(spare, level);
     if (stream) {
         follow(url, meta, token, length);
         return;
@@ -1005,7 +1005,7 @@ function skip(quiet) {
 
 export function load(url, meta, length, level = 1) {
     epoch++;
-    levels.set(audio, level);
+    songLevels.set(audio, level);
     turn(audio);
     holding = false;
     note(`load ${meta?.title}`);
@@ -1092,11 +1092,11 @@ export function stop() {
 
 // Each song's own level from its ReplayGain (#23), the volume chosen times it: an iPhone's volume is the phone's own,
 // and stays as it is.
-const levels = new WeakMap();
+const songLevels = new WeakMap();
 let wanted = storedVolume();
 
 function turn(el) {
-    el.volume = Math.min(1, wanted * (levels.get(el) ?? 1));
+    el.volume = Math.min(1, wanted * (songLevels.get(el) ?? 1));
 }
 
 function storedVolume() {
