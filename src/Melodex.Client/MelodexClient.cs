@@ -522,6 +522,10 @@ public sealed class MelodexClient(HttpClient http)
 
     /// <summary>Puts a replaced file back, deleting the copy that replaced it; its song is set never to be upgraded.</summary>
     /// <summary>Rolls an upgrade back; with never, its song is never upgraded again.</summary>
+    /// <summary>How to play a file an upgrade replaced, while it's held, to compare it with the better copy.</summary>
+    public Task<PlayInfo?> GetHeldPlayInfoAsync(Guid id, CancellationToken ct = default) =>
+        GetOrNullAsync<PlayInfo>($"{Api}/upgrades/held/{id}/play", ct);
+
     public async Task RestoreHeldFileAsync(Guid id, bool never = false, CancellationToken ct = default)
     {
         using var response = await http.PostAsync($"{Api}/upgrades/held/{id}/restore{(never ? "?never=true" : "")}", null, ct);

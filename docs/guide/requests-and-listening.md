@@ -103,7 +103,9 @@ cutoff is met.
   deleted straight away. While it's held the upgrade waits under **Review → Upgraded** (and on the song's page):
   **Approve** keeps it and deletes the old file now, and **Roll back** deletes the better copy and puts the old file
   back, where a later upgrade may replace it again; **Roll back, never upgrade** also sets the song never to be
-  upgraded. An upgrade left alone is auto-approved once its time is up.
+  upgraded. An upgrade left alone is auto-approved once its time is up. To check one by ear, **Play the upgrade** or
+  **Play the original** under it: either plays the rest of the upgrades, or their originals, after it, so you can skip
+  through them. Originals aren't kept in your listening history.
 
 #### What your player keeps
 

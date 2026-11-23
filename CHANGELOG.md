@@ -6,6 +6,9 @@ What changed in each release of Melodex. Versions follow [semantic versioning](h
 
 ### Added
 
+- **Play upgrades from Review**: each upgrade on the **Upgraded** tab can be played, and so can the file it replaced,
+  while it's held, to hear the difference. Each plays the rest of the upgrades (or their originals) after it, so you
+  can skip through them. Originals aren't kept in listening history. The API has `GET /upgrades/held/{id}/play` (#239).
 - **Subsonic players**: Melodex speaks the Subsonic API with OpenSubsonic's extensions, at `/rest`, so Symfonium,
   Amperfy, Substreamer, Tempo, Feishin and other Subsonic apps can browse your library, search it, play it (turned
   into MP3, Opus or AAC at a lower bitrate when a player asks), show covers and lyrics, and keep your playlists, the

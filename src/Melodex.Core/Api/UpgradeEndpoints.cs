@@ -1,5 +1,9 @@
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Melodex.Client;
 using Melodex.Core.Access;
+using Melodex.Core.Data;
+using Melodex.Core.Listening;
 using Melodex.Core.Import;
 using Melodex.Core.Library;
 
@@ -67,6 +71,41 @@ public static class UpgradeEndpoints
         upgrades.MapGet("/held", (Guid? trackId, Upgrades service, CancellationToken ct) => service.HeldAsync(trackId, ct))
             .WithName("GetHeldFiles").WithSummary("Files replaced by better copies that can be put back, of one song or all, newest first.");
 
+        // The replaced file, to listen to beside the better copy before keeping it (#239).
+        upgrades.MapGet("/held/{id:guid}/play", async (Guid id, MelodexDbContext db, Upgrades service, StreamSigner signer, CancellationToken ct) =>
+            {
+                if (await db.HeldFiles.FindAsync([id], ct) is not { } held || service.HeldFullPath(held) is not { } full || !File.Exists(full))
+                    return Results.NotFound();
+                var track = held.TrackId is { } trackId
+                    ? await db.Tracks.Where(t => t.Id == trackId).Select(t => new { t.Title, t.ArtistCredit, t.ArtistId }).FirstOrDefaultAsync(ct)
+                    : null;
+                var better = held.LibraryFileId is { } fileId
+                    ? await db.LibraryFiles.Where(f => f.Id == fileId).Select(f => new { f.EditionId, AlbumId = (Guid?)f.Edition!.AlbumId, AlbumTitle = f.Edition.Album.Title })
+                        .FirstOrDefaultAsync(ct)
+                    : null;
+                var codec = MediaTypes.CodecFor(held.Path);
+                // Its file ID is the held file's own.
+                return Results.Ok(new PlayInfo(held.TrackId ?? held.Id, held.Id, track?.Title ?? held.Title, track?.ArtistCredit ?? "", track?.ArtistId,
+                    better?.AlbumId, better?.AlbumTitle, better?.AlbumId is { } album ? LibraryView.CoverUrl(album, better.EditionId) : null,
+                    held.Duration?.TotalSeconds, codec, MediaTypes.For(held.Path, codec), signer.Sign(HeldStreamPath(id))));
+            })
+            .RequireScope(Scopes.Listen).WithName("PlayHeldFile")
+            .WithSummary("How to play a file an upgrade replaced, while it's held: a signed stream URL, to compare it with the better copy. 404 once it's gone.")
+            .Produces<PlayInfo>().Produces(StatusCodes.Status404NotFound);
+
+        upgrades.MapGet("/held/{id:guid}/stream", async (Guid id, long? exp, string? sig, [FromQuery(Name = "as")] string? asked, string? keep,
+                MelodexDbContext db, Upgrades service, StreamSigner signer, StreamCopies copies, CancellationToken ct) =>
+            {
+                if (!signer.Verify(HeldStreamPath(id), exp ?? 0, sig))
+                    return Results.StatusCode(StatusCodes.Status403Forbidden);
+                if (await db.HeldFiles.FindAsync([id], ct) is not { } held || service.HeldFullPath(held) is not { } full || !File.Exists(full))
+                    return Results.NotFound();
+                return await copies.ServeAsync(full, null, asked, keep, ct);
+            })
+            .AllowAnyone()
+            .WithName("StreamHeldFile").WithSummary("A file an upgrade replaced, with range requests for seeking. Needs the signature from its stream URL; as and keep work as for library files.")
+            .Produces(StatusCodes.Status200OK).Produces(StatusCodes.Status206PartialContent).Produces(StatusCodes.Status403Forbidden).Produces(StatusCodes.Status404NotFound);
+
         upgrades.MapPost("/held/{id:guid}/restore", async (Guid id, bool? never, Upgrades service, CancellationToken ct) =>
             {
                 try
@@ -99,4 +138,6 @@ public static class UpgradeEndpoints
 
         return api;
     }
+
+    public static string HeldStreamPath(Guid id) => $"api/v1/upgrades/held/{id}/stream";
 }

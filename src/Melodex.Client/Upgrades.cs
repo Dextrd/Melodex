@@ -78,8 +78,9 @@ public sealed record UpgradeRunInfo(bool ByHand, string Requester, DateTime Star
 /// <param name="ReplacedBy">The better copy's path.</param>
 /// <param name="Was">Its quality.</param>
 /// <param name="Now">The better copy's quality.</param>
+/// <param name="FileId">The better copy's library file, to play it.</param>
 public sealed record HeldFileInfo(Guid Id, Guid? TrackId, string Title, string Path, string ReplacedBy, FileQuality Was, FileQuality? Now, DateTime HeldAt,
-    DateTime DeleteAt, string? CoverUrl = null, double? DurationSeconds = null);
+    DateTime DeleteAt, string? CoverUrl = null, double? DurationSeconds = null, Guid? FileId = null);
 
 /// <summary>What a look for upgrades found.</summary>
 /// <param name="Upgradable">Files below their cutoff in what was looked through.</param>

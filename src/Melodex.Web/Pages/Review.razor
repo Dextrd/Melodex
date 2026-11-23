@@ -13,6 +13,7 @@
 @using Microsoft.JSInterop
 @using System.Text.RegularExpressions
 @inject IJSRuntime JS
+@inject Player Player
 
 <PageTitle>Review · Melodex</PageTitle>
 
@@ -450,6 +451,8 @@ else
                         <div class="muted small"><QualityBadge Quality="held.Was" Dot="true" /> @held.Was.Label</div>
                         <div class="muted small path">@held.Path · @Format.Duration(held.DurationSeconds)</div>
                     </ReviewSong>
+                    <IconButton Icon="play" Requires="@UserPermissions.Listen" Class="small held-play" Label="Play the original"
+                                Title="Play the file it replaced, to compare, then the rest of the originals in turn" OnClick="() => PlayHeldAsync(held, original: true)" />
                 </div>
                 <div>
                     <div class="label">Upgrade</div>
@@ -458,6 +461,8 @@ else
                     </div>
                     <div class="muted small path">@held.ReplacedBy</div>
                     <div class="muted small">Upgraded @Format.Ago(held.HeldAt); will be auto-approved on @held.DeleteAt.ToLocalTime().ToString("d MMMM")</div>
+                    <IconButton Icon="play" Requires="@UserPermissions.Listen" Class="small held-play" Label="Play the upgrade" Disabled="held.FileId is null"
+                                Title="Play the better copy, then the rest of the upgrades in turn" OnClick="() => PlayHeldAsync(held, original: false)" />
                 </div>
                 <div class="review-actions">
                     <IconButton Icon="approve" Primary="true" Title="Approve: keep the better copy, and delete the old file now" Disabled="_busy" OnClick="() => SettleAsync(held, Settle.Approve)" />
@@ -1177,5 +1182,21 @@ else
     {
         Tracker.Changed -= OnRequestsChanged;
         Nav.LocationChanged -= OnLocationChanged;
+    }
+
+    // The upgrades from this one on, the better copies or the files they replaced, so you can skip through them in turn (#239).
+    private Task PlayHeldAsync(HeldFileInfo from, bool original)
+    {
+        var shown = VisibleHeld.Where(h => original || h.FileId is not null).ToList();
+        var entries = shown.Select(h =>
+        {
+            var (title, artist) = ReviewSong.Split(h.Title);
+            return new PlayerEntry
+            {
+                TrackId = h.TrackId ?? h.Id, FileId = original ? null : h.FileId, HeldId = original ? h.Id : null,
+                Title = original ? $"{title} (original)" : title, ArtistCredit = artist ?? "", CoverUrl = h.CoverUrl, DurationSeconds = h.DurationSeconds,
+            };
+        }).ToList();
+        return Player.PlayAsync(entries, shown.IndexOf(from), new PlaySource(PlaySourceKind.Other, Name: original ? "Upgrades' originals" : "Upgrades"));
     }
 }
