@@ -129,6 +129,7 @@ What changed in each release of Melodex. Versions follow [semantic versioning](h
 
 ### Fixed
 
+- **Previous** works once the queue has run out, playing its last song again; it was greyed out (#241).
 - Starting a song you don't have, or skipping to one, no longer sometimes plays the song after it instead, or skips
   songs on its own while they're fetched: a song not yet asked for was remembered as having nothing to play. And a song
   chosen while another is still playing is no longer skipped past when that one ends first (#109).
