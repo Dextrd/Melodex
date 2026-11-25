@@ -108,6 +108,8 @@ What changed in each release of Melodex. Versions follow [semantic versioning](h
 - **A scan no longer updates the catalogue after it**, and its setting is gone: **Update the catalogue** runs on its
   own schedule, after the scan in the daily window to start with, or from the Scan menu (#238).
 - **Look for missing lyrics** is a card on Tools, rather than a button under Settings → Library (#238).
+- **API keys** shows **Your keys**, and for the admin, **Other people's keys** in a section of its own, any of which
+  they can revoke (#238).
 - **Editing someone under Settings → Users changes what they may do**, alone: their login and media server logins are
   theirs to change, on their own account, and your own card opens yours (#238).
 - **Plugins with nothing to set have no settings button**, and buttons that delete or can't be undone are outlined in

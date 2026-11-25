@@ -1401,6 +1401,8 @@ svg.flip { transform: scaleY(-1); }
 .settings-group { display: flex; flex-direction: column; gap: .15rem; }
 .settings-group + .settings-group { margin-top: 1.4rem; }
 .settings-group h2 { margin: 0 0 .4rem; padding: 0 .75rem; font-size: .82rem; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--text); }
+.section-save { margin-top: .75rem; }
+.others-keys { margin-top: 1.5rem; }
 .log-retention { margin-bottom: 1rem; }
 .log-retention > summary { cursor: pointer; color: var(--muted); margin-bottom: .5rem; }
 .settings-body > :first-child { margin-top: 0; }

@@ -17,13 +17,19 @@ else
     {
         <h2>Login</h2>
         <section class="panel" aria-label="Login">
-            <div class="panel-body">@Body(EditorTab.Login)</div>
+            <div class="panel-body">
+                @Body(EditorTab.Login)
+                @SectionSave(EditorTab.Login, string.IsNullOrWhiteSpace(_username))
+            </div>
         </section>
         @if (_accounts.Count > 0)
         {
             <h2>Media server accounts</h2>
             <section class="panel" aria-label="Media server accounts">
-                <div class="panel-body">@Body(EditorTab.Servers)</div>
+                <div class="panel-body">
+                    @Body(EditorTab.Servers)
+                    @SectionSave(EditorTab.Servers, false)
+                </div>
             </section>
         }
     }
@@ -44,22 +50,15 @@ else
     <div role="tabpanel">@Body(_tab)</div>
     }
 
-    <div class="toolbar @(Self ? "account-save" : "dialog-buttons")">
-        @if (Self)
-        {
-            <button class="primary" disabled="@(_busy || string.IsNullOrWhiteSpace(_username))" @onclick="SaveAsync">
-                @if (_busy) { <span class="spinner"></span> }Save
-            </button>
-            @if (_saved) { <span class="muted small">Saved.</span> }
-        }
-        else
-        {
+    @if (!Self)
+    {
+        <div class="toolbar dialog-buttons">
             <button @onclick="OnCancel">Cancel</button>
             <button class="primary" disabled="@(_busy || string.IsNullOrWhiteSpace(_username) || New && _password.Length == 0)" @onclick="SaveAsync">
                 @if (_busy) { <span class="spinner"></span> }@(New ? "Add" : "Save")
             </button>
-        }
-    </div>
+        </div>
+    }
 }
 
 @code {
@@ -97,7 +96,6 @@ else
     private PlaylistSyncStatus? _sync;
     private string? _loginError;
     private bool _busy;
-    private bool _saved;
 
     private bool New => !Self && _id is null;
     private bool Admin => Self ? Auth.Status?.IsAdmin == true : User?.IsAdmin == true;
@@ -276,10 +274,38 @@ else
             _permissions.Remove(permission);
     }
 
+    // On your own account each section has its own Save, keeping only what's in it.
+    private RenderFragment SectionSave(EditorTab section, bool disabled) =>
+        @<div class="toolbar section-save">
+            <button class="primary" disabled="@(_busy || disabled)" @onclick="() => SaveSectionAsync(section)">
+                @if (_busy && _savingSection == section) { <span class="spinner"></span> }Save
+            </button>
+            @if (_savedSection == section) { <span class="muted small">Saved.</span> }
+        </div>;
+
+    private EditorTab? _savingSection, _savedSection;
+
+    private async Task SaveSectionAsync(EditorTab section)
+    {
+        _busy = true;
+        _savingSection = section;
+        _savedSection = null;
+        _loginError = null;
+        try
+        {
+            if (section == EditorTab.Login ? await SaveLoginAsync() : await SaveAccountsAsync())
+                _savedSection = section;
+        }
+        finally
+        {
+            _busy = false;
+            _savingSection = null;
+        }
+    }
+
     private async Task SaveAsync()
     {
         _busy = true;
-        _saved = false;
         _loginError = null;
         try
         {
@@ -293,7 +319,6 @@ else
                 _tab = EditorTab.Servers;
                 return;
             }
-            _saved = true;
             await OnSaved.InvokeAsync();
         }
         finally

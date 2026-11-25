@@ -42,7 +42,8 @@ Someone who just listens needs Browse and Listen. Buttons for what someone may n
 Apps use a key from **Settings → Server → API keys**. Anyone signed in can make keys there, as many as they like, but each can do only
 what its maker may. A key belongs to whoever made it and can never do more than they may: if their
 permissions shrink, or they're removed, so does the key. **Everything you may do** gives a key all its owner's
-permissions, now and later. See the [client guide](../client-guide.md) for the API itself.
+permissions, now and later. Your keys are under **Your keys**; the admin also sees everyone else's, under **Other
+people's keys**, and can revoke any of them. See the [client guide](../client-guide.md) for the API itself.
 
 ## A lost admin password
 
