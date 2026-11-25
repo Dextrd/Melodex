@@ -1,0 +1,11 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Report a security problem
+    url: https://github.com/Dextrd/Melodex/security/advisories/new
+    about: Report vulnerabilities privately, not in a public issue.
+  - name: The guide
+    url: https://github.com/Dextrd/Melodex/blob/main/docs/guide/README.md
+    about: Installing, setting up and using Melodex, with a troubleshooting page.
+  - name: A retrieval plugin
+    url: https://github.com/Dextrd/Melodex/blob/main/docs/guide/plugins.md#retrieval-plugins
+    about: Retrieval plugins have repositories of their own. Issues with one go there.
