@@ -4,6 +4,14 @@ What changed in each release of Melodex. Versions follow [semantic versioning](h
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-11-25
+
+Melodex becomes a full music server: Subsonic players with stars, ratings and a shared play queue; listening history,
+scrobbling and discovery plugins; radio, and For you's daily mixes and weekly discoveries; even volume; gapless playback
+on iPhones; genres from MusicBrainz; import from Apple Music; Maintenance on Tools; and Settings in sections. Retrieval
+plugins have repositories of their own, so the compose file is just the core and the beets worker: see
+[upgrading](docs/guide/upgrading.md). The core and beets worker images change; the database migrates on start.
+
 ### Added
 
 - **Play upgrades from Review**: each upgrade on the **Upgraded** tab can be played, and so can the file it replaced,
@@ -13,7 +21,7 @@ What changed in each release of Melodex. Versions follow [semantic versioning](h
   Amperfy, Substreamer, Tempo, Feishin and other Subsonic apps can browse your library, search it, play it (turned
   into MP3, Opus or AAC at a lower bitrate when a player asks), show covers and lyrics, and keep your playlists, the
   same ones as in Melodex. Players sign in with an API key: tick **Let a Subsonic player sign in with it** when you
-  make one under **Settings → API**, and it's the password with your username. See the new guide page, Subsonic
+  make one under **Settings → API keys**, and it's the password with your username. See the new guide page, Subsonic
   players (#7).
 - Songs' genres are read from their tags. Files scanned before have theirs read on the next scan (#7).
 - **Stars and ratings**: star songs, albums and artists you have, and rate songs and albums 1 to 5, from their pages
@@ -76,15 +84,15 @@ What changed in each release of Melodex. Versions follow [semantic versioning](h
 - Melodex's own Subsonic extension, `melodex`: each song's ID in the API, and whether you have all of an album (#7).
 - **Settings → Scheduled tasks**: daily, weekly and monthly windows, each with its own times (running past midnight
   if it ends earlier than it starts), the weekly one on a day you pick and the monthly one on a day of the month (in a
-  shorter month, its last day), all in one time zone. Tick what each runs: a scan, a catalogue update, the lossless
-  check, a look for missing lyrics, the visualiser's bars, retrying failed downloads, getting what's on wishlists, and
-  upgrades. A window runs them once, in that order; retries and wishlists keep **Downloads at a time** going (5 to start
-  with), as upgrades keep theirs, until all have been asked for or the window closes. Each schedule shows when it next
-  runs and how its last run went. New installs scan, update the catalogue, check lossless files and make the
-  visualiser's bars daily from 01:00 to 06:00, and do the rest weekly on Mondays (#112).
+  shorter month, its last day), all in one time zone. Tick what each runs: a scan, a catalogue update, a look for
+  missing lyrics, retrying failed fetches, getting what's on wishlists, and upgrades. A window runs them once, in that
+  order; retries and wishlists keep a few fetches going (5 to start with, set under **Settings → Fetching**), as
+  upgrades keep theirs, until all have been asked for or the window closes. Each schedule shows when it next runs and
+  how its last run went. New installs scan and update the catalogue daily from 01:00 to 06:00, and do the rest weekly
+  on Mondays (#112).
 - Every scheduled task can still be run straight away where it lives, which says which schedule it's on: **Look for
-  missing lyrics now** under **Settings → General**, **Make missing bars now** under **Settings → Playback**, **Retry
-  failed** on **Activity → Fetches** and **Get them all** on the wishlist are new (#112).
+  missing lyrics** and **Look for upgrades** on Tools, **Retry failed** on **Activity → Fetches** and **Get them all**
+  on the wishlist are new (#112).
 - How often playlists sync for changes made in the media server can be set, under **Settings → Scheduled tasks** (#112).
 - Each song's spectrum, which the visualiser's bars are drawn from, is a documented part of the API for any app to
   use, at `/spectrum` beside a song's stream: each band's level unsmoothed, from 40 Hz to 16 kHz over a wider range of
@@ -140,7 +148,7 @@ What changed in each release of Melodex. Versions follow [semantic versioning](h
 - The visualiser's bars reach 16 kHz, where they stopped at 10 kHz, and a song's spectrum is version 2 of its format.
   `.bars` files beside songs are made again in it as the visualiser's bars are next made when matching, and take
   about a third more room. `/bars` still gives version 1, for apps written for it (#102).
-- Everyone can make API keys under **Settings → API**, as many as they like, each able to do only what they may. The
+- Everyone can make API keys under **Settings → API keys**, as many as they like, each able to do only what they may. The
   permission that was **API keys and webhooks** is now **Webhooks**; on a key it still lets an app make and revoke its
   owner's keys (#7).
 - The upgrade schedule has moved from **Settings → Quality** to **Settings → Scheduled tasks**, as it was set: on the
