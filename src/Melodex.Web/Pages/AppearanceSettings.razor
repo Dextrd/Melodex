@@ -1,36 +1,6 @@
 @page "/settings/appearance"
-@page "/settings/notifications"
 @layout SettingsLayout
-@inject AuthState Auth
-@inject NavigationManager Nav
 
-<PageTitle>@(Notifications ? "Notifications" : "Appearance") · Melodex</PageTitle>
+<PageTitle>Appearance · Melodex</PageTitle>
 
-@*
-    Your own look, or which notifications you see, and for whoever may change settings, everyone's too: what people see
-    until they choose their own. It's the one panel, with a switch at its top right between the two.
-*@
-@if (Auth.May(UserPermissions.Settings))
-{
-    <AppearancePanel ForEveryone="_everyone" Notifications="Notifications">
-        <Switch>
-            <Segmented T="bool" Value="_everyone" Options="Whose" OnChange="v => _everyone = v" Label="Whose look" Class="panel-switch" />
-        </Switch>
-    </AppearancePanel>
-}
-else
-{
-    <AppearancePanel Notifications="Notifications" />
-}
-
-@code {
-    private bool _everyone;
-
-    private bool Notifications => Nav.ToBaseRelativePath(Nav.Uri).Split('?', '#')[0].TrimEnd('/') == "settings/notifications";
-
-    private static readonly IReadOnlyList<(bool, string, string?)> Whose =
-    [
-        (false, "You", "For you"),
-        (true, "Everyone", "For everyone who hasn't chosen their own"),
-    ];
-}
+<LookSettings />
