@@ -1,9 +1,10 @@
 # Tools
 
 The **Tools** page holds things you run now and then. **Import / Export** has importing lists of songs, and exporting
-your playlists and library; importing needs the **Request** permission. **Formatting** has what writes your music files
-themselves, over the whole library: [formatting](library.md#formatting) and [even volume](library.md#even-volume),
-which need the **Format** permission. What each does shows in **Activity** as it goes.
+your playlists and library; importing needs the **Request** permission. **Maintenance** looks after what's in the
+library: what new music gets as it comes, for music that was there before, and looking for upgrades. **Formatting**
+[formats](library.md#formatting) the whole library's files, which needs the **Format** permission. What each does
+shows in **Activity** as it goes.
 
 ## Importing from a list
 
@@ -117,6 +118,26 @@ as they're fetched. Songs that couldn't be matched, or are to review, go to Revi
 **Importing again updates.** Melodex knows each playlist by its name on the service, and each song by the service's ID
 for it, so a later copy brings only what's new since: new songs go on the end of the playlist made the first time, and a
 list with nothing new is shown as such and left out. Songs taken off a playlist on the service stay in Melodex's.
+
+## Maintenance
+
+New music gets most of these as it comes: a download is checked for lossy music passed off as lossless before it's
+filed, after each scan new and changed files are checked and new songs get their visualiser bars, and new music has its
+volume evened out while that's on. Music that was in your library before Melodex, or added all at once, can have them
+here:
+
+- **Check lossless files** looks for lossy music passed off as lossless in your FLAC, WAV and AIFF files (see [Lossless
+  that seems lossy](requests-and-listening.md#lossless-that-seems-lossy)). It checks those not checked yet, or all of
+  them again. Files are only read. It needs the **Scan** permission.
+- **Look for missing lyrics** asks the lyrics plugins for every song without lyrics (see
+  [lyrics](library.md#lyrics)). It needs the **Scan** permission.
+- **Even volume** works out how loud each song and album is and writes it into the files (see [even
+  volume](library.md#even-volume)). It asks before it starts, and needs the **Format** permission.
+- **Look for upgrades** looks for better copies of every song below its cutoff now, as the schedule does (see
+  [upgrades](requests-and-listening.md#upgrades)), and says how many there are. While a look is going, it can stop it.
+  It needs the **Request** permission.
+- **Make visualiser bars** makes the [visualiser](requests-and-listening.md#the-visualiser)'s bars for every song
+  without them, in a `.bars` file beside it. It's there while **Settings → Playback** keeps bars beside songs.
 
 ## Exporting
 

@@ -103,8 +103,12 @@ What changed in each release of Melodex. Versions follow [semantic versioning](h
 
 ### Changed
 
-- **Tools** is in two sections, **Import / Export** and **Formatting**. Formatting the whole library has moved there,
-  from the Library page's Scan menu, beside the new Even volume (#23).
+- **Checking lossless files and making the visualiser's bars are on Tools**, under **Maintenance**, and no longer
+  scheduled tasks: new music gets them as it comes, so they're only needed for music that was there before. Schedules
+  that had them ticked carry on without them, and their buttons in Settings → Quality and Playback have moved there,
+  as has **Look for upgrades** (#237).
+- **Tools** is in sections: **Import / Export**, **Maintenance** (with the new Even volume) and **Formatting**.
+  Formatting the whole library has moved there, from the Library page's Scan menu (#23).
 - **Retrieval plugins have repositories of their own**, `dextrd/melodex-retriever-<name>`, each with its own releases
   and image, which keeps its name. Each README has the lines to add to your compose file. Melodex's own compose file
   is just Melodex now: the core and the beets worker, with no plugins and no `COMPOSE_PROFILES`. The guide's Plugins
