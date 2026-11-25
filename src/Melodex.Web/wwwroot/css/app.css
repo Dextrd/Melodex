@@ -20,6 +20,8 @@
     --partial-fill: #e5a32b;
     --covered-fill: #4a8fd6;
     --missing-fill: #f3cdc7;
+    /* Buttons that delete or can't be undone, outlined in it. */
+    --danger: #8f1d14;
     color-scheme: light;
 
     /* Pink, Melodex's own, until theme.js says otherwise. */
@@ -48,6 +50,7 @@
     --covered-bg: #18293a;
     --missing: #f08a7c;
     --missing-bg: #3a1d19;
+    --danger: #e5534b;
     --owned-fill: #5cc890;
     --partial-fill: #e8b453;
     --covered-fill: #78aee0;
@@ -83,6 +86,7 @@
     --covered-bg: #d6e9f7;
     --missing: #93306a;
     --missing-bg: #f6dcec;
+    --danger: #7a0d0d;
     --owned-fill: #009e73;
     --partial-fill: #e69f00;
     --covered-fill: #0072b2;
@@ -101,6 +105,7 @@
     --covered-bg: #0b2a40;
     --missing: #f08ccb;
     --missing-bg: #3d1530;
+    --danger: #ff6b63;
     --owned-fill: #2fc597;
     --partial-fill: #f2a91a;
     --covered-fill: #3fa3e8;
@@ -200,7 +205,8 @@ main { max-width: 1100px; margin: 0 auto; padding: 1.25rem 1rem 3rem; }
     html:has(.page-scroll), html:has(.page-scroll) body { height: 100%; overflow: hidden; }
     body:has(.page-scroll) #app { height: 100%; display: flex; flex-direction: column; }
     #app > * { flex: none; }
-    #app > .page-scroll { flex: 1; min-height: 0; overflow-y: auto; }
+    /* Room is kept for the scrollbar on every page, so short pages don't shift sideways from long ones. */
+    #app > .page-scroll { flex: 1; min-height: 0; overflow-y: auto; scrollbar-gutter: stable; }
     /* The title stays at the top as the page scrolls, as the sections do below it (#126). */
     .settings-title {
         position: sticky; top: 0; z-index: 6; background: var(--bg);
@@ -1184,8 +1190,8 @@ a.plain:hover { color: var(--accent); }
 .format-choices label > span { display: flex; flex-direction: column; }
 .format-choices select { width: 100%; }
 @media (max-width: 480px) { .format-choices label { grid-template-columns: 1fr; gap: .25rem; } }
-button.danger { background: var(--missing); border-color: var(--missing); color: #fff; }
-button.danger:hover:not(:disabled) { filter: brightness(1.1); }
+button.danger { background: transparent; border: 1.5px solid var(--danger); color: var(--danger); font-weight: 600; }
+button.danger:hover:not(:disabled) { background: color-mix(in srgb, var(--danger) 12%, transparent); }
 button .spinner { width: .85rem; height: .85rem; vertical-align: -2px; margin-right: .3rem; }
 
 /* A tile, with its menu, or a button in its corner shown on hover or focus. */
@@ -1385,18 +1391,15 @@ svg.flip { transform: scaleY(-1); }
 .settings-nav a { padding: .45rem .75rem; border-radius: 6px; color: var(--muted); text-decoration: none; }
 .settings-nav a:hover { background: var(--surface); color: var(--text); }
 .settings-nav a.active { background: var(--surface); color: var(--text); font-weight: 600; box-shadow: inset 3px 0 0 var(--accent); }
-/* Your account first, as a large button with your initial and name (#238); the rest in titled groups. */
-.settings-nav a.settings-account { display: flex; align-items: center; gap: .65rem; padding: .6rem .7rem; margin-bottom: .5rem; color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: 10px; }
+/* In titled groups, your account first, with a large button with your initial and name (#238). */
+.settings-nav a.settings-account { display: flex; align-items: center; gap: .65rem; padding: .6rem .7rem; margin-bottom: .2rem; color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: 10px; }
 .settings-nav a.settings-account:hover { border-color: var(--accent); }
 .settings-nav a.settings-account.active { border-color: var(--accent); box-shadow: none; }
 .settings-account .avatar { flex: none; width: 2.6rem; height: 2.6rem; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; background: var(--accent); color: var(--accent-text); font-size: 1.15rem; }
 .settings-account-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
-.settings-group { display: flex; flex-direction: column; gap: .15rem; margin-top: .6rem; }
-.settings-group h2 { margin: 0 0 .15rem; padding: 0 .75rem; font-size: .72rem; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
-.settings-tabs { display: flex; gap: .25rem; flex-wrap: wrap; margin-bottom: 1rem; border-bottom: 1px solid var(--border); }
-.settings-tabs a { padding: .45rem .8rem; color: var(--muted); text-decoration: none; border-bottom: 2px solid transparent; margin-bottom: -1px; }
-.settings-tabs a:hover { color: var(--text); }
-.settings-tabs a.active { color: var(--text); font-weight: 600; border-bottom-color: var(--accent); }
+.settings-group { display: flex; flex-direction: column; gap: .15rem; }
+.settings-group + .settings-group { margin-top: 1.4rem; }
+.settings-group h2 { margin: 0 0 .4rem; padding: 0 .75rem; font-size: .82rem; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--text); }
 .log-retention { margin-bottom: 1rem; }
 .log-retention > summary { cursor: pointer; color: var(--muted); margin-bottom: .5rem; }
 .settings-body > :first-child { margin-top: 0; }
@@ -1407,6 +1410,7 @@ svg.flip { transform: scaleY(-1); }
     .settings-nav a { padding: .4rem .6rem; }
     .settings-nav a.active { box-shadow: inset 0 -2px 0 var(--accent); }
     .settings-nav a.settings-account { flex: 1 0 100%; margin-bottom: .25rem; }
+    .settings-group + .settings-group { margin-top: 0; }
     .settings-group { display: contents; }
     .settings-group h2 { display: none; }
 }
@@ -1513,7 +1517,7 @@ svg.flip { transform: scaleY(-1); }
 .setup-body .error { max-width: none; white-space: normal; }
 
 /* Settings → About. */
-.about { padding: 1.2rem 1.4rem 1.4rem; max-width: 44rem; }
+.about { padding: 1.2rem 1.4rem 1.4rem; }
 .about-head { display: flex; align-items: center; gap: 1rem; margin-bottom: 1.2rem; }
 .about-head h2 { margin: 0; font-size: 1.5rem; }
 .about-head p { margin: .2rem 0 0; }

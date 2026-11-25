@@ -5,10 +5,10 @@
 
 <PageTitle>Library settings · Melodex</PageTitle>
 
-@* How the library is matched, shown and filled in: the Library section of Settings (#238). *@
+@* How the library is shown, laid out and filled in: the Library section of Settings (#238). *@
 
 
-@if (_settings is null)
+@if (_settings is null || _pathTemplate is null)
 {
     <Loading />
 }
@@ -46,30 +46,25 @@ else
         }
     </ReleaseKindsEditor>
 
-    <h2>Matching</h2>
+    <h2 id="format">Library format</h2>
+    <p class="muted small">
+        Where each album's files go in the music folder: new albums as they're fetched, and the library's files when they're
+        <a href="tools">formatted</a>.
+    </p>
     <div class="card settings-card">
-        <div class="setting-line">
-            Send fuzzy matches under
-            <NumberField Min="50" Max="100" Label="Confidence, in percent" Value="(int)Math.Round(_settings.MatchThreshold * 100)"
-                         ValueChanged="n => Set(_settings with { MatchThreshold = n / 100.0 })" />
-            % confidence to review
+        <div class="field">
+            <label class="field-label" for="path-template">Folder layout</label>
+            <input id="path-template" type="text" style="width: 100%; max-width: 32rem;" @bind="_pathTemplate" @bind:after="FetchChanged" />
+            <div class="muted small">
+                A <a href="https://beets.readthedocs.io/en/stable/reference/pathformat.html" target="_blank" rel="noopener noreferrer">beets path format</a>.
+                The default, <code>@FetchSettings.DefaultPathTemplate</code>, gives <code>Portishead/Dummy/11 Glory Box.opus</code>.
+                A track for an album you already have goes next to that album's files instead.
+                @if (_pathTemplate != FetchSettings.DefaultPathTemplate)
+                {
+                    <button class="link small" @onclick="() => { _pathTemplate = FetchSettings.DefaultPathTemplate; FetchChanged(); }">Use the default</button>
+                }
+            </div>
         </div>
-        <div class="muted small">Applies from the next scan.</div>
-        <div class="setting-line">
-            When MusicBrainz is busy, try each album
-            <NumberField Min="1" Max="10" Label="Attempts" Value="_settings.AttemptsWhenBusy" ValueChanged="n => Set(_settings with { AttemptsWhenBusy = n })" />
-            @(_settings.AttemptsWhenBusy == 1 ? "time" : "times") before leaving it for next time
-        </div>
-        <div class="muted small">A busy album goes to the back of the queue, so MusicBrainz gets time to recover before it's tried again.</div>
-        <label class="dialog-choice">
-            <input type="checkbox" checked="@_settings.UpdateCatalogueAfterScan" @onchange="e => Set(_settings with { UpdateCatalogueAfterScan = (bool)e.Value! })" />
-            <span>
-                <strong>Update the catalogue after each scan</strong>
-                <span class="muted small">Looks up your artists' discographies and their albums' editions, as its own task, so the missing view stays current. The Scan menu's <em>Update catalogue</em> starts one any time.</span>
-            </span>
-        </label>
-        <ScheduleNote Task="ScheduledTask.Scan" />
-        <ScheduleNote Task="ScheduledTask.CatalogueUpdate" />
     </div>
 
     <h2>File metadata</h2>
@@ -124,8 +119,8 @@ else
     <AutoSave @ref="_saver" Save="SaveAsync" />
 
     <p class="muted small">
-        Where new albums go and how they're fetched are under <a href="settings/fetching">Fetching</a>; plugins (sources, the media server and the
-        catalogue) under <a href="settings/plugins">Plugins</a>.
+        How music is fetched and matched is under <a href="settings/fetching">Fetching</a>; plugins (sources, the media server and the catalogue)
+        under <a href="settings/plugins">Plugins</a>.
     </p>
 }
 
@@ -156,6 +151,9 @@ else
     ];
 
     private LibrarySettings? _settings;
+    private string? _pathTemplate;
+    // What's changed since it was last saved: the library's settings, the folder layout (kept with fetching's), or both.
+    private bool _libraryChanged, _fetchChanged;
     private AutoSave? _saver;
 
     private static readonly (DuplicateTracks, string, string)[] DuplicateOptions =
@@ -170,7 +168,9 @@ else
 
     protected override async Task OnInitializedAsync()
     {
+        var fetch = Api.GetFetchSettingsAsync();
         _settings = await Api.GetLibrarySettingsAsync();
+        _pathTemplate = (await fetch).PathTemplate;
     }
 
     private bool IsDefaultShowing => Enum.GetValues<ReleaseKind>().All(k => _settings!.ShowingOf(k) == ReleaseKinds.Default(k));
@@ -186,10 +186,28 @@ else
     private void Set(LibrarySettings settings)
     {
         _settings = settings;
-        Changed();
+        _libraryChanged = true;
+        _saver?.Changed();
     }
 
-    private void Changed() => _saver?.Changed();
+    private void FetchChanged()
+    {
+        _fetchChanged = true;
+        _saver?.Changed();
+    }
 
-    private Task SaveAsync() => Api.SaveLibrarySettingsAsync(_settings!);
+    // The folder layout is saved over fetching's settings as they are now, so what's changed on Fetching meanwhile stays.
+    private async Task SaveAsync()
+    {
+        if (_libraryChanged)
+        {
+            _libraryChanged = false;
+            await Api.SaveLibrarySettingsAsync(_settings!);
+        }
+        if (_fetchChanged)
+        {
+            _fetchChanged = false;
+            await Api.SaveFetchSettingsAsync(await Api.GetFetchSettingsAsync() with { PathTemplate = _pathTemplate! });
+        }
+    }
 }

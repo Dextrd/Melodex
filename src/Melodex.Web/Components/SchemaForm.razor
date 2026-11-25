@@ -3,10 +3,6 @@
 @using System.Text.Json.Nodes
 
 @* A plugin's settings form, built from the JSON Schema in its manifest. Secrets start empty and keep their saved value unless typed over. *@
-@if (Fields.Count == 0)
-{
-    <div class="muted small">This plugin has no settings.</div>
-}
 @foreach (var (name, field) in Fields)
 {
     var type = Text(field, "type");

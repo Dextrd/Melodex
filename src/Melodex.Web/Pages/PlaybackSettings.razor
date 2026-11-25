@@ -75,27 +75,6 @@ else
         }
     </div>
 
-    <h2>Listen now</h2>
-    <div class="card settings-card">
-        <div class="setting-line">
-            Keep listen-now tracks for
-            <NumberField Min="5" Max="10080" Step="5" Label="Minutes" Value="_fetch.ListenNowExpiryMinutes" ValueChanged="n => { _fetch = _fetch with { ListenNowExpiryMinutes = n }; _saver?.Changed(); }" />
-            minutes after they were last played
-        </div>
-        <div class="muted small">A track fetched to listen to, and not added to the library, is deleted after this.</div>
-        <div class="setting-line">
-            Fetch
-            <NumberField Min="0" Max="20" Label="Songs ahead" Value="_fetch.ListenNowAhead" ValueChanged="n => { _fetch = _fetch with { ListenNowAhead = n }; _saver?.Changed(); }" />
-            songs ahead of the one playing, and
-            <NumberField Min="0" Max="20" Label="Songs behind" Value="_fetch.ListenNowBehind" ValueChanged="n => { _fetch = _fetch with { ListenNowBehind = n }; _saver?.Changed(); }" />
-            behind it
-        </div>
-        <div class="muted small">
-            Playing an album you don't have all of puts all of it in the queue, but only the songs you don't have this near the one playing are
-            fetched to listen to. The rest are fetched as the queue comes to them.
-        </div>
-    </div>
-
     <h2 id="radio">Radio</h2>
     <p class="muted small">
         Start a radio from a song, album, artist or playlist, and it plays songs like it without end: none twice, not one played in the last two days

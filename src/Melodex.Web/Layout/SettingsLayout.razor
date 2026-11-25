@@ -4,23 +4,28 @@
 @inject NavigationManager Nav
 
 @*
-    Settings (#238): your own account first, as a large button with your initial and name, then the rest in sections,
-    each page shown to those who may use it. Down the left, or across the top on narrow screens. Your account's pages
-    (the account itself, your look and your API keys) have tabs of their own above them.
+    Settings (#238), in sections: your own account first, as a large button with your initial and name, with your look
+    and API keys, then the rest, each page shown to those who may use it. Down the left, or across the top on narrow
+    screens. Only the page beside them changes as you go between them.
 *@
 <h1 class="settings-title">Settings</h1>
 <div class="settings-page">
     <nav class="settings-nav" aria-label="Settings sections">
-        @if (Auth.Status is { Username: { } name } status)
-        {
-            <a href="settings/account" class="settings-account @(InAccount ? "active" : "")" aria-current="@(InAccount ? "page" : null)">
-                <span class="avatar" aria-hidden="true">@Initial(name)</span>
-                <span class="settings-account-text">
-                    <strong class="ellipsis">@name</strong>
-                    <span class="muted small">@(status.IsAdmin ? "Admin" : "Your account")</span>
-                </span>
-            </a>
-        }
+        <div class="settings-group" role="group" aria-labelledby="settings-you">
+            <h2 id="settings-you">Your account</h2>
+            @if (Auth.Status is { Username: { } name } status)
+            {
+                <a href="settings/account" class="settings-account @(OnAccount ? "active" : "")" aria-current="@(OnAccount ? "page" : null)">
+                    <span class="avatar" aria-hidden="true">@Initial(name)</span>
+                    <span class="settings-account-text">
+                        <strong class="ellipsis">@name</strong>
+                        <span class="muted small">@(status.IsAdmin ? "Admin" : "Your account")</span>
+                    </span>
+                </a>
+            }
+            <NavLink href="settings/appearance">Appearance</NavLink>
+            <NavLink href="settings/api">API keys</NavLink>
+        </div>
         @if (Auth.May(UserPermissions.Settings))
         {
             <div class="settings-group" role="group" aria-labelledby="settings-library">
@@ -64,14 +69,6 @@
         </div>
     </nav>
     <div class="settings-body">
-        @if (InAccount)
-        {
-            <nav class="settings-tabs" aria-label="Your account">
-                <NavLink href="settings/account" Match="NavLinkMatch.All">Account</NavLink>
-                <NavLink href="settings/appearance">Appearance</NavLink>
-                <NavLink href="settings/api">API keys</NavLink>
-            </nav>
-        }
         @if (Needed is null || Auth.May(Needed))
         {
             @Body
@@ -86,7 +83,7 @@
 @code {
     private string Path => Nav.ToBaseRelativePath(Nav.Uri).Split('?', '#')[0].TrimEnd('/');
 
-    private bool InAccount => Path is "settings/account" or "account" or "settings/appearance" or "settings/api";
+    private bool OnAccount => Path is "settings/account" or "account";
 
     // What the open page needs: users and webhooks have pages of their own, everyone has their own account, keys and
     // look, and the rest are settings.

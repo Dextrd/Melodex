@@ -98,11 +98,16 @@ What changed in each release of Melodex. Versions follow [semantic versioning](h
 
 ### Changed
 
-- **Settings in sections**: your account comes first, as a large button with your initial and name, holding your
-  account, your look (**Appearance**) and your **API keys** as tabs. The rest are under **Library**, **Downloads**,
-  **Server** and **Melodex**. **General** is gone: its library settings are the **Library** page, the folder layout
-  and fetching have a **Fetching** page, how long logs are kept is on the **Log** page, and resetting Melodex is on
-  **About**. The old `/account` link still opens your account (#238).
+- **Settings in sections**: **Your account** comes first, a large button with your initial and name, with your look
+  (**Appearance**) and your **API keys**. The rest are under **Library**, **Downloads**, **Server** and **Melodex**.
+  **General** is gone: its library settings are the **Library** page, with the folder layout as **Library format**;
+  fetching, matching, listen now's settings and how many scheduled fetches go at once have a **Fetching** page; how
+  long logs are kept is on the **Log** page; and resetting Melodex is on **About**. The old `/account` link still opens
+  your account (#238).
+- **Editing someone under Settings → Users changes what they may do**, alone: their login and media server logins are
+  theirs to change, on their own account, and your own card opens yours (#238).
+- **Plugins with nothing to set have no settings button**, and buttons that delete or can't be undone are outlined in
+  red (#238).
 - **Retrieval plugins have repositories of their own**, `dextrd/melodex-retriever-<name>`, each with its own releases
   and image, which keeps its name. Each README has the lines to add to your compose file. Melodex's own compose file
   is just Melodex now: the core and the beets worker, with no plugins and no `COMPOSE_PROFILES`. The guide's Plugins

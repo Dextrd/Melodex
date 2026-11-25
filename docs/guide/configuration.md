@@ -17,17 +17,17 @@ Variables named `Navidex__…`, from before the rename, still work; a `Melodex__
 
 ## In the web app
 
-Settings opens with **your account** at the top: a large button with your initial and name. It holds what's only
-yours, in three tabs: **Account** (your login, media-server logins and [scrobbling](library.md#history)),
-**Appearance** (see [Appearance](appearance.md)) and **API keys** (see the [client guide](../client-guide.md)). Below it
-the rest are in sections, each page shown to whoever may use it:
+Settings is in sections, each page shown to whoever may use it. **Your account** comes first, with what's only yours:
+a large button with your initial and name for your account itself (your login, media-server logins and
+[scrobbling](library.md#history)), **Appearance** (see [Appearance](appearance.md)) and **API keys** (see the [client
+guide](../client-guide.md)). Then:
 
 | Section | Page | Holds |
 | --- | --- | --- |
-| Library | **Library** | Songs on more than one release, the missing view (each kind of release shown, hidden, or for new songs only), matching, file metadata, and lyrics |
+| Library | **Library** | Songs on more than one release, the missing view (each kind of release shown, hidden, or for new songs only), the library format (the folder layout, for new albums and formatting), file metadata, and lyrics |
 | | **Quality** | The [quality profile](requests-and-listening.md#quality) and [upgrades](requests-and-listening.md#upgrades) |
-| | **Playback** | Which songs play [without a gap](requests-and-listening.md#gapless-playback), when [the visualiser](requests-and-listening.md#the-visualiser)'s bars are made, if at all, how long listen-now songs are kept, how much of a [radio](requests-and-listening.md#radio) is songs you don't have, and whether radios carry on when a queue runs out |
-| Downloads | **Fetching** | The folder layout for new albums, how many fetches run at once, and how close a file must be to the song's length |
+| | **Playback** | Which songs play [without a gap](requests-and-listening.md#gapless-playback), when [the visualiser](requests-and-listening.md#the-visualiser)'s bars are made, if at all, how much of a [radio](requests-and-listening.md#radio) is songs you don't have, and whether radios carry on when a queue runs out |
+| Downloads | **Fetching** | How many fetches run at once, on the schedule or not, how close a file must be to the song's length, listen now's (how long its songs are kept, and how far ahead they're fetched), and matching |
 | | **Scheduled tasks** | What runs on its own, and when: see [Scheduled tasks](#scheduled-tasks) |
 | Server | **Plugins** | See [Plugins](plugins.md) |
 | | **Users**, **Webhooks** | See [Users and permissions](users-and-permissions.md) and the [client guide](../client-guide.md) |
@@ -66,7 +66,8 @@ weekly one is Mondays at the same times, for lyrics, failed downloads, wishlists
 - **A window runs its tasks once, in order**: scan, catalogue, lossless check, lyrics, the visualiser's bars, then
   failed downloads, wishlists and upgrades. The first five are tasks on **Activity**, one after another; the rest wait
   for them, as nothing can be asked for while a scan reads the library.
-- **Downloads go a few at a time.** Retries and wishlists keep **Downloads at a time** going (5 to start with), and
+- **Fetches go a few at a time.** Retries and wishlists keep a few fetches going, as many as **Settings → Fetching →
+  Scheduled fetches** says (5 to start with), and
   upgrades their own **Upgrades at a time**: as each finishes, the next is asked for in its place, so the queue never
   fills with a window's worth at once. Each waits for its downloads to finish before the next starts, and upgrades go
   last, filling what's left of the window. When the window closes, nothing more is asked for; those not started wait

@@ -3,8 +3,8 @@
 
 @*
     Someone's account in three tabs: their login, what they may do, and their login on each media server that syncs
-    playlists. One Save keeps it all. Under Settings → Users it's a dialog for anyone; on Your account it's the page,
-    for yourself.
+    playlists. One Save keeps it all. On Your account it's the page, for yourself; under Settings → Users it's a dialog
+    for adding someone, or for what someone else may do, alone.
 *@
 @if (_accounts is null)
 {
@@ -12,6 +12,8 @@
 }
 else
 {
+    @if (!PermissionsOnly)
+    {
     <nav class="page-tabs editor-tabs" role="tablist" aria-label="@(Self ? "Your account" : "User")">
         @Tab(EditorTab.Login, "Login", _loginError is not null)
         @Tab(EditorTab.Permissions, "Permissions", false)
@@ -20,6 +22,7 @@ else
             @Tab(EditorTab.Servers, "Media server accounts", _accounts.Any(a => a.Error is not null))
         }
     </nav>
+    }
 
     <div role="tabpanel">
         @switch (_tab)
@@ -74,6 +77,7 @@ else
                         </label>
                     }
                 }
+                @if (PermissionsOnly && _loginError is not null) { <p class="error small">@_loginError</p> }
                 break;
 
             case EditorTab.Servers:
@@ -166,6 +170,9 @@ else
     /// <summary>Your own account, on Your account. Otherwise someone else's, or a new user's when <see cref="User"/> is null.</summary>
     [Parameter] public bool Self { get; set; }
 
+    /// <summary>Only what someone else may do: their login and media server logins are theirs, on their own account.</summary>
+    [Parameter] public bool PermissionsOnly { get; set; }
+
     /// <summary>The user being changed; null to add one.</summary>
     [Parameter] public UserInfo? User { get; set; }
 
@@ -201,13 +208,15 @@ else
 
     protected override async Task OnInitializedAsync()
     {
+        if (PermissionsOnly)
+            _tab = EditorTab.Permissions;
         _id = Self ? Auth.Status?.UserId : User?.Id;
         _username = Self ? Auth.Status?.Username ?? "" : User?.Username ?? "";
         _permissions = (Self ? UserPermissions.All.Select(p => p.Id).Where(p => Auth.May(p)) : User?.Permissions ?? [UserPermissions.Read, UserPermissions.Listen]).ToHashSet();
         try
         {
             // A new user has no logins yet, but the servers are the same for everyone.
-            var accounts = Self && !Auth.May(UserPermissions.Listen) ? []
+            var accounts = PermissionsOnly || Self && !Auth.May(UserPermissions.Listen) ? []
                 : New ? (await Api.ListMediaServerAccountsAsync()).Select(a => a with { Username = null })
                 : await Api.ListMediaServerAccountsAsync(Self ? null : _id);
             _accounts = accounts.Select(a => new ServerLogin(a)).ToList();
@@ -256,7 +265,7 @@ else
         {
             if (!await SaveLoginAsync())
             {
-                _tab = EditorTab.Login;
+                _tab = PermissionsOnly ? EditorTab.Permissions : EditorTab.Login;
                 return;
             }
             if (!await SaveAccountsAsync())

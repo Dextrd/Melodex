@@ -3,21 +3,21 @@
 ## Users
 
 The admin, made at setup, may do everything. Add other people under **Settings → Users**, giving each only what they
-need. Nobody can give a permission they don't have, and only the admin can change the admin's account. Removing
-someone signs them out and revokes their API keys; what they asked for stays.
+need: adding someone gives them a username and password to start with. Nobody can give a permission they don't have.
+Removing someone signs them out and revokes their API keys; what they asked for stays.
 
-Each user's card lists what they may do; click the list to see all of it. Its settings button opens their account in
-three tabs, saved together:
+Each user's card lists what they may do; click the list to see all of it. Its settings button changes what they may
+do; the admin may do everything, so theirs has none. On your own card it opens your account.
 
-- **Login**: their username, and a new password, which signs them out everywhere.
-- **Permissions**: what they may do.
+Everyone changes their own account under **Your account**, at the top of Settings or in the account menu at the top
+right, in three tabs, saved together:
+
+- **Login**: their username and password. Changing either needs their current password, and a new password signs
+  them out everywhere else.
+- **Permissions**: what they may do, to read.
 - **Media server accounts**, when a media server that's set up syncs playlists: their login on each, to sync their
   playlists. The one in use is marked; the others' logins are kept for switching to them. Each login is checked with
-  its server when you save, and a tab with something to fix is marked.
-
-Anyone can change their own account under **Your account**, at the top of Settings or in the account menu at the top
-right: the same three tabs, for themselves. Changing their username or password needs their current password, and a new password signs
-them out everywhere else.
+  its server when they save, and a tab with something to fix is marked.
 
 ## What each permission allows
 

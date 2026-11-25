@@ -109,7 +109,7 @@ scan.
 - **Format the whole library**: see [Formatting](#formatting).
 
 After each scan, Melodex queues a catalogue update of its own, which shows on Activity as a separate task. To update
-the catalogue only when you ask, turn off **Update the catalogue after each scan** under **Settings → Library →
+the catalogue only when you ask, turn off **Update the catalogue after each scan** under **Settings → Fetching →
 Matching**.
 
 Scans and other long jobs show on **Activity**, where they can be paused, cancelled or moved in the queue, one by one
@@ -197,7 +197,7 @@ a deluxe edition, a compilation) is fetched once or for each, and whether owning
 
 **Format** rewrites files' tags and covers from the catalogue, and moves them to where your naming scheme says. It's on
 each artist, album and track page, and for the whole library in the Scan menu. It shows what will change first, and
-nothing is written until you confirm. Set the folder layout under **Settings → Fetching**. **Genres** writes the
+nothing is written until you confirm. Set the folder layout under **Settings → Library → Library format**. **Genres** writes the
 catalogue's [genres](#genres) into files that have none of their own, or into every file the catalogue has some for,
 over its own, when you choose the catalogue's **over the file's own**.
 
