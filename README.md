@@ -64,7 +64,8 @@ Upgrading from 1.x? See [upgrading](docs/guide/upgrading.md). Coming from Navide
 - [The client guide](docs/client-guide.md), for apps that use the API. The interactive reference is at `/api/docs` on
   your server.
 - [Plugin contracts](docs/contracts/README.md), for writing plugins.
-- [Developing Melodex](docs/development.md).
+- [Contributing](CONTRIBUTING.md), and [Developing Melodex](docs/development.md).
+- [Security policy](SECURITY.md), for reporting vulnerabilities privately.
 - [Changelog](CHANGELOG.md).
 
 ## Plugins and sources

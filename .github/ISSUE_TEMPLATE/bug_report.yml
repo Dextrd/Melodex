@@ -1,0 +1,39 @@
+name: Bug report
+description: Something in Melodex doesn't work as it should.
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: How to make it happen
+      description: The steps, from a page or setting someone else can find.
+      placeholder: |
+        1. Open Library → Artists
+        2. …
+  - type: input
+    id: version
+    attributes:
+      label: Melodex version
+      description: It's under Settings → About.
+      placeholder: "2.0.0"
+    validations:
+      required: true
+  - type: input
+    id: where
+    attributes:
+      label: Where you saw it
+      description: The browser or Subsonic app, and the device.
+      placeholder: Firefox on Windows, Symfonium on Android…
+  - type: textarea
+    id: log
+    attributes:
+      label: Log
+      description: Anything from Settings → Log around the time it happened. Take out anything private first.
+      render: text

@@ -1,0 +1,27 @@
+name: Feature request
+description: An idea for something Melodex could do.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What you'd like to do
+      description: The problem it solves, or what you're trying to do that Melodex doesn't let you.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: How it could work
+      description: What you'd see and do. Rough is fine.
+  - type: textarea
+    id: other
+    attributes:
+      label: Anything else
+      description: Other apps that do it well, or ways round it you use now.
+  - type: checkboxes
+    id: build
+    attributes:
+      label: Building it
+      options:
+        - label: I'd like to build this myself, once it's agreed.
