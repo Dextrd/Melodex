@@ -10,6 +10,8 @@ missing. Ask for what you want and it's fetched through plugins you choose, chec
 beets. Then play it: in Melodex's own web player, in any Subsonic app on your phone, or beside Navidrome, Jellyfin or
 Plex, which it keeps up to date.
 
+<p align="center"><img src="docs/images/artist_page.webp" alt="An artist's page: albums, EPs and singles, each marked owned, partly owned, missing or covered, with Get everything missing"></p>
+
 **Your library**
 
 - **See what's missing**: every artist's discography against what you have, with official albums told apart from
@@ -42,6 +44,42 @@ Plex, which it keeps up to date.
 - **Plugins for everything**: sources, catalogues, artwork, lyrics, discovery, scrobbling and media servers, built in
   or at an address of your own.
 - **An open API**: scoped keys, server-sent events and signed webhooks.
+
+## A look around
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/images/player.webp" alt="The player, full screen, with the cover, visualiser bars and synced lyrics"><br><sub>The player, with synced lyrics and the visualiser</sub></td>
+    <td width="50%"><img src="docs/images/for_you_page.webp" alt="For you: mixes, artists and albums picked from what you play"><br><sub>For you: daily mixes, weekly discoveries, and artists and albums like what you play</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/images/album_page.webp" alt="An album you partly own: the songs you have, with their files, and the ones you don't"><br><sub>An album you partly own, playing while the rest can be fetched</sub></td>
+    <td width="50%"><img src="docs/images/track_page.webp" alt="A song's page: the albums it's on, its synced lyrics and its file"><br><sub>A song: every album it's on, its lyrics and its file</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/images/review_page.webp" alt="Review: lossless files that seem to be lossy, to trust or replace"><br><sub>Review: lossless files that seem to be lossy, ready to replace</sub></td>
+    <td width="50%" align="center"><img src="docs/images/mobile_album_page.webp" width="240" alt="An album page on a phone"><br><sub>On a phone</sub></td>
+  </tr>
+</table>
+
+## How it compares
+
+Melodex does in one app what usually takes three, and it's built to sit beside what you already use.
+
+- **Lidarr** watches for new albums and grabs them from Usenet and torrents. Melodex does the same job, and it also
+  counts songs you already have on compilations and other editions, so you aren't sent after albums you own in all but
+  name. It gets music through any source you add as a plugin, including stores and services you pay for, or a folder you
+  drop files into. It checks lossless files for lossy music passed off as lossless, and fetches an upgrade on hold so
+  you can listen to both and roll back. And you can play what's missing straight away with Listen now, without adding it
+  to your library.
+- **Navidrome, Jellyfin and Plex** play what you have. Melodex plays it too, in its own web player or in any Subsonic
+  app, with "For you", radio and scrobbling. It can also keep them up to date, and sync your playlists with Navidrome or
+  Jellyfin, so you can get the best of both.
+- **beets** tags and files your music. Melodex uses beets to do that, so you keep its folder layouts and its care for
+  tags, without running it yourself.
+
+If you only want to play a library that's already complete, Navidrome on its own is lighter. But Melodex is for a
+library that's still growing.
 
 ## Quick start
 
