@@ -44,6 +44,12 @@ usual. New music has ReplayGain worked out and written into its files as it's ad
 files untouched, turn it **Off** under **Settings → Playback → Even volume**. Nothing is written into the music
 you already have until you ask for it under **Tools → Even volume** or on an artist's or album's page.
 
+## To 2.0.0: checks on Tools
+
+Checking lossless files and making the visualiser's bars are no longer scheduled tasks: new music gets them as it
+comes, so they're only needed once, for a library brought in, and they're under **Tools → Maintenance**.
+Schedules that had them ticked carry on without them.
+
 ## To 2.0.0: discovery
 
 Melodex sets up the new ListenBrainz discovery plugin once, as it did LRCLIB for lyrics, so artists' and songs' pages

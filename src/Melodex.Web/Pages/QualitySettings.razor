@@ -85,15 +85,14 @@ else
     }
     <div class="toolbar quality-reset">
         <button @onclick="Reset">Use the default</button>
-        @if (_saveError is not null) { <span class="error small" title="@_saveError">@_saveError</span> }
     </div>
 
     <h2 id="lossless">Lossless that seems lossy</h2>
     <p class="muted small">
         Lossy music is sometimes passed off as lossless: an MP3 saved as FLAC, labelled FLAC, but no better than the MP3. Lossy encoders cut off the highs
         where they give themselves away, about 16.5 kHz for an MP3 at 128 kbps and 20 kHz at 320, so each lossless download, and the library's lossless
-        files, are checked for that. One that's cut off counts as what it seems to be. It's a suspicion, not proof: a master can be cut off on purpose, and an
-        encode that keeps the highs can't be told.
+        files after each scan, are checked for that; <a href="tools">Tools → Check lossless files</a> checks the rest. One that's cut off
+        counts as what it seems to be. It's a suspicion, not proof: a master can be cut off on purpose, and an encode that keeps the highs can't be told.
     </p>
     <div class="card settings-card">
         @foreach (var (value, label, help) in SuspectOptions)
@@ -104,43 +103,6 @@ else
             </label>
         }
     </div>
-
-    <h3>The library's lossless files</h3>
-    @if (_spectra is { } spectra)
-    {
-        <div class="card settings-card">
-            <div class="setting-line">
-                @if (spectra.Lossless == 0)
-                {
-                    <span>There are no FLAC, WAV or AIFF files in the library to check.</span>
-                }
-                else
-                {
-                    <span>
-                        @spectra.Checked of @spectra.Lossless checked;
-                        @(spectra.Suspects.Count == 0 ? "none seem lossy" : spectra.Suspects.Count == 1 ? "1 seems lossy" : $"{spectra.Suspects.Count} seem lossy").
-                    </span>
-                    <span class="spacer"></span>
-                    @if (spectra.Checked < spectra.Lossless)
-                    {
-                        <button @onclick="() => CheckAsync(false)" disabled="@_checking">Check the rest</button>
-                    }
-                    <button @onclick="() => CheckAsync(true)" disabled="@_checking">Check them all again</button>
-                }
-            </div>
-            <div class="muted small">
-                Files are only read. New and changed ones are checked after each scan; ALAC, APE and WavPack can't be.
-                @if (_checkQueued) { <span>Queued: it's under Tasks in Activity.</span> }
-            </div>
-            <ScheduleNote Task="ScheduledTask.LosslessCheck" />
-            @if (spectra.Suspects.Count > 0)
-            {
-                <div class="small">
-                    @(spectra.Suspects.Count == 1 ? "It's" : "They're") under <a href="review/seems-lossy">Review → Seems lossy</a>, to replace or trust.
-                </div>
-            }
-        </div>
-    }
 
     <h2 id="upgrades">Upgrades</h2>
     <p class="muted small">
@@ -184,39 +146,7 @@ else
                     }
                 </label>
             }
-            @if (_upgradeError is not null) { <div class="error small" title="@_upgradeError">@_upgradeError</div> }
-            <div class="setting-line">
-                <span>
-                    @(upgrades.Upgradable == 1 ? "1 song is below its cutoff." : $"{upgrades.Upgradable} songs are below their cutoff.")
-                </span>
-                <span class="spacer"></span>
-                @if (upgrades.Run is not null)
-                {
-                    <button @onclick="StopUpgradesAsync" disabled="@_searching">Stop looking</button>
-                }
-                else
-                {
-                    <button @onclick="SearchUpgradesAsync" disabled="@(_searching || upgrades.Upgradable == 0)">Look for upgrades now</button>
-                }
-            </div>
-            <div class="muted small">
-                @if (upgrades.Run is { } run)
-                {
-                    <span>
-                        Looking now@(run.ByHand ? "" : ", on the schedule"): @Format.Count(run.Asked, "song", "songs") asked for so far, @run.Going going
-                        @(run.Until is { } until ? $", until {until.ToLocalTime():HH:mm}" : "").
-                        <a href="activity/downloads">Follow it in Activity</a>.
-                    </span>
-                }
-                else
-                {
-                    <span>Starts now, whatever the time, the same way as a scheduled look: it stops when everything's been tried, or with the window upgrades are scheduled in if it starts in it. A song, album or artist can be looked for on its own page.</span>
-                    @if (_searched is { Queued: 0 })
-                    {
-                        <span>Nothing new to look for: the rest are being looked for already.</span>
-                    }
-                }
-            </div>
+            <div class="muted small">To look for upgrades now, whatever the schedule, use <a href="tools">Tools → Look for upgrades</a>.</div>
         </div>
 
         @if (upgrades.Held.Count > 0)
@@ -246,22 +176,15 @@ else
     // What's changed since it was last saved: the profile, the upgrade settings, or both.
     private bool _profileChanged, _upgradesChanged;
     private bool _stepsOpen;
-    private string? _saveError;
-
-    private SpectrumStatus? _spectra;
 
     private UpgradeStatus? _upgrades;
     private UpgradeSettings? _upgradeSettings;
-    private UpgradeSearch? _searched;
-    private bool _searching;
-    private string? _upgradeError;
 
     private static readonly (OldFiles Value, string Help)[] OldFileOptions =
     [
         (OldFiles.Hold, "Until then the upgrade can be rolled back, under Review → Upgraded or on the song's page; approving it deletes the old file sooner."),
         (OldFiles.Delete, "Nothing can be rolled back."),
     ];
-    private bool _checking, _checkQueued;
 
     private static readonly (SuspectLossless Value, string Label, string Help)[] SuspectOptions =
     [
@@ -278,21 +201,8 @@ else
         // The list shows at once; the rest fills in as it comes, upgrades shimmering until then, as they ask the media
         // server which version it is.
         StateHasChanged();
-        await Task.WhenAll(LoadSpectraAsync(), DrawnAsync(LoadUpgradesAsync()));
+        await DrawnAsync(LoadUpgradesAsync());
         _upgradesLoading = false;
-    }
-
-    private async Task LoadSpectraAsync()
-    {
-        try
-        {
-            _spectra = await Api.GetSpectrumStatusAsync();
-        }
-        catch (HttpRequestException)
-        {
-            // Shown without it.
-        }
-        StateHasChanged();
     }
 
     private async Task DrawnAsync(Task loading)
@@ -358,62 +268,6 @@ else
             }
             // What's below its cutoff may have changed, but what's being typed stays as it is.
             await LoadUpgradesAsync();
-        }
-    }
-
-    private async Task SearchUpgradesAsync()
-    {
-        _searching = true;
-        try
-        {
-            _searched = await Api.SearchUpgradesAsync(new FormatScope(FormatScopeKind.Library));
-            await LoadUpgradesAsync();
-        }
-        catch (Exception e) when (e is HttpRequestException or MelodexApiException)
-        {
-            _upgradeError = e.Message;
-        }
-        finally
-        {
-            _searching = false;
-        }
-    }
-
-    private async Task StopUpgradesAsync()
-    {
-        _searching = true;
-        try
-        {
-            await Api.StopUpgradesAsync();
-            _searched = null;
-            await LoadUpgradesAsync();
-        }
-        catch (Exception e) when (e is HttpRequestException or MelodexApiException)
-        {
-            _upgradeError = e.Message;
-        }
-        finally
-        {
-            _searching = false;
-        }
-    }
-
-    private async Task CheckAsync(bool again)
-    {
-        _checking = true;
-        try
-        {
-            await Api.CheckSpectraAsync(again);
-            _checkQueued = true;
-            _spectra = await Api.GetSpectrumStatusAsync();
-        }
-        catch (Exception e) when (e is HttpRequestException or MelodexApiException)
-        {
-            _saveError = e.Message;
-        }
-        finally
-        {
-            _checking = false;
         }
     }
 

@@ -215,7 +215,7 @@ at the end. Over a whole library, it's best to format when nobody's listening.
 
 **Even volume** works out how loud each song is, and each album as a whole, and writes it into the files as
 ReplayGain, which Melodex's [player](requests-and-listening.md#even-volume), most Subsonic players and media servers
-use to play everything at about the same volume. It's under **Tools → Formatting** for the whole library, and on each artist and
+use to play everything at about the same volume. It's under **Tools → Maintenance** for the whole library, and on each artist and
 album page. Like formatting, it only writes files matched to the catalogue, and asks before it starts; Activity shows
 each file and how loud it was. It takes a second or two a song, so a whole library takes a while.
 

@@ -9,13 +9,13 @@ public enum ScheduledTask
     /// <summary>Fill in the catalogue for every library artist.</summary>
     CatalogueUpdate,
 
-    /// <summary>Check lossless files not yet checked for lossy music passed off as lossless.</summary>
+    /// <summary>No longer scheduled: new files are checked as they come, and the rest from Tools (#237). Kept so schedules saved before still read.</summary>
     LosslessCheck,
 
     /// <summary>Look again for lyrics for songs without them.</summary>
     Lyrics,
 
-    /// <summary>Make the visualiser's bars for songs without them, while they're made ahead.</summary>
+    /// <summary>No longer scheduled: new songs get them after each scan, and the rest from Tools (#237). Kept so schedules saved before still read.</summary>
     Bars,
 
     /// <summary>Ask again for downloads that failed, a few at a time, until all have been or the window closes.</summary>
@@ -40,9 +40,14 @@ public abstract record ScheduleWindow
     /// <summary>When it closes: the next day when it's earlier than <see cref="From"/>, as 22:00 to 04:00 is; a whole day when it's the same.</summary>
     public TimeOnly Until { get; init; } = new(6, 0);
 
-    /// <summary>The tasks run in it, in <see cref="ScheduledTask"/>'s order. A task is in one schedule at most.</summary>
-    public IReadOnlyList<ScheduledTask> Tasks { get; init; } = [];
+    /// <summary>The tasks run in it, in <see cref="ScheduledTask"/>'s order. A task is in one schedule at most. Those no longer scheduled are left out.</summary>
+    public IReadOnlyList<ScheduledTask> Tasks
+    {
+        get;
+        init => field = value.Any(ScheduleSettings.Retired) ? value.Where(t => !ScheduleSettings.Retired(t)).ToList() : value;
+    } = [];
 }
+
 
 /// <summary>Every day.</summary>
 public sealed record DailySchedule : ScheduleWindow;
@@ -66,12 +71,15 @@ public sealed record MonthlySchedule : ScheduleWindow
 /// </summary>
 public sealed record ScheduleSettings
 {
+    /// <summary>Tasks that were scheduled once and are on Tools instead, as they're only needed once: new music gets them as it comes (#237).</summary>
+    public static bool Retired(ScheduledTask task) => task is ScheduledTask.LosslessCheck or ScheduledTask.Bars;
+
     /// <summary>The time zone the days and times are in, as a browser names it (IANA); UTC if it's unknown.</summary>
     public string TimeZone { get; init; } = "UTC";
 
     public DailySchedule Daily { get; init; } = new()
     {
-        Tasks = [ScheduledTask.Scan, ScheduledTask.CatalogueUpdate, ScheduledTask.LosslessCheck, ScheduledTask.Bars],
+        Tasks = [ScheduledTask.Scan, ScheduledTask.CatalogueUpdate],
     };
 
     public WeeklySchedule Weekly { get; init; } = new()

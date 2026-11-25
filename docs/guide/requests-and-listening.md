@@ -62,8 +62,8 @@ lossy. A hi-res file that stops where a CD does was made from one, and counts as
 - **The library's lossless files are checked too**, after each scan, for any new or changed. Suspect ones show their
   quality with a ⚠ and a dashed edge, count as what they seem, below the cutoff, for upgrades, and wait under
   **Review → Seems lossy**: **Replace** looks for a better copy, as an upgrade, and **Trust it** says it's lossless,
-  so it counts as that and isn't checked again (until an upgrade replaces it). **Settings → Quality** can check them
-  all again. Files are only read.
+  so it counts as that and isn't checked again (until an upgrade replaces it). **Tools → Check lossless files** can
+  check them all again. Files are only read.
 
 It's a suspicion, not proof. A master can be cut off on purpose, an old recording may have little in the highs, and
 an encode that keeps them (MP3 V0, AAC at 256) can't be told this way. FLAC, WAV and AIFF can be checked; ALAC, APE
@@ -87,9 +87,9 @@ cutoff is met.
   its cutoff has been tried or the window closes; any not started by then are cancelled and wait for the next. Those
   looked for longest ago go first, and the worst of those. It's on from the start, and can be unticked. Upgrades go
   after anything you ask for.
-- **Look for upgrades now** starts a look the same way, whatever the time: it stops when everything's been tried, or
-  with the window if it starts in one. While a look is going, **Settings → Quality** and **Activity → Downloads** say
-  so, with **Stop looking**, which cancels the upgrades it asked for that haven't started.
+- **Tools → Look for upgrades** starts a look the same way, whatever the time: it stops when everything's been tried,
+  or with the window if it starts in one. While a look is going, that card and **Activity → Downloads** say so, with
+  **Stop looking**, which cancels the upgrades it asked for that haven't started.
 - **Only a copy that reaches the cutoff is kept.** Sources are only asked for copies that may be better than what you
   have and reach the cutoff, so a source that can only get lossy copies, such as yt-dlp, is passed over when the cutoff
   is lossless (Activity says it found nothing that reaches the cutoff). A copy's quality is read and its spectrum checked
