@@ -263,7 +263,8 @@ public partial class MelodexDbContext(DbContextOptions<MelodexDbContext> options
         modelBuilder.Entity<ScrobbleAccount>(e =>
         {
             e.HasOne<User>().WithMany().HasForeignKey(a => a.UserId).OnDelete(DeleteBehavior.Cascade);
-            e.HasIndex(a => new { a.UserId, a.Service }).IsUnique();
+            e.HasOne<PluginInstance>().WithMany().HasForeignKey(a => a.PluginInstanceId).OnDelete(DeleteBehavior.Cascade);
+            e.HasIndex(a => new { a.UserId, a.PluginInstanceId }).IsUnique();
         });
 
         modelBuilder.Entity<ScrobbleSend>(e =>

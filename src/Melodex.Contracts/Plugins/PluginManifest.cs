@@ -24,6 +24,9 @@ public enum PluginType
 
     /// <summary>Music related to what someone plays: similar artists and songs, and recommendations.</summary>
     Discovery,
+
+    /// <summary>Sends what people play to listening services, on accounts they link themselves.</summary>
+    Scrobbling,
 }
 
 /// <summary>
@@ -55,7 +58,7 @@ public sealed record PluginManifest
 
     /// <summary>
     /// Capability names from <see cref="Index.IndexCapabilities"/>, <see cref="Retrieval.RetrievalCapabilities"/>,
-    /// <see cref="Connectors.ConnectorCapabilities"/>, <see cref="Artwork.ArtworkCapabilities"/>, <see cref="Lyrics.LyricsCapabilities"/> or <see cref="Discovery.DiscoveryCapabilities"/>. The core and API only offer what is declared here.
+    /// <see cref="Connectors.ConnectorCapabilities"/>, <see cref="Artwork.ArtworkCapabilities"/>, <see cref="Lyrics.LyricsCapabilities"/>, <see cref="Discovery.DiscoveryCapabilities"/> or <see cref="Scrobbling.ScrobblingCapabilities"/>. The core and API only offer what is declared here.
     /// </summary>
     public IReadOnlyList<string> Capabilities { get; init; } = [];
 

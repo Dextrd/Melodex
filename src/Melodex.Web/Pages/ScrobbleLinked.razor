@@ -1,11 +1,14 @@
-@page "/account/lastfm"
+@page "/account/scrobbling/{Service:guid}"
 @inject MelodexClient Api
 @inject NavigationManager Nav
 
-<PageTitle>Last.fm · Melodex</PageTitle>
+<PageTitle>Linking · Melodex</PageTitle>
 
-@* Where Last.fm sends you back once you've allowed Melodex, with a token that's turned into the link. *@
-<h1>Linking Last.fm</h1>
+@*
+    Where a scrobbling service that links on its own page, such as Last.fm, sends you back once you've allowed Melodex,
+    with a token that's turned into the link.
+*@
+<h1>Linking your account</h1>
 @if (_error is not null)
 {
     <div class="notice warning" role="alert">@_error</div>
@@ -17,6 +20,7 @@ else
 }
 
 @code {
+    [Parameter] public Guid Service { get; set; }
     [SupplyParameterFromQuery(Name = "token")] public string? Token { get; set; }
 
     private string? _error;
@@ -25,12 +29,12 @@ else
     {
         if (string.IsNullOrWhiteSpace(Token))
         {
-            _error = "Last.fm didn't send a token back. Try linking again.";
+            _error = "The service didn't send a token back. Try linking again.";
             return;
         }
         try
         {
-            await Api.LinkLastFmAsync(Token);
+            await Api.LinkScrobblingAsync(Service, Token);
             Nav.NavigateTo("account#scrobbling", replace: true);
         }
         catch (Exception e) when (e is HttpRequestException or MelodexApiException)

@@ -79,15 +79,18 @@ public class Mix
     public DateTime? KeptAt { get; set; }
 }
 
-/// <summary>Someone's account on ListenBrainz or Last.fm, which their plays are sent to.</summary>
+/// <summary>Someone's account on a scrobbling service, such as ListenBrainz or Last.fm, which their plays are sent to.</summary>
 public class ScrobbleAccount
 {
     public Guid Id { get; set; } = Guid.CreateVersion7();
     public Guid UserId { get; set; }
-    public ScrobbleService Service { get; set; }
+
+    /// <summary>The scrobbling plugin it's linked with (#236).</summary>
+    public Guid PluginInstanceId { get; set; }
+
     public required string Username { get; set; }
 
-    /// <summary>The ListenBrainz user token or Last.fm session key, encrypted.</summary>
+    /// <summary>What the plugin sends plays with, such as a user token or session key, encrypted.</summary>
     public required string Secret { get; set; }
 
     public DateTime LinkedAt { get; set; } = DateTime.UtcNow;

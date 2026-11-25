@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Web;
 using Microsoft.AspNetCore.Hosting;
@@ -8,13 +9,17 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Melodex.Client;
+using Melodex.Contracts.Plugins;
 using Melodex.Core.Data;
 using Melodex.Core.Listening;
+using Melodex.Core.Plugins;
+using Melodex.Plugins.LastFm;
+using Melodex.Plugins.ListenBrainz;
 using Melodex.Core.Tests.Support;
 
 namespace Melodex.Core.Tests;
 
-/// <summary>Listening history (#2): plays kept for each person, most played, and sent on to ListenBrainz and Last.fm.</summary>
+/// <summary>Listening history (#2): plays kept for each person, most played, and sent on through the scrobbling plugins (#236).</summary>
 public sealed class PlayTests : IDisposable
 {
     private readonly string _dataPath = Path.Combine(Path.GetTempPath(), "melodex-tests", Guid.NewGuid().ToString("N"));
@@ -26,7 +31,12 @@ public sealed class PlayTests : IDisposable
     {
         _factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder => builder
             .UseSetting("Melodex:DataPath", _dataPath).UseSetting("Melodex:ScheduledTasks", "false")
-            .ConfigureServices(services => services.AddHttpClient(Scrobbler.HttpClientName).ConfigurePrimaryHttpMessageHandler(() => _services)));
+            .ConfigureServices(services => services.Configure<PluginHttpOptions>(http =>
+            {
+                http.PrimaryHandler = () => _services;
+                http.RateLimit = false;
+                http.RetryDelay = TimeSpan.FromMilliseconds(10);
+            })));
         _api = new MelodexClient(_factory.CreateSignedInClient());
     }
 
@@ -89,10 +99,16 @@ public sealed class PlayTests : IDisposable
     [Fact]
     public async Task Plays_go_to_ListenBrainz_and_wait_while_it_is_down()
     {
+        // ListenBrainz is set up out of the box, linked with a token.
+        var brainz = (await _api.GetScrobblingAsync()).Single();
+        Assert.Equal(("ListenBrainz", ListenBrainzScrobblingFactory.PluginId, ScrobbleLinkKind.Token, null),
+            (brainz.Name, brainz.PluginId, brainz.Link, brainz.Linked));
         Assert.Equal(HttpStatusCode.BadRequest,
-            (await Assert.ThrowsAsync<MelodexApiException>(() => _api.LinkListenBrainzAsync("wrong"))).Status);
-        var link = await _api.LinkListenBrainzAsync(FakeScrobbling.Token);
-        Assert.Equal((ScrobbleService.ListenBrainz, "listener"), (link.Service, link.Username));
+            (await Assert.ThrowsAsync<MelodexApiException>(() => _api.LinkScrobblingAsync(brainz.Id, "wrong"))).Status);
+        Assert.Equal(HttpStatusCode.NotFound,
+            (await Assert.ThrowsAsync<MelodexApiException>(() => _api.LinkScrobblingAsync(Guid.NewGuid(), FakeScrobbling.Token))).Status);
+        var link = await _api.LinkScrobblingAsync(brainz.Id, FakeScrobbling.Token);
+        Assert.Equal("listener", link.Username);
 
         await _api.RecordPlayAsync(Song(Guid.NewGuid(), "Roads", Guid.NewGuid()));
         var sent = await WaitAsync(() => _services.Listens.Count > 0);
@@ -101,55 +117,75 @@ public sealed class PlayTests : IDisposable
         Assert.Equal(("single", "Roads", "Portishead", "Dummy"), ((string)listen["listen_type"]!, (string)listen["payload"]![0]!["track_metadata"]!["track_name"]!,
             (string)listen["payload"]![0]!["track_metadata"]!["artist_name"]!, (string)listen["payload"]![0]!["track_metadata"]!["release_name"]!));
         Assert.Equal(240000, (long)listen["payload"]![0]!["track_metadata"]!["additional_info"]!["duration_ms"]!);
-        Assert.True(await WaitAsync(async () => (await _api.GetScrobblingAsync()).Links.Single().LastSentAt is not null));
+        Assert.True(await WaitAsync(async () => (await LinkAsync(brainz.Id))?.LastSentAt is not null));
 
         // While it's down, plays wait and are tried again.
         _services.Down = true;
         await _api.RecordPlayAsync(Song(Guid.NewGuid(), "Glory Box"));
-        Assert.True(await WaitAsync(async () => (await _api.GetScrobblingAsync()).Links.Single().Error is not null));
-        Assert.Equal(1, (await _api.GetScrobblingAsync()).Links.Single().Waiting);
+        Assert.True(await WaitAsync(async () => (await LinkAsync(brainz.Id))?.Error is not null));
+        Assert.Equal(1, (await LinkAsync(brainz.Id))!.Waiting);
         _services.Down = false;
         await DueNowAsync();
-        Assert.Equal(0, (await _api.GetScrobblingAsync()).Links.Single().Waiting);
+        Assert.Equal(0, (await LinkAsync(brainz.Id))!.Waiting);
         Assert.Equal(2, _services.Listens.Count);
 
         // A token it no longer takes stops sending until it's linked again, and then what waited goes.
         _services.Refuse = true;
         await _api.RecordPlayAsync(Song(Guid.NewGuid(), "Sour Times"));
-        Assert.True(await WaitAsync(async () => (await _api.GetScrobblingAsync()).Links.Single().Error?.Contains("link it again") == true));
+        Assert.True(await WaitAsync(async () => (await LinkAsync(brainz.Id))?.Error?.Contains("link it again") == true));
         _services.Refuse = false;
         await DueNowAsync();
         Assert.Equal(2, _services.Listens.Count);
-        await _api.LinkListenBrainzAsync(FakeScrobbling.Token);
+        await _api.LinkScrobblingAsync(brainz.Id, FakeScrobbling.Token);
         Assert.True(await WaitAsync(() => _services.Listens.Count == 3));
 
-        await _api.UnlinkScrobblingAsync(ScrobbleService.ListenBrainz);
-        Assert.Empty((await _api.GetScrobblingAsync()).Links);
+        // While the plugin's off, plays wait for it.
+        await _api.UpdatePluginAsync(brainz.Id, new UpdatePlugin(Enabled: false));
+        Assert.Empty(await _api.GetScrobblingAsync());
+        await _api.RecordPlayAsync(Song(Guid.NewGuid(), "Wandering Star"));
+        await DueNowAsync();
+        Assert.Equal(3, _services.Listens.Count);
+        await _api.UpdatePluginAsync(brainz.Id, new UpdatePlugin(Enabled: true));
+        await DueNowAsync();
+        Assert.Equal(4, _services.Listens.Count);
+
+        await _api.UnlinkScrobblingAsync(brainz.Id);
+        Assert.Null((await _api.GetScrobblingAsync()).Single().Linked);
+        // Taking the plugin away takes the links made with it.
+        await _api.LinkScrobblingAsync(brainz.Id, FakeScrobbling.Token);
+        await _api.RemovePluginAsync(brainz.Id);
+        using var scope = _factory.Services.CreateScope();
+        Assert.Empty(scope.ServiceProvider.GetRequiredService<MelodexDbContext>().ScrobbleAccounts);
     }
 
     [Fact]
-    public async Task Plays_go_to_Last_fm_with_the_admins_API_key()
+    public async Task Plays_go_to_Last_fm_linked_on_its_own_page()
     {
-        Assert.Null((await _api.GetScrobblingAsync()).LastFmApiKey);
-        // Without the admin's key, Last.fm can't be linked.
-        Assert.Equal(HttpStatusCode.BadRequest,
-            (await Assert.ThrowsAsync<MelodexApiException>(() => _api.LinkLastFmAsync(FakeScrobbling.Token))).Status);
-        await _api.SaveScrobblingSettingsAsync(new SaveScrobbleSettings(FakeScrobbling.ApiKey, FakeScrobbling.Secret));
-        Assert.Equal(new ScrobbleSettingsInfo(FakeScrobbling.ApiKey, true), await _api.GetScrobblingSettingsAsync());
-        // The secret's kept when it's left out.
-        await _api.SaveScrobblingSettingsAsync(new SaveScrobbleSettings(FakeScrobbling.ApiKey));
-        Assert.Equal(FakeScrobbling.ApiKey, (await _api.GetScrobblingAsync()).LastFmApiKey);
+        var plugin = await _api.AddPluginAsync(new AddPlugin(LastFmScrobblingFactory.PluginId,
+            Settings: JsonDocument.Parse($$"""{ "apiKey": "{{FakeScrobbling.ApiKey}}", "secret": "{{FakeScrobbling.Secret}}" }""").RootElement));
+        Assert.Equal(PluginType.Scrobbling, plugin.Type);
+        var lastFm = (await _api.GetScrobblingAsync()).Single(s => s.Id == plugin.Id);
+        Assert.Equal(ScrobbleLinkKind.Web, lastFm.Link);
 
-        var link = await _api.LinkLastFmAsync(FakeScrobbling.Token);
-        Assert.Equal((ScrobbleService.LastFm, "lastfm-listener"), (link.Service, link.Username));
+        // Last.fm's page asks you to allow Melodex, then sends you back with a token.
+        var page = new Uri(await _api.GetScrobbleLinkPageAsync(plugin.Id, "https://melodex.example/account/scrobbling/" + plugin.Id));
+        var query = HttpUtility.ParseQueryString(page.Query);
+        Assert.Equal(("www.last.fm", FakeScrobbling.ApiKey, "https://melodex.example/account/scrobbling/" + plugin.Id), (page.Host, query["api_key"], query["cb"]));
+        Assert.Equal(HttpStatusCode.BadRequest,
+            (await Assert.ThrowsAsync<MelodexApiException>(() => _api.LinkScrobblingAsync(plugin.Id, "wrong"))).Status);
+
+        var link = await _api.LinkScrobblingAsync(plugin.Id, FakeScrobbling.Token);
+        Assert.Equal("lastfm-listener", link.Username);
         await _api.SetNowPlayingAsync(Song(Guid.NewGuid(), "Roads"));
         Assert.True(await WaitAsync(() => _services.LastFm.Any(c => c["method"] == "track.updateNowPlaying")));
         await _api.RecordPlayAsync(Song(Guid.NewGuid(), "Roads", Guid.NewGuid()));
         Assert.True(await WaitAsync(() => _services.LastFm.Any(c => c["method"] == "track.scrobble")));
         var scrobble = _services.LastFm.Single(c => c["method"] == "track.scrobble");
         Assert.Equal(("Roads", "Portishead", "Dummy", FakeScrobbling.Session), (scrobble["track[0]"], scrobble["artist[0]"], scrobble["album[0]"], scrobble["sk"]));
-        Assert.Equal(0, (await _api.GetScrobblingAsync()).Links.Single().Waiting);
+        Assert.True(await WaitAsync(async () => (await LinkAsync(plugin.Id))?.Waiting == 0));
     }
+
+    private async Task<ScrobbleLink?> LinkAsync(Guid service) => (await _api.GetScrobblingAsync()).Single(s => s.Id == service).Linked;
 
     /// <summary>Has the scrobbler try what's waiting now, rather than after its wait.</summary>
     private async Task DueNowAsync()
@@ -209,7 +245,7 @@ public sealed class PlayTests : IDisposable
                 var parameters = query.AllKeys.ToDictionary(k => k!, k => query[k]!);
                 var signed = new Dictionary<string, string>(parameters);
                 signed.Remove("api_sig");
-                if (parameters.GetValueOrDefault("api_key") != ApiKey || parameters.GetValueOrDefault("api_sig") != Scrobbler.LastFmSignature(signed, Secret))
+                if (parameters.GetValueOrDefault("api_key") != ApiKey || parameters.GetValueOrDefault("api_sig") != LastFmScrobbling.Signature(signed, Secret))
                     return Json(new JsonObject { ["error"] = 13, ["message"] = "Invalid method signature supplied" });
                 LastFm.Enqueue(parameters);
                 return parameters["method"] switch

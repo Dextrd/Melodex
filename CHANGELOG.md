@@ -30,8 +30,10 @@ What changed in each release of Melodex. Versions follow [semantic versioning](h
   album lists, `scrobble` and now playing. The API has `POST`, `GET` and `DELETE /plays`, `GET /plays/top/{kind}` and
   `PUT /plays/now`, and webhooks a `play.recorded` event (#2).
 - **Scrobbling to ListenBrainz and Last.fm**: link your accounts under **Scrobbling** on your account page and your plays
-  are sent there too, with what's playing now; plays that can't be sent wait until they can. Last.fm needs an API key
-  the admin enters under **Settings → Playback** (#2).
+  are sent there too, with what's playing now; plays that can't be sent wait until they can (#2). The services are
+  **scrobbling plugins**, a seventh kind, under **Settings → Plugins → Scrobbling**: ListenBrainz is set up from the
+  start, and Last.fm takes the admin's own API key and shared secret. Plugins at an address can be scrobbling plugins
+  too; see the new scrobbling contract (#236).
 - **Discovery plugins**, a sixth kind: similar artists, similar songs and recommendations, in the order you choose
   under **Settings → Plugins → Discovery**, with what they agree on first. An artist's page shows **Similar artists**
   and a song's page **Similar songs** at its foot: songs the catalogue has, listed as search lists them, to play,

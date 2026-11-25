@@ -1342,14 +1342,13 @@ namespace Melodex.Core.Data.Migrations
                     b.Property<DateTime>("LinkedAt")
                         .HasColumnType("TEXT");
 
+                    b.Property<Guid>("PluginInstanceId")
+                        .HasColumnType("TEXT");
+
                     b.Property<bool>("Refused")
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("Secret")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Service")
                         .IsRequired()
                         .HasColumnType("TEXT");
 
@@ -1362,7 +1361,9 @@ namespace Melodex.Core.Data.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("UserId", "Service")
+                    b.HasIndex("PluginInstanceId");
+
+                    b.HasIndex("UserId", "PluginInstanceId")
                         .IsUnique();
 
                     b.ToTable("ScrobbleAccounts");
@@ -1840,6 +1841,12 @@ namespace Melodex.Core.Data.Migrations
 
             modelBuilder.Entity("Melodex.Core.Data.ScrobbleAccount", b =>
                 {
+                    b.HasOne("Melodex.Core.Data.PluginInstance", null)
+                        .WithMany()
+                        .HasForeignKey("PluginInstanceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
                     b.HasOne("Melodex.Core.Data.User", null)
                         .WithMany()
                         .HasForeignKey("UserId")
