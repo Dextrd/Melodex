@@ -55,9 +55,6 @@ public sealed record PlaybackSettings
     /// <summary>Work out ReplayGain again for files that have it already, rather than leaving them.</summary>
     public bool RedoGains { get; init; }
 
-    /// <summary>Work out ReplayGain for new music as it's filed.</summary>
-    public bool GainsForNewMusic { get; init; } = true;
-
     public const double DefaultLoudnessTarget = -18;
 }
 
@@ -71,5 +68,4 @@ public sealed record PlaybackStatus(PlaybackSettings Settings, int Songs, long E
 /// <summary>Playback's settings to save.</summary>
 /// <param name="DeleteBarsFiles">Delete the .bars files beside the library's songs too.</param>
 public sealed record SavePlayback(VisualiserBars Visualiser, bool DeleteBarsFiles = false, GaplessPlayback Gapless = GaplessPlayback.SameAlbum,
-    VolumeLevelling Levelling = VolumeLevelling.Track, double LoudnessTarget = PlaybackSettings.DefaultLoudnessTarget, bool RedoGains = false,
-    bool GainsForNewMusic = true);
+    VolumeLevelling Levelling = VolumeLevelling.Track, double LoudnessTarget = PlaybackSettings.DefaultLoudnessTarget, bool RedoGains = false);

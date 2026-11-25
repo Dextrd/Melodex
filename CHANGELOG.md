@@ -93,7 +93,7 @@ What changed in each release of Melodex. Versions follow [semantic versioning](h
   Safari: their own sound where the phone takes it, otherwise AAC at 256 kbps. Stream URLs take `as=mp4` and `keep` for
   it (#109).
 - **Even volume**: Melodex works out how loud each song and album is and writes it into the files as ReplayGain (R128
-  tags for Opus), from **Tools**, an artist's or album's page, and for new music as it's added. The player turns songs
+  tags for Opus), from **Tools**, an artist's or album's page, and for new music as it's added while it's on. The player turns songs
   up or down by it, for each song or each album as chosen under **Settings → Playback**, to -18 LUFS or a loudness you
   choose, and Subsonic players get it as OpenSubsonic's `replayGain`. Files that have ReplayGain already are left as
   they are unless you ask. The API has `POST /library/replaygain`, and songs' play info carries their gains (#23).

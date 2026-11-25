@@ -222,8 +222,8 @@ each file and how loud it was. It takes a second or two a song, so a whole libra
 Loudness is measured as ReplayGain 2 does (EBU R128's way of hearing it), and each song is brought to -18 LUFS, which
 **Settings → Playback → Even volume** can change. Opus files get the R128 tags Opus players read instead. Files that
 have ReplayGain already, as many rips do, are left as they are, unless you tick **Work it out again for files that
-have it already**; an album that's gained a song is done again whole, as its album gain changes. New music is done as
-it's added, unless you untick **Work it out for new music**.
+have it already**; an album that's gained a song is done again whole, as its album gain changes. While even volume is on,
+for each song or each album, new music is done as it's added.
 
 ## Choosing a cover
 

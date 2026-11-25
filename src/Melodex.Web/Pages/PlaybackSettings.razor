@@ -72,10 +72,6 @@ else
             into the files as they're worked out, so a change counts for files worked out from now on, or all of them with the setting below.
         </div>
         <label class="check">
-            <input type="checkbox" checked="@_gainsForNew" @onchange="e => { _gainsForNew = e.Value is true; _saver?.Changed(); }" />
-            Work it out for new music as it's added to the library
-        </label>
-        <label class="check">
             <input type="checkbox" checked="@_redoGains" @onchange="e => { _redoGains = e.Value is true; _saver?.Changed(); }" />
             Work it out again for files that have it already
         </label>
@@ -223,13 +219,13 @@ else
         (VolumeLevelling.Track, "Each song", "Every song at about the same volume, whatever's around it. Best for playlists, radios and shuffle."),
         (VolumeLevelling.Album, "Each album",
             "An album's songs keep how loud they are next to each other, as a quiet intro is meant to be quiet, and the album as a whole is evened out."),
-        (VolumeLevelling.Off, "Off", "Songs play as loud as they were made, ReplayGain or not."),
+        (VolumeLevelling.Off, "Off", "Songs play as loud as they were made, ReplayGain or not, and new music isn't worked out."),
     ];
 
     private PlaybackStatus? _status;
     private VolumeLevelling _levelling;
     private double _target;
-    private bool _redoGains, _gainsForNew;
+    private bool _redoGains;
     private GaplessPlayback _gapless;
     private FetchSettings? _fetch;
     private VisualiserBars _visualiser;
@@ -260,8 +256,7 @@ else
         _fetch = await Api.GetFetchSettingsAsync();
         _visualiser = _status.Settings.Visualiser;
         _gapless = _status.Settings.Gapless;
-        (_levelling, _target, _redoGains, _gainsForNew) =
-            (_status.Settings.Levelling, _status.Settings.LoudnessTarget, _status.Settings.RedoGains, _status.Settings.GainsForNewMusic);
+        (_levelling, _target, _redoGains) = (_status.Settings.Levelling, _status.Settings.LoudnessTarget, _status.Settings.RedoGains);
         _gaplessWorks = await Player.GaplessWorksAsync();
         _volumeWorks = await Player.VolumeWorksAsync();
     }
@@ -282,7 +277,7 @@ else
 
     private async Task SaveAsync()
     {
-        await Api.SavePlaybackSettingsAsync(new SavePlayback(_visualiser, _deleteBarsFiles, _gapless, _levelling, _target, _redoGains, _gainsForNew));
+        await Api.SavePlaybackSettingsAsync(new SavePlayback(_visualiser, _deleteBarsFiles, _gapless, _levelling, _target, _redoGains));
         _deleteBarsFiles = false;
         await Api.SaveFetchSettingsAsync(_fetch!);
         Player.RadioSettingsChanged(new RadioSettings(_fetch!.RadioMissingPercent, _fetch.RadioAutoplay));

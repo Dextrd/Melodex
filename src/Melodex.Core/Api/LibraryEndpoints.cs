@@ -679,7 +679,7 @@ public static class LibraryEndpoints
                 await s.SavePlaybackAsync(new PlaybackSettings
                 {
                     Visualiser = value.Visualiser, Gapless = value.Gapless, Levelling = value.Levelling, LoudnessTarget = value.LoudnessTarget,
-                    RedoGains = value.RedoGains, GainsForNewMusic = value.GainsForNewMusic,
+                    RedoGains = value.RedoGains,
                 }, ct);
                 if (value.DeleteBarsFiles)
                     await queue.EnqueueAsync(BarsTask.TaskKind, BarsTask.Delete, ct);

@@ -40,8 +40,8 @@ as it is. Two things change:
 ## To 2.0.0: even volume
 
 The first scan after upgrading reads every file's ReplayGain, if it has any, once, so it takes a little longer than
-usual. New music has ReplayGain worked out and written into its files as it's added; to leave new files untouched,
-untick **Work it out for new music** under **Settings → Playback → Even volume**. Nothing is written into the music
+usual. New music has ReplayGain worked out and written into its files as it's added, while even volume is on; to leave new
+files untouched, turn it **Off** under **Settings → Playback → Even volume**. Nothing is written into the music
 you already have until you ask for it under **Tools → Even volume** or on an artist's or album's page.
 
 ## To 2.0.0: discovery
