@@ -143,6 +143,57 @@ public sealed class FormatTests(RequestFixture fixture)
     }
 
     [TestLibraryFact]
+    public async Task Even_volume_works_out_an_albums_loudness_and_writes_it_into_its_files()
+    {
+        var album = await OwnedAlbumAsync("Portishead");
+        List<LibraryFile> files;
+        using (var scope = fixture.Factory.Services.CreateScope())
+            files = await scope.ServiceProvider.GetRequiredService<MelodexDbContext>().LibraryFiles
+                .Where(f => f.Edition!.AlbumId == album.Album.Id).OrderBy(f => f.Path).ToListAsync();
+        // The test library's songs are silent; two are given a tone, the second twice as loud, keeping their tags.
+        var (quiet, loud) = (files[0], files[1]);
+        await ToneAsync(quiet.Path, 0.1);
+        await ToneAsync(loud.Path, 0.2);
+
+        await Assert.ThrowsAsync<MelodexApiException>(() => Api.SavePlaybackSettingsAsync(new SavePlayback(VisualiserBars.OnDemand, LoudnessTarget: -40)));
+        var task = await WaitAsync(await Api.StartReplayGainAsync(new StartReplayGain(new FormatScope(FormatScopeKind.Album, album.Album.Id))));
+        Assert.Equal(TaskState.Succeeded, task.State);
+        Assert.StartsWith("Wrote ReplayGain to 2 files", task.Progress);
+        var rows = (await Api.GetTaskRowsAsync(task.Id))!.Rows;
+        Assert.Equal(files.Count, rows.Count);
+        Assert.Equal(files.Count - 2, rows.Count(r => r.State == TaskRowState.Failed && r.Detail == "It's silent"));
+
+        // To -18 LUFS: the -20 LUFS song up 2 dB, the -14 one down 4, and the album, about -16 together, down 2.
+        var sent = fixture.Importer.Formats.Last().Files;
+        Assert.Equal([quiet.Path, loud.Path], sent.Select(f => f.Path));
+        double Tag(int i, string field) => double.Parse(sent[i].Tags[field], System.Globalization.CultureInfo.InvariantCulture);
+        Assert.Equal(2, Tag(0, "replaygain_track_gain"), 0.5);
+        Assert.Equal(-4, Tag(1, "replaygain_track_gain"), 0.5);
+        Assert.Equal(-2, Tag(0, "replaygain_album_gain"), 0.5);
+        Assert.Equal(Tag(0, "replaygain_album_gain"), Tag(1, "replaygain_album_gain"));
+        Assert.Equal(0.2, Tag(0, "replaygain_album_peak"), 0.03);
+        Assert.Equal(0.1, Tag(0, "replaygain_track_peak"), 0.02);
+
+        // Read back from the files, and given to the player with each song.
+        var play = (await Api.GetPlayInfoAsync(quiet.TrackId!.Value))!;
+        Assert.Equal(Tag(0, "replaygain_track_gain"), play.Gain!.TrackGain!.Value, 0.01);
+        Assert.Equal(Tag(0, "replaygain_album_gain"), play.Gain.AlbumGain!.Value, 0.01);
+    }
+
+    // Replaces a file's audio with a few seconds of a 997 Hz tone at the given peak, in both channels.
+    private async Task ToneAsync(string path, double peak)
+    {
+        var full = Path.Combine(fixture.Music, path);
+        var temp = Path.ChangeExtension(full, ".tone" + Path.GetExtension(full));
+        var tone = $"{peak.ToString(System.Globalization.CultureInfo.InvariantCulture)}*sin(2*PI*997*t)";
+        using (var ffmpeg = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("ffmpeg",
+                   ["-nostdin", "-v", "error", "-i", full, "-f", "lavfi", "-i", $"aevalsrc={tone}|{tone}:s=48000:d=4", "-map", "1:a", "-map_metadata", "0", "-y", temp])
+               { RedirectStandardError = true })!)
+            await ffmpeg.WaitForExitAsync();
+        File.Move(temp, full, overwrite: true);
+    }
+
+    [TestLibraryFact]
     public async Task A_resumed_format_skips_the_files_it_already_did()
     {
         var album = await OwnedAlbumAsync("Homework");

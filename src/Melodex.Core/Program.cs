@@ -61,6 +61,7 @@ builder.Services.AddScoped<ConnectorPlugins>();
 builder.Services.AddScoped<ArtworkPlugins>();
 builder.Services.AddScoped<LyricsPlugins>();
 builder.Services.AddScoped<DiscoveryPlugins>();
+builder.Services.AddScoped<ScrobblingPlugins>();
 builder.Services.AddScoped<DiscoveryService>();
 builder.Services.AddScoped<RadioService>();
 builder.Services.AddScoped<MixService>();
@@ -83,6 +84,7 @@ builder.Services.AddScoped<LibraryView>();
 builder.Services.AddScoped<LocalMusic>();
 builder.Services.AddScoped<LibraryRemover>();
 builder.Services.AddScoped<LibraryFormatter>();
+builder.Services.AddSingleton<LoudnessMeter>();
 builder.Services.AddScoped<CoverChooser>();
 builder.Services.AddScoped<LyricsFinder>();
 builder.Services.AddScoped<PlaylistService>();
@@ -108,6 +110,7 @@ builder.Services.AddScoped<ITaskHandler, LibraryScanTask>();
 builder.Services.AddScoped<ITaskHandler, ArtistRefreshTask>();
 builder.Services.AddScoped<ITaskHandler, CatalogueUpdateTask>();
 builder.Services.AddScoped<ITaskHandler, FormatTask>();
+builder.Services.AddScoped<ITaskHandler, ReplayGainTask>();
 builder.Services.AddScoped<ITaskHandler, LyricsTask>();
 builder.Services.AddScoped<ITaskHandler, SpectrumTask>();
 builder.Services.AddScoped<ITaskHandler, GenresTask>();
@@ -140,9 +143,8 @@ builder.Services.AddSingleton<SubsonicLibrary>();
 builder.Services.AddScoped<SubsonicAuth>();
 builder.Services.AddSingleton<StreamCopies>();
 builder.Services.AddScoped<ListenNowService>();
-// Listening history, sent on to ListenBrainz and Last.fm (#2).
+// Listening history, sent on through the scrobbling plugins (#2, #236).
 builder.Services.AddScoped<PlayService>();
-builder.Services.AddHttpClient(Scrobbler.HttpClientName, http => http.Timeout = TimeSpan.FromSeconds(20));
 builder.Services.AddSingleton<Scrobbler>();
 builder.Services.AddHostedService(services => services.GetRequiredService<Scrobbler>());
 builder.Services.AddHostedService<ListenNowSweeper>();
@@ -173,6 +175,7 @@ using (var scope = app.Services.CreateScope())
     await ArtworkPlugins.EnsureDefaultAsync(db, scope.ServiceProvider.GetRequiredService<PluginCatalog>());
     await LyricsPlugins.EnsureDefaultAsync(db, scope.ServiceProvider.GetRequiredService<PluginCatalog>());
     await DiscoveryPlugins.EnsureDefaultAsync(db, scope.ServiceProvider.GetRequiredService<PluginCatalog>());
+    await ScrobblingPlugins.EnsureDefaultAsync(db, scope.ServiceProvider.GetRequiredService<PluginCatalog>());
     await app.Services.GetRequiredService<StreamSigner>().InitialiseAsync(db);
 }
 

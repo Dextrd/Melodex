@@ -35,9 +35,7 @@ public sealed class ScheduledTasks(
     {
         ScheduledTask.Scan => LibraryScanTask.TaskKind,
         ScheduledTask.CatalogueUpdate => CatalogueUpdateTask.TaskKind,
-        ScheduledTask.LosslessCheck => SpectrumTask.TaskKind,
         ScheduledTask.Lyrics => LyricsTask.TaskKind,
-        ScheduledTask.Bars => BarsTask.TaskKind,
         _ => null,
     };
 
@@ -87,16 +85,7 @@ public sealed class ScheduledTasks(
     }
 
     /// <summary>Tasks that make no sense as things are, with why.</summary>
-    public async Task<Dictionary<ScheduledTask, string>> UnavailableAsync(CancellationToken ct)
-    {
-        var unavailable = new Dictionary<ScheduledTask, string>();
-        var bars = (await settings.GetPlaybackAsync(ct)).Visualiser;
-        if (bars != VisualiserBars.WhenMatching)
-            unavailable[ScheduledTask.Bars] = bars == VisualiserBars.Off
-                ? "The visualiser is off, so there are no bars to make."
-                : "The bars are made as each song plays, so none are kept beside songs to make ahead.";
-        return unavailable;
-    }
+    public Task<Dictionary<ScheduledTask, string>> UnavailableAsync(CancellationToken ct) => Task.FromResult(new Dictionary<ScheduledTask, string>());
 
     // Each step as far as it can go now.
     private async Task<(ScheduleRunInfo, ScheduleDownloads)> AdvanceAsync(ScheduleRunInfo run, ScheduleDownloads downloads, DateTime utcNow, CancellationToken ct)
@@ -141,15 +130,6 @@ public sealed class ScheduledTasks(
         // Nothing to do is said so, rather than a task that does nothing.
         if (step.Task == ScheduledTask.Lyrics && !await lyrics.HaveSourcesAsync(ct))
             return step with { State = ScheduledStepState.Skipped, Detail = "No lyrics sources are set up" };
-        if (step.Task == ScheduledTask.Bars && (await settings.GetPlaybackAsync(ct)).Visualiser is var bars and not VisualiserBars.WhenMatching)
-            return step with
-            {
-                State = ScheduledStepState.Skipped,
-                Detail = bars == VisualiserBars.Off ? "The visualiser is off" : "The visualiser's bars are made as songs play, not ahead",
-            };
-        if (step.Task == ScheduledTask.LosslessCheck && !await SpectrumTask.Unchecked(db).AnyAsync(ct)
-            && !await db.BackgroundTasks.AnyAsync(t => t.Kind == LibraryScanTask.TaskKind && (t.Status == BackgroundTaskStatus.Queued || t.Status == BackgroundTaskStatus.Running), ct))
-            return step with { State = ScheduledStepState.Done, Detail = "Every lossless file has been checked" };
         var task = await queue.EnqueueAsync(kind, null, ct);
         return step with { State = ScheduledStepState.Running, TaskId = task.Id };
     }

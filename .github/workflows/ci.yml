@@ -20,6 +20,9 @@ jobs:
           python3 tools/testlib/generate.py
       - run: dotnet restore
       - run: dotnet build --no-restore -c Release
+      # The web app's scripts are modules no test loads: one that doesn't parse stops the whole player.
+      - name: Check the web app's scripts parse
+        run: for f in src/Melodex.Web/wwwroot/js/*.js; do node --check --input-type=module < "$f" || { echo "::error file=$f::It doesn't parse"; exit 1; }; done
       # The gate test replays recorded MusicBrainz responses from tests/fixtures, so CI never calls MusicBrainz.
       - run: dotnet test --no-build --configuration Release
       - name: Check the model matches the migrations

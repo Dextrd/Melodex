@@ -524,6 +524,12 @@ namespace Melodex.Core.Data.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("TEXT");
 
+                    b.Property<double?>("AlbumGain")
+                        .HasColumnType("REAL");
+
+                    b.Property<double?>("AlbumPeak")
+                        .HasColumnType("REAL");
+
                     b.Property<Guid?>("ArtistId")
                         .HasColumnType("TEXT");
 
@@ -556,6 +562,9 @@ namespace Melodex.Core.Data.Migrations
 
                     b.Property<DateTime?>("FormattedAt")
                         .HasColumnType("TEXT");
+
+                    b.Property<bool>("GainsRead")
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Genres")
                         .HasColumnType("TEXT");
@@ -621,8 +630,14 @@ namespace Melodex.Core.Data.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<double?>("TrackGain")
+                        .HasColumnType("REAL");
+
                     b.Property<Guid?>("TrackId")
                         .HasColumnType("TEXT");
+
+                    b.Property<double?>("TrackPeak")
+                        .HasColumnType("REAL");
 
                     b.Property<DateTime?>("TrustedAt")
                         .HasColumnType("TEXT");
@@ -1327,14 +1342,13 @@ namespace Melodex.Core.Data.Migrations
                     b.Property<DateTime>("LinkedAt")
                         .HasColumnType("TEXT");
 
+                    b.Property<Guid>("PluginInstanceId")
+                        .HasColumnType("TEXT");
+
                     b.Property<bool>("Refused")
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("Secret")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Service")
                         .IsRequired()
                         .HasColumnType("TEXT");
 
@@ -1347,7 +1361,9 @@ namespace Melodex.Core.Data.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("UserId", "Service")
+                    b.HasIndex("PluginInstanceId");
+
+                    b.HasIndex("UserId", "PluginInstanceId")
                         .IsUnique();
 
                     b.ToTable("ScrobbleAccounts");
@@ -1825,6 +1841,12 @@ namespace Melodex.Core.Data.Migrations
 
             modelBuilder.Entity("Melodex.Core.Data.ScrobbleAccount", b =>
                 {
+                    b.HasOne("Melodex.Core.Data.PluginInstance", null)
+                        .WithMany()
+                        .HasForeignKey("PluginInstanceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
                     b.HasOne("Melodex.Core.Data.User", null)
                         .WithMany()
                         .HasForeignKey("UserId")

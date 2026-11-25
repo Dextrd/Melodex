@@ -86,7 +86,7 @@ else
             </div>
 
             <ul class="schedule-tasks" aria-label="@($"{Schedules.Name(repeat)} tasks")">
-                @foreach (var task in Enum.GetValues<ScheduledTask>())
+                @foreach (var task in Enum.GetValues<ScheduledTask>().Where(t => !ScheduleSettings.Retired(t)))
                 {
                     var here = window.Tasks.Contains(task);
                     var elsewhere = _settings.WhenRuns(task) is { } other && other != repeat ? other : (ScheduleRepeat?)null;

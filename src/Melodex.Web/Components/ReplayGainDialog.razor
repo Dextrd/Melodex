@@ -1,0 +1,64 @@
+@inject MelodexClient Api
+@inject TaskNotices Tasks
+
+@*
+    Starts working out the loudness of the library's, an artist's or an album's songs, written into their files as
+    ReplayGain (#23). Says plainly that it writes the music files before starting.
+*@
+<Dialog Title="@($"Even out {Name}'s volume")" OnClose="CloseAsync">
+    @if (_started is not null)
+    {
+        <p>It's started. It runs in the background; you can follow it, pause it or cancel it on <a href="activity">Activity</a>.</p>
+        <div class="toolbar dialog-buttons"><button class="primary" @onclick="CloseAsync">Close</button></div>
+    }
+    else
+    {
+        <p>
+            Melodex works out how loud each song is, and each album as a whole, and writes it into the files as ReplayGain. Melodex's player,
+            Subsonic players and your media server then turn loud songs down and quiet ones up, so everything plays at about the same volume.
+        </p>
+        <p class="notice warning">
+            This writes to the music files themselves, @(Scope.Kind == FormatScopeKind.Library ? "every matched one in your library" : "the matched ones"),
+            and can't be undone. Files that have ReplayGain already are left as they are, unless
+            <a href="settings/playback#even-volume">the playback settings</a> say to work it out again.
+            @if (Scope.Kind == FormatScopeKind.Library) { <span>Over the whole library this takes a while: a second or two a song.</span> }
+        </p>
+        <p class="notice warning">While a song's file is written it may stop for a moment, here or in your media server's apps.</p>
+        @if (_error is not null) { <p class="error">@_error</p> }
+        <div class="toolbar dialog-buttons">
+            <button @onclick="CloseAsync">Cancel</button>
+            <button class="primary" disabled="@_busy" @onclick="StartAsync">@if (_busy) { <span class="spinner"></span> }Write ReplayGain</button>
+        </div>
+    }
+</Dialog>
+
+@code {
+    [Parameter, EditorRequired] public FormatScope Scope { get; set; } = null!;
+
+    /// <summary>What it covers: "the whole library", an artist's name or an album's title.</summary>
+    [Parameter] public string Name { get; set; } = "";
+
+    [Parameter] public EventCallback OnClose { get; set; }
+
+    private TaskInfo? _started;
+    private bool _busy;
+    private string? _error;
+
+    private Task CloseAsync() => _busy ? Task.CompletedTask : OnClose.InvokeAsync();
+
+    private async Task StartAsync()
+    {
+        _busy = true;
+        _error = null;
+        try
+        {
+            _started = await Api.StartReplayGainAsync(new StartReplayGain(Scope));
+            Tasks.Started(_started);
+        }
+        catch (Exception e) when (e is HttpRequestException or MelodexApiException)
+        {
+            _error = e.Message;
+        }
+        _busy = false;
+    }
+}

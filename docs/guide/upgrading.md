@@ -37,6 +37,19 @@ as it is. Two things change:
   `COMPOSE_PROFILES` does nothing. Paste back the plugins you use from their READMEs, where the lines are the same as
   before. Your plugins' settings are kept in Melodex, so nothing needs adding again under **Settings → Plugins**.
 
+## To 2.0.0: even volume
+
+The first scan after upgrading reads every file's ReplayGain, if it has any, once, so it takes a little longer than
+usual. New music has ReplayGain worked out and written into its files as it's added, while even volume is on; to leave new
+files untouched, turn it **Off** under **Settings → Playback → Even volume**. Nothing is written into the music
+you already have until you ask for it under **Tools → Even volume** or on an artist's or album's page.
+
+## To 2.0.0: checks on Tools
+
+Checking lossless files and making the visualiser's bars are no longer scheduled tasks: new music gets them as it
+comes, so they're only needed once, for a library brought in, and they're under **Tools → Maintenance**.
+Schedules that had them ticked carry on without them.
+
 ## To 2.0.0: discovery
 
 Melodex sets up the new ListenBrainz discovery plugin once, as it did LRCLIB for lyrics, so artists' and songs' pages

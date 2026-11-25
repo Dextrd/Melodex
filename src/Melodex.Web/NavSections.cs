@@ -8,7 +8,7 @@ public enum NavSection { Library, Search, Tools }
 
 /// <summary>
 /// Where you were in the Library, in Search and in Tools, this session. The artist, album and song pages you open from one belong
-/// to it. Its link in the top bar goes back to the page you were last on there; from there, back to its own page as you
+/// to it; opened from anywhere else, they're the Library's. Its link in the top bar goes back to the page you were last on there; from there, back to its own page as you
 /// left it; and from that, to its own page afresh.
 /// </summary>
 public sealed class NavSections : IDisposable
@@ -97,8 +97,12 @@ public sealed class NavSections : IDisposable
             Current = NavSection.Library;
             _last[NavSection.Library] = path;
         }
-        else if (IsDeep(path) && Current is { } within)
-            _last[within] = path;
+        else if (IsDeep(path))
+        {
+            // Opened from somewhere that isn't a section, such as Review or Activity, or straight from a link: the Library's (#240).
+            Current ??= NavSection.Library;
+            _last[Current.Value] = path;
+        }
         else
             Current = null;
     }

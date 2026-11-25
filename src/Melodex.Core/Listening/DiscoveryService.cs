@@ -168,8 +168,11 @@ public sealed class DiscoveryService(MelodexDbContext db, DiscoveryPlugins plugi
     public async Task<IReadOnlyList<DiscoveredSong>> RecommendAsync(Guid userId, int take, CancellationToken ct)
     {
         take = Math.Clamp(take, 1, MaxTake);
-        var accounts = (await db.ScrobbleAccounts.AsNoTracking().Where(a => a.UserId == userId).ToListAsync(ct))
-            .ToDictionary(a => a.Service == ScrobbleService.ListenBrainz ? DiscoveryAccounts.ListenBrainz : DiscoveryAccounts.LastFm, a => a.Username);
+        // Linked scrobbling accounts, by service: the last part of the plugin's ID, such as listenbrainz.
+        var accounts = (await db.ScrobbleAccounts.AsNoTracking().Where(a => a.UserId == userId)
+                .Join(db.PluginInstances, a => a.PluginInstanceId, p => p.Id, (a, p) => new { p.PluginId, a.Username }).ToListAsync(ct))
+            .GroupBy(a => a.PluginId[(a.PluginId.LastIndexOf('.') + 1)..])
+            .ToDictionary(g => g.Key, g => g.First().Username);
         var since = DateTime.UtcNow - Lately;
         var plays = await db.Plays.AsNoTracking().Where(p => p.UserId == userId && p.PlayedAt >= since).ToListAsync(ct);
         var topArtists = new List<DiscoveryArtist>();

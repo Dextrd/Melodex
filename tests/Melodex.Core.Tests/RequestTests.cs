@@ -866,6 +866,17 @@ public sealed class RequestTests(RequestFixture fixture, ITestOutputHelper outpu
             Assert.Equal((oldPath, "mp3", "pcm"), (held.Path, held.Was.Codec, held.Now?.Codec));
             Assert.True(File.Exists(Path.Combine(fixture.Staging, $"{replace.Hold}/10 Voyager.mp3")));
             Assert.Contains(await Api.GetHeldFilesAsync(), h => h.Id == held.Id);
+            Assert.Equal(fileId, held.FileId);
+
+            // Both can be played, to compare them: the held one from where it's held (#239).
+            var original = (await Api.GetHeldPlayInfoAsync(held.Id))!;
+            Assert.Equal((trackId, "audio/mpeg"), (original.TrackId, original.MediaType));
+            using (var anyone = fixture.Factory.CreateClient())
+            {
+                var bytes = await anyone.GetByteArrayAsync(original.StreamUrl);
+                Assert.Equal(new FileInfo(Path.Combine(fixture.Staging, $"{replace.Hold}/10 Voyager.mp3")).Length, bytes.Length);
+                Assert.Equal(System.Net.HttpStatusCode.Forbidden, (await anyone.GetAsync(original.StreamUrl.Split('?')[0])).StatusCode);
+            }
 
             // Put back, the better copy goes, and the song isn't upgraded again.
             await Api.RestoreHeldFileAsync(held.Id, never: true);
@@ -874,6 +885,7 @@ public sealed class RequestTests(RequestFixture fixture, ITestOutputHelper outpu
             Assert.True(File.Exists(Path.Combine(fixture.Music, oldPath)));
             Assert.False(File.Exists(Path.Combine(fixture.Music, upgraded.Path)));
             Assert.Empty(await Api.GetHeldFilesAsync(trackId));
+            Assert.Null(await Api.GetHeldPlayInfoAsync(held.Id));
             Assert.Equal(QualityOverrideKind.NeverUpgrade, (await Api.GetQualitySettingAsync("tracks", trackId, null))!.Kind);
             Assert.Equal(0, (await Api.SearchUpgradesAsync(new FormatScope(FormatScopeKind.Track, trackId))).Upgradable);
         }

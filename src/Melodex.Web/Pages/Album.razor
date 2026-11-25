@@ -81,6 +81,8 @@ else
                     {
                         <IconButton Icon="format" Requires="@UserPermissions.Format" Large="true" Label="Format" Title="Rewrite this album's files: their tags, cover and where they live"
                                     OnClick="() => _formatting = true" />
+                        <IconButton Icon="volume" Requires="@UserPermissions.Format" Large="true" Label="Even volume" Title="Work out how loud this album's songs are, and write it into their files as ReplayGain"
+                                    OnClick="() => _levelling = true" />
                     }
                     <IconButton Icon="image" Requires="@UserPermissions.Format" Large="true" Label="Cover" Title="Choose the album's cover, from any of its editions or a picture of your own"
                                 OnClick="() => _choosingCover = true" />
@@ -254,6 +256,11 @@ else
     <FormatDialog Scope="new FormatScope(FormatScopeKind.Album, _album.Album.Id)" Name="@_album.Album.Title" OnClose="() => _formatting = false" />
 }
 
+@if (_levelling && _album is not null)
+{
+    <ReplayGainDialog Scope="new FormatScope(FormatScopeKind.Album, _album.Album.Id)" Name="@_album.Album.Title" OnClose="() => _levelling = false" />
+}
+
 @code {
     [Parameter] public Guid Id { get; set; }
 
@@ -276,7 +283,7 @@ else
     // The edition being changed to, until its tracks arrive.
     private Guid? _switching;
     private bool _notFound;
-    private bool _formatting;
+    private bool _formatting, _levelling;
     private bool _choosingCover;
     private (string Name, IReadOnlyList<PlaylistItem> Songs)? _adding;
 

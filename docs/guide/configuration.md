@@ -45,28 +45,25 @@ ticking it on one takes it off another; one on none only runs when you start it.
 
 - **Scan the library**: read new and changed files and match them, then whatever **Settings → Library** says follows a scan.
 - **Update the catalogue**: look up every library artist's discography.
-- **Check lossless files**: look for lossy music passed off as lossless in files not checked yet.
 - **Look for missing lyrics**: look again for songs without lyrics.
-- **Make the visualiser's bars**: for songs without them. Only while **Settings → Playback** keeps bars beside songs:
-  made as songs play, or with the visualiser off, it's greyed out, saying why, and one ticked already is left out of
-  runs until they're kept beside songs again.
 - **Retry failed fetches**: ask again for fetches that failed. Any not started when the window closes go back to
   failed, for the next window.
 - **Get what's on wishlists**: ask for what's on everyone's wishlist, each in the name of whoever wished for it, when a
   retriever is on to fetch it. Any not started when the window closes are cancelled, and stay on the wishlist.
 - **Look for upgrades**: look through the whole library for [upgrades](requests-and-listening.md#upgrades).
 
-To start with, the daily window is 01:00 to 06:00 and scans, updates the catalogue, checks lossless files and makes
-the visualiser's bars; the
-weekly one is Mondays at the same times, for lyrics, failed downloads, wishlists and upgrades; nothing is monthly.
+Checking lossless files and making the visualiser's bars aren't scheduled: new music gets them as it comes, so they're
+needed once, for a library brought in, and are on [Tools](tools.md#bringing-in-a-library).
+
+To start with, the daily window is 01:00 to 06:00 and scans and updates the catalogue; the weekly one is Mondays at the same times, for lyrics, failed downloads, wishlists and upgrades; nothing is monthly.
 
 - **Each window has its own times.** One that ends earlier than it starts runs past midnight: 22:00 to 04:00 ends the
   next morning. One that ends when it starts lasts a whole day.
 - **The weekly one runs on a day you pick, the monthly one on a day of the month, 1 to 31.** In a month shorter than
   that, it runs on the month's last day: 31 is the last day of every month.
 - **All three are in one time zone**, the server's UTC to start with: **Use this browser's** sets yours.
-- **A window runs its tasks once, in order**: scan, catalogue, lossless check, lyrics, the visualiser's bars, then
-  failed downloads, wishlists and upgrades. The first five are tasks on **Activity**, one after another; the rest wait
+- **A window runs its tasks once, in order**: scan, catalogue, lyrics, then failed downloads, wishlists and upgrades.
+  The first three are tasks on **Activity**, one after another; the rest wait
   for them, as nothing can be asked for while a scan reads the library.
 - **Fetches go a few at a time.** Retries and wishlists keep a few fetches going, as many as **Settings → Fetching →
   Scheduled fetches** says (5 to start with), and
@@ -79,7 +76,7 @@ weekly one is Mondays at the same times, for lyrics, failed downloads, wishlists
 
 Below each schedule are when it next runs, and how its last run went, a line for each task, with a link to its task on
 Activity. Every task can still be run straight away from its own place, which says which schedule it's on and links
-here: **Scan** and **Update catalogue** in the Library page's Scan menu, **Look for missing lyrics** on Tools, **Make missing bars now** under **Settings → Playback**, **Check the rest** of the lossless files and **Look for upgrades now** under **Settings → Quality**, **Retry
+here: **Scan** and **Update catalogue** in the Library page's Scan menu, **Look for missing lyrics** and **Look for upgrades** on Tools, **Retry
 failed** on **Activity → Fetches**, and **Get them all** on the wishlist. Those last two ask for everything at once.
 
 **Sync playlists every** sets how often playlists sync with the media server for changes made there, from 1 minute to

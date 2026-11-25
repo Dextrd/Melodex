@@ -32,9 +32,7 @@ public sealed class Schedules(MelodexClient api)
     {
         ScheduledTask.Scan => "Scan the library",
         ScheduledTask.CatalogueUpdate => "Update the catalogue",
-        ScheduledTask.LosslessCheck => "Check lossless files",
         ScheduledTask.Lyrics => "Look for missing lyrics",
-        ScheduledTask.Bars => "Make the visualiser's bars",
         ScheduledTask.RetryFailed => "Retry failed fetches",
         ScheduledTask.Wishlist => "Get what's on wishlists",
         _ => "Look for upgrades",
@@ -44,9 +42,7 @@ public sealed class Schedules(MelodexClient api)
     {
         ScheduledTask.Scan => "Reads new and changed files and matches them, then does what the library settings say follows a scan.",
         ScheduledTask.CatalogueUpdate => "Fills in every library artist's discography and the editions of their albums.",
-        ScheduledTask.LosslessCheck => "Checks lossless files that haven't been for lossy music passed off as lossless.",
         ScheduledTask.Lyrics => "Asks the lyrics plugins again for songs without lyrics.",
-        ScheduledTask.Bars => "Makes the bars for songs without them, while Playback says to make them ahead; it catches any a scan missed.",
         ScheduledTask.RetryFailed => "Asks again for fetches that failed, a few at a time. Any not started when the window closes wait for the next.",
         ScheduledTask.Wishlist => "Asks for what's on everyone's wishlist, in their name, a few at a time, if a retriever is on to fetch it. Any not started when the window closes are cancelled, and stay wished for.",
         _ => "Goes last, keeping Upgrades at a time going until every song below its cutoff has been tried or the window closes.",
@@ -56,12 +52,10 @@ public sealed class Schedules(MelodexClient api)
     public static (string Where, string Href) RunNow(ScheduledTask task) => task switch
     {
         ScheduledTask.Scan or ScheduledTask.CatalogueUpdate => ("Scan menu", "library"),
-        ScheduledTask.LosslessCheck => ("Settings → Quality", "settings/quality#lossless"),
         ScheduledTask.Lyrics => ("Tools → Look for missing lyrics", "tools"),
-        ScheduledTask.Bars => ("Settings → Playback", "settings/playback#visualiser"),
         ScheduledTask.RetryFailed => ("Activity → Fetches", "activity/fetches"),
         ScheduledTask.Wishlist => ("Wishlist", "wishlist"),
-        _ => ("Settings → Quality", "settings/quality#upgrades"),
+        _ => ("Tools → Look for upgrades", "tools"),
     };
 
     public static string Name(ScheduleRepeat repeat) => repeat switch

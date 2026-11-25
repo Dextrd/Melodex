@@ -2,7 +2,6 @@
 @layout SettingsLayout
 @inject MelodexClient Api
 @inject Player Player
-@inject TaskNotices Tasks
 
 <PageTitle>Playback · Melodex</PageTitle>
 
@@ -37,6 +36,47 @@ else
         }
     </div>
 
+    <h2 id="even-volume">Even volume</h2>
+    <p class="muted small">
+        Songs are mastered at very different volumes. With ReplayGain worked out and written into your files, loud songs are turned down and quiet
+        ones up, so you don't reach for the volume between them. Melodex's player uses it as chosen here; Subsonic players and your media server
+        read it from the files too. A browser can't play louder than full volume, so quiet songs come up only as far as the player's volume
+        leaves room for: keep it around three quarters, and turn your speakers up instead. Work it out for the whole library on <a href="tools">Tools</a>, or for an artist or album on its page.
+    </p>
+    @if (!_volumeWorks)
+    {
+        <div class="notice warning" role="status">
+            ⚠ Not in Melodex's player on this device: on iPhones and iPads the volume is the phone's own, so songs play as they are. Other players
+            on it that read ReplayGain still even them out.
+        </div>
+    }
+    <div class="card settings-card">
+        @foreach (var (value, name, hint) in LevellingChoices)
+        {
+            <label class="dialog-choice">
+                <input type="radio" name="levelling" checked="@(_levelling == value)" @onchange="() => { _levelling = value; _saver?.Changed(); }" />
+                <span>
+                    <strong>@name</strong>
+                    <span class="muted small">@hint</span>
+                </span>
+            </label>
+        }
+        <div class="setting-line">
+            Bring songs to
+            <NumberField Min="-30" Max="-5" Label="LUFS" Value="(int)Math.Round(_target)" ValueChanged="n => { _target = n; _saver?.Changed(); }" />
+            LUFS
+        </div>
+        <div class="muted small">
+            ReplayGain's own is -18; higher is louder, with more songs turned up past where they'd clip, so those are turned up less. It's written
+            into the files as they're worked out, so a change counts for files worked out from now on, or all of them with the setting below.
+        </div>
+        <label class="check">
+            <input type="checkbox" checked="@_redoGains" @onchange="e => { _redoGains = e.Value is true; _saver?.Changed(); }" />
+            Work it out again for files that have it already
+        </label>
+        <div class="muted small">Otherwise files that came with ReplayGain, or have had it worked out already, are left as they are.</div>
+    </div>
+
     <h2 id="visualiser">Visualiser</h2>
     <p class="muted small">
         The bars that move with the music under the cover in the full-screen player. The server works them out from each song, so your browser doesn't
@@ -66,12 +106,7 @@ else
         @* Only while bars sit beside songs: made as songs play, or with no visualiser, there are none to make. *@
         @if (_status.Settings.Visualiser == VisualiserBars.WhenMatching)
         {
-            <div class="setting-line">
-                <ScheduleNote Task="ScheduledTask.Bars" />
-                <span class="spacer"></span>
-                <button disabled="@_makingBars" @onclick="MakeBarsAsync">@if (_makingBars) { <span class="spinner"></span> }Make missing bars now</button>
-            </div>
-            @if (_barsError is not null) { <div class="error small">@_barsError</div> }
+            <div class="muted small">New songs get theirs after each scan. For songs already in the library without them, use <a href="tools">Tools → Make visualiser bars</a>.</div>
         }
     </div>
 
@@ -120,8 +155,6 @@ else
         </Dialog>
     }
 
-    <LastFmApiKey />
-
     @if (_deleting)
     {
         <Dialog Title="Delete the .bars files?" OnClose="CloseDeleting" Alert="true">
@@ -152,38 +185,33 @@ else
         (GaplessPlayback.Off, "Off", "Each song starts once the one before has ended, after a moment to load. Nothing's downloaded ahead."),
     ];
 
+    private static readonly (VolumeLevelling Value, string Name, string Hint)[] LevellingChoices =
+    [
+        (VolumeLevelling.Track, "Each song", "Every song at about the same volume, whatever's around it. Best for playlists, radios and shuffle."),
+        (VolumeLevelling.Album, "Each album",
+            "An album's songs keep how loud they are next to each other, as a quiet intro is meant to be quiet, and the album as a whole is evened out."),
+        (VolumeLevelling.Off, "Off", "Songs play as loud as they were made, ReplayGain or not, and new music isn't worked out."),
+    ];
+
     private PlaybackStatus? _status;
+    private VolumeLevelling _levelling;
+    private double _target;
+    private bool _redoGains;
     private GaplessPlayback _gapless;
     private FetchSettings? _fetch;
     private VisualiserBars _visualiser;
     private bool _warning, _deleting, _leaving, _deleteBarsFiles;
     private AutoSave? _saver;
-    private bool _gaplessWorks = true;
-    private bool _makingBars;
-    private string? _barsError;
-
-    private async Task MakeBarsAsync()
-    {
-        _makingBars = true;
-        _barsError = null;
-        try
-        {
-            Tasks.Started(await Api.MakeBarsAsync());
-        }
-        catch (Exception e) when (e is HttpRequestException or MelodexApiException)
-        {
-            _barsError = e.Message;
-        }
-        _makingBars = false;
-    }
-
+    private bool _gaplessWorks = true, _volumeWorks = true;
     protected override async Task OnInitializedAsync()
     {
         _status = await Api.GetPlaybackSettingsAsync();
         _fetch = await Api.GetFetchSettingsAsync();
         _visualiser = _status.Settings.Visualiser;
         _gapless = _status.Settings.Gapless;
+        (_levelling, _target, _redoGains) = (_status.Settings.Levelling, _status.Settings.LoudnessTarget, _status.Settings.RedoGains);
         _gaplessWorks = await Player.GaplessWorksAsync();
+        _volumeWorks = await Player.VolumeWorksAsync();
     }
 
     // Saved as it's chosen, except that making bars beside every song is warned of first, for the room they take,
@@ -202,11 +230,12 @@ else
 
     private async Task SaveAsync()
     {
-        await Api.SavePlaybackSettingsAsync(new SavePlayback(_visualiser, _deleteBarsFiles, _gapless));
+        await Api.SavePlaybackSettingsAsync(new SavePlayback(_visualiser, _deleteBarsFiles, _gapless, _levelling, _target, _redoGains));
         _deleteBarsFiles = false;
         await Api.SaveFetchSettingsAsync(_fetch!);
         Player.RadioSettingsChanged(new RadioSettings(_fetch!.RadioMissingPercent, _fetch.RadioAutoplay));
         _status = await Api.GetPlaybackSettingsAsync();
+        Player.PlaybackChanged(_status.Settings);
     }
 
     // Asked whether to delete them: on leaving bars made when matching, with the change; otherwise on their own.

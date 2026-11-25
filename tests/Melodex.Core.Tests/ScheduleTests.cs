@@ -36,7 +36,7 @@ public sealed class ScheduleTests : IDisposable
     public async Task A_new_install_scans_daily_and_upgrades_weekly_and_upgrades_say_so()
     {
         var status = await _api.GetSchedulesAsync();
-        Assert.Equal([ScheduledTask.Scan, ScheduledTask.CatalogueUpdate, ScheduledTask.LosslessCheck, ScheduledTask.Bars], status.Settings.Daily.Tasks);
+        Assert.Equal([ScheduledTask.Scan, ScheduledTask.CatalogueUpdate], status.Settings.Daily.Tasks);
         Assert.Equal(5, status.Settings.DownloadsAtATime);
         Assert.Equal([ScheduledTask.Lyrics, ScheduledTask.RetryFailed, ScheduledTask.Wishlist, ScheduledTask.Upgrades], status.Settings.Weekly.Tasks);
         Assert.Empty(status.Settings.Monthly.Tasks);
@@ -59,33 +59,38 @@ public sealed class ScheduleTests : IDisposable
     }
 
     [Fact]
-    public async Task The_visualisers_bars_are_only_made_on_a_schedule_while_they_sit_beside_songs()
+    public async Task Lossless_checks_and_bars_are_no_longer_scheduled_and_old_schedules_carry_on_without_them()
     {
-        // Made as songs play, to start with: ticked on the daily schedule, but left out of its runs, and saying why.
-        var status = await _api.GetSchedulesAsync();
-        Assert.Contains(ScheduledTask.Bars, status.Settings.Daily.Tasks);
-        Assert.StartsWith("The bars are made as each song plays", status.Unavailable[ScheduledTask.Bars]);
-        var refused = await Assert.ThrowsAsync<MelodexApiException>(() => _api.MakeBarsAsync());
-        Assert.Equal(HttpStatusCode.Conflict, refused.Status);
-
+        // A schedule saved before they moved to Tools (#237) still reads, without them.
         var now = DateTime.UtcNow;
-        var open = new DailySchedule { From = TimeOnly.FromDateTime(now.AddHours(-1)), Until = TimeOnly.FromDateTime(now.AddHours(1)), Tasks = [ScheduledTask.Bars] };
-        await _api.SaveSchedulesAsync(status.Settings with { TimeZone = "UTC", Daily = open, Weekly = status.Settings.Weekly with { Tasks = [] } });
-        Assert.Null((await _api.GetSchedulesAsync()).Windows.Single(w => w.Repeat == ScheduleRepeat.Daily).Next);
-        using var scope = _factory.Services.CreateScope();
-        var tasks = scope.ServiceProvider.GetRequiredService<ScheduledTasks>();
-        await tasks.TickAsync(now, default);
-        Assert.Null((await _api.GetSchedulesAsync()).Running);
-
-        // Beside songs, it runs.
-        await _api.SavePlaybackSettingsAsync(new SavePlayback(VisualiserBars.WhenMatching));
-        status = await _api.GetSchedulesAsync();
+        var from = TimeOnly.FromDateTime(now.AddHours(-1)).ToString("HH:mm");
+        var until = TimeOnly.FromDateTime(now.AddHours(1)).ToString("HH:mm");
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<MelodexDbContext>();
+            db.Settings.Add(new Setting
+            {
+                Key = "schedule",
+                ValueJson = $$"""{ "timeZone": "UTC", "daily": { "from": "{{from}}", "until": "{{until}}", "tasks": ["losslessCheck", "bars", "lyrics"] }, "weekly": { "tasks": [] } }""",
+            });
+            await db.SaveChangesAsync();
+        }
+        var status = await _api.GetSchedulesAsync();
+        Assert.Equal([ScheduledTask.Lyrics], status.Settings.Daily.Tasks);
         Assert.Empty(status.Unavailable);
-        await tasks.TickAsync(now, default);
-        // Going, or with nothing to make, done already.
+
+        // A run leaves them out.
+        using (var scope = _factory.Services.CreateScope())
+            await scope.ServiceProvider.GetRequiredService<ScheduledTasks>().TickAsync(now, default);
         status = await _api.GetSchedulesAsync();
         var run = status.Running ?? status.Windows.Single(w => w.Repeat == ScheduleRepeat.Daily).Last!;
-        Assert.Equal(ScheduledTask.Bars, run.Steps.Single().Task);
+        Assert.Equal([ScheduledTask.Lyrics], run.Steps.Select(s => s.Task));
+
+        // Bars are made from Tools only while they sit beside songs.
+        var refused = await Assert.ThrowsAsync<MelodexApiException>(() => _api.MakeBarsAsync());
+        Assert.Equal(HttpStatusCode.Conflict, refused.Status);
+        await _api.SavePlaybackSettingsAsync(new SavePlayback(VisualiserBars.WhenMatching));
+        Assert.Equal(BarsTask.TaskKind, (await _api.MakeBarsAsync()).Kind);
     }
 
     [Theory]

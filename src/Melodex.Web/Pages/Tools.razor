@@ -1,13 +1,19 @@
 @page "/tools"
 @inject AuthState Auth
+@inject MelodexClient Api
+@inject TaskNotices Tasks
 
 <PageTitle>Tools · Melodex</PageTitle>
 
-@* Things you run to build your library, not settings: a card for each. What they're doing shows in Activity. *@
+@*
+    Things you run to build your library, not settings: a card for each, in sections: lists in and out, looking after
+    what's there, and what writes the files themselves. What they're doing shows in Activity.
+*@
 <ToolsPlace />
 <h1>Tools</h1>
 <p class="muted">Things you run now and then to build your library. What each does shows in Activity as it goes.</p>
 
+<h2>Import / Export</h2>
 <div class="tool-cards">
     @if (Auth.May(UserPermissions.Request))
     {
@@ -63,3 +69,319 @@
         </span>
     </a>
 </div>
+
+@if (Auth.May(UserPermissions.Scan) || Auth.May(UserPermissions.Format) || Auth.May(UserPermissions.Request))
+{
+    <h2>Maintenance</h2>
+    <p class="muted small">
+        Looking after what's in the library. New music gets these as it comes; run them here for music that was there before Melodex, or to go
+        over the whole library again.
+    </p>
+    <div class="tool-cards">
+        @if (Auth.May(UserPermissions.Scan))
+        {
+            <button class="card tool-card" @onclick="OpenLosslessAsync">
+                <Icon Name="quality" />
+                <span>
+                    <strong>Check lossless files</strong>
+                    <span class="muted small">
+                        Look for lossy music passed off as lossless in your FLAC, WAV and AIFF files, by what's missing from its sound. Files are only
+                        read; any that seem lossy wait under Review to replace or trust.
+                    </span>
+                </span>
+            </button>
+        }
+        @if (Auth.May(UserPermissions.Scan))
+        {
+            <button class="card tool-card" disabled="@_busy" @onclick="FindLyricsAsync">
+                <Icon Name="lyrics" />
+                <span>
+                    <strong>Look for missing lyrics</strong>
+                    <span class="muted small">
+                        Ask the lyrics plugins for every song without lyrics, as each scan does when Settings → Library says to. A song no source had
+                        lyrics for is asked about again after a month.
+                    </span>
+                </span>
+            </button>
+        }
+        @if (Auth.May(UserPermissions.Format))
+        {
+            <button class="card tool-card" @onclick="() => _levelling = true">
+                <Icon Name="volume" />
+                <span>
+                    <strong>Even volume</strong>
+                    <span class="muted small">
+                        Work out how loud each song and album is, and write it into the files as ReplayGain, so everything plays at about the same
+                        volume here, in Subsonic players and in your media server. Asks before it starts. Also on each artist and album page.
+                    </span>
+                </span>
+            </button>
+        }
+        @if (Auth.May(UserPermissions.Request))
+        {
+            <button class="card tool-card" @onclick="OpenUpgradesAsync">
+                <Icon Name="upgrade" />
+                <span>
+                    <strong>Look for upgrades</strong>
+                    <span class="muted small">
+                        Look for better copies of every song below its cutoff, as the schedule does, now. A song, album or artist can be looked for
+                        on its own page.
+                    </span>
+                </span>
+            </button>
+        }
+        @if (_bars)
+        {
+            <button class="card tool-card" @onclick="() => _barsOpen = true">
+                <Icon Name="visualiser" />
+                <span>
+                    <strong>Make visualiser bars</strong>
+                    <span class="muted small">
+                        Make the full-screen player's bars for every song without them, kept beside each song in a .bars file, as Settings →
+                        Playback says.
+                    </span>
+                </span>
+            </button>
+        }
+    </div>
+}
+
+@if (Auth.May(UserPermissions.Format))
+{
+    <h2>Formatting</h2>
+    <p class="muted small">This writes to your music files themselves, every matched one in the library. It asks before it starts.</p>
+    <div class="tool-cards">
+        <button class="card tool-card" @onclick="() => _formatting = true">
+            <Icon Name="format" />
+            <span>
+                <strong>Format the whole library</strong>
+                <span class="muted small">
+                    Rewrite files' tags and covers from the catalogue, and move them to where your naming scheme says. Also on each artist,
+                    album and track page.
+                </span>
+            </span>
+        </button>
+    </div>
+}
+
+@if (_formatting)
+{
+    <FormatDialog Scope="new FormatScope(FormatScopeKind.Library, null)" Name="the whole library" OnClose="() => _formatting = false" />
+}
+
+@if (_levelling)
+{
+    <ReplayGainDialog Scope="new FormatScope(FormatScopeKind.Library, null)" Name="the whole library" OnClose="() => _levelling = false" />
+}
+
+@if (_losslessOpen)
+{
+    <Dialog Title="Check lossless files" OnClose="() => _losslessOpen = false">
+        @if (_spectra is not { } spectra)
+        {
+            <Loading Inline="true" />
+        }
+        else if (spectra.Lossless == 0)
+        {
+            <p>There are no FLAC, WAV or AIFF files in the library to check.</p>
+        }
+        else
+        {
+            <p>
+                @spectra.Checked of @spectra.Lossless lossless files checked;
+                @(spectra.Suspects.Count == 0 ? "none seem lossy" : spectra.Suspects.Count == 1 ? "1 seems lossy" : $"{spectra.Suspects.Count} seem lossy").
+                Each takes a second or so. ALAC, APE and WavPack can't be checked.
+            </p>
+        }
+        @if (_toolError is not null) { <p class="error">@_toolError</p> }
+        <div class="toolbar dialog-buttons">
+            <button @onclick="() => _losslessOpen = false">Cancel</button>
+            @if (_spectra is { Lossless: > 0 } shown)
+            {
+                <button disabled="@_busy" @onclick="() => CheckAsync(true)">Check them all again</button>
+                <button class="primary" disabled="@(_busy || shown.Checked == shown.Lossless)" @onclick="() => CheckAsync(false)">Check the rest</button>
+            }
+        </div>
+    </Dialog>
+}
+
+@if (_lyricsError is not null)
+{
+    <Dialog Title="Look for missing lyrics" OnClose="() => _lyricsError = null">
+        <p class="error">@_lyricsError</p>
+        <div class="toolbar dialog-buttons">
+            <button @onclick="() => _lyricsError = null">Close</button>
+        </div>
+    </Dialog>
+}
+
+@if (_upgradesOpen)
+{
+    <Dialog Title="Look for upgrades" OnClose="() => _upgradesOpen = false">
+        @if (_upgrades is not { } upgrades)
+        {
+            @if (_toolError is null) { <Loading Inline="true" /> }
+        }
+        else if (upgrades.Run is { } run)
+        {
+            <p>
+                Looking now@(run.ByHand ? "" : ", on the schedule"): @Format.Count(run.Asked, "song", "songs") asked for so far, @run.Going going
+                @(run.Until is { } until ? $", until {until.ToLocalTime():HH:mm}" : "").
+                <a href="activity/fetches">Follow it in Activity</a>.
+            </p>
+        }
+        else
+        {
+            <p>@(upgrades.Upgradable == 1 ? "1 song is below its cutoff." : $"{upgrades.Upgradable:N0} songs are below their cutoff.")</p>
+            <p class="muted small">
+                It keeps as many going as <a href="settings/quality#upgrades">Settings → Quality</a> says, asking for the next as each finishes, until
+                everything's been tried, or until the window upgrades are scheduled in closes if it starts in it.
+            </p>
+            @if (_searched is { Queued: 0 })
+            {
+                <p class="muted small">Nothing new to look for: the rest are being looked for already.</p>
+            }
+        }
+        @if (_toolError is not null) { <p class="error">@_toolError</p> }
+        <div class="toolbar dialog-buttons">
+            <button @onclick="() => _upgradesOpen = false">Close</button>
+            @if (_upgrades?.Run is not null)
+            {
+                <button disabled="@_busy" @onclick="StopUpgradesAsync">Stop looking</button>
+            }
+            else if (_upgrades is { } shown)
+            {
+                <button class="primary" disabled="@(_busy || shown.Upgradable == 0)" @onclick="SearchUpgradesAsync">Look for upgrades now</button>
+            }
+        </div>
+    </Dialog>
+}
+
+@if (_barsOpen)
+{
+    <Dialog Title="Make visualiser bars" OnClose="() => _barsOpen = false">
+        <p>
+            Every song without its bars gets them, in a .bars file beside it, about 1.4 KB for each second of music. It takes a second or so
+            a song, so a large library takes hours. Media servers pass the files by.
+        </p>
+        @if (_toolError is not null) { <p class="error">@_toolError</p> }
+        <div class="toolbar dialog-buttons">
+            <button @onclick="() => _barsOpen = false">Cancel</button>
+            <button class="primary" disabled="@_busy" @onclick="MakeBarsAsync">Make missing bars</button>
+        </div>
+    </Dialog>
+}
+
+@code {
+    private bool _formatting, _levelling;
+    private bool _bars, _losslessOpen, _barsOpen, _busy;
+    private SpectrumStatus? _spectra;
+    private bool _upgradesOpen;
+    private string? _lyricsError;
+    private UpgradeStatus? _upgrades;
+    private UpgradeSearch? _searched;
+    private string? _toolError;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Bars only sit beside songs, to be made ahead, when Playback says so.
+        if (Auth.May(UserPermissions.Scan))
+            _bars = (await Api.GetPlaybackAsync()).Visualiser == VisualiserBars.WhenMatching;
+    }
+
+    private async Task OpenLosslessAsync()
+    {
+        _losslessOpen = true;
+        _toolError = null;
+        _spectra = null;
+        try
+        {
+            _spectra = await Api.GetSpectrumStatusAsync();
+        }
+        catch (Exception e) when (e is HttpRequestException or MelodexApiException)
+        {
+            _toolError = e.Message;
+        }
+    }
+
+    // Started straight away, as there's nothing to choose; it shows in Activity.
+    private async Task FindLyricsAsync()
+    {
+        _busy = true;
+        try
+        {
+            Tasks.Started(await Api.FindLyricsAsync());
+        }
+        catch (Exception e) when (e is HttpRequestException or MelodexApiException)
+        {
+            _lyricsError = e.Message;
+        }
+        _busy = false;
+    }
+
+    private async Task OpenUpgradesAsync()
+    {
+        _upgradesOpen = true;
+        _toolError = null;
+        _upgrades = null;
+        _searched = null;
+        await LoadUpgradesAsync();
+    }
+
+    private async Task LoadUpgradesAsync()
+    {
+        try
+        {
+            _upgrades = await Api.GetUpgradesAsync();
+        }
+        catch (Exception e) when (e is HttpRequestException or MelodexApiException)
+        {
+            _toolError = e.Message;
+        }
+    }
+
+    // A look through the whole library, as a scheduled one; what it's doing shows here and in Activity.
+    private Task SearchUpgradesAsync() => UpgradeAsync(async () => _searched = await Api.SearchUpgradesAsync(new FormatScope(FormatScopeKind.Library)));
+
+    private Task StopUpgradesAsync() => UpgradeAsync(async () =>
+    {
+        await Api.StopUpgradesAsync();
+        _searched = null;
+    });
+
+    private async Task UpgradeAsync(Func<Task> action)
+    {
+        _busy = true;
+        _toolError = null;
+        try
+        {
+            await action();
+            await LoadUpgradesAsync();
+        }
+        catch (Exception e) when (e is HttpRequestException or MelodexApiException)
+        {
+            _toolError = e.Message;
+        }
+        _busy = false;
+    }
+
+    private Task CheckAsync(bool again) => RunAsync(() => Api.CheckSpectraAsync(again), () => _losslessOpen = false);
+
+    private Task MakeBarsAsync() => RunAsync(() => Api.MakeBarsAsync(), () => _barsOpen = false);
+
+    private async Task RunAsync(Func<Task<TaskInfo>> start, Action close)
+    {
+        _busy = true;
+        _toolError = null;
+        try
+        {
+            Tasks.Started(await start());
+            close();
+        }
+        catch (Exception e) when (e is HttpRequestException or MelodexApiException)
+        {
+            _toolError = e.Message;
+        }
+        _busy = false;
+    }
+}

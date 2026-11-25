@@ -273,6 +273,7 @@ public static class PluginEndpoints
         PluginType.Index => "a catalogue",
         PluginType.Lyrics => "a lyrics plugin",
         PluginType.Discovery => "a discovery plugin",
+        PluginType.Scrobbling => "a scrobbling plugin",
         _ => "an artwork plugin",
     };
 

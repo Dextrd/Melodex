@@ -175,7 +175,8 @@ public class PluginCatalogTests
                 Melodex.Plugins.FanartTv.FanartTvFactory.PluginId, Melodex.Plugins.Wikimedia.WikimediaCommonsFactory.PluginId,
                 Melodex.Plugins.Deezer.DeezerFactory.PluginId, Melodex.Plugins.Deezer.DeezerIndexFactory.PluginId, Melodex.Plugins.Lrclib.LrclibFactory.PluginId,
                 Melodex.Plugins.Plex.PlexConnectorFactory.PluginId, Melodex.Plugins.Jellyfin.JellyfinConnectorFactory.PluginId,
-                Melodex.Plugins.ListenBrainz.ListenBrainzFactory.PluginId, Melodex.Plugins.LastFm.LastFmFactory.PluginId,
+                Melodex.Plugins.ListenBrainz.ListenBrainzFactory.PluginId, Melodex.Plugins.ListenBrainz.ListenBrainzScrobblingFactory.PluginId,
+                Melodex.Plugins.LastFm.LastFmFactory.PluginId, Melodex.Plugins.LastFm.LastFmScrobblingFactory.PluginId,
             ], Catalog(root).All.Select(p => p.Manifest.Id));
         }
         finally

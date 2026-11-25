@@ -6,6 +6,9 @@ What changed in each release of Melodex. Versions follow [semantic versioning](h
 
 ### Added
 
+- **Play upgrades from Review**: each upgrade on the **Upgraded** tab can be played, and so can the file it replaced,
+  while it's held, to hear the difference. Each plays the rest of the upgrades (or their originals) after it, so you
+  can skip through them. Originals aren't kept in listening history. The API has `GET /upgrades/held/{id}/play` (#239).
 - **Subsonic players**: Melodex speaks the Subsonic API with OpenSubsonic's extensions, at `/rest`, so Symfonium,
   Amperfy, Substreamer, Tempo, Feishin and other Subsonic apps can browse your library, search it, play it (turned
   into MP3, Opus or AAC at a lower bitrate when a player asks), show covers and lyrics, and keep your playlists, the
@@ -27,8 +30,10 @@ What changed in each release of Melodex. Versions follow [semantic versioning](h
   album lists, `scrobble` and now playing. The API has `POST`, `GET` and `DELETE /plays`, `GET /plays/top/{kind}` and
   `PUT /plays/now`, and webhooks a `play.recorded` event (#2).
 - **Scrobbling to ListenBrainz and Last.fm**: link your accounts under **Scrobbling** on your account page and your plays
-  are sent there too, with what's playing now; plays that can't be sent wait until they can. Last.fm needs an API key
-  the admin enters under **Settings → Playback** (#2).
+  are sent there too, with what's playing now; plays that can't be sent wait until they can (#2). The services are
+  **scrobbling plugins**, a seventh kind, under **Settings → Plugins → Scrobbling**: ListenBrainz is set up from the
+  start, and Last.fm takes the admin's own API key and shared secret. Plugins at an address can be scrobbling plugins
+  too; see the new scrobbling contract (#236).
 - **Discovery plugins**, a sixth kind: similar artists, similar songs and recommendations, in the order you choose
   under **Settings → Plugins → Discovery**, with what they agree on first. An artist's page shows **Similar artists**
   and a song's page **Similar songs** at its foot: songs the catalogue has, listed as search lists them, to play,
@@ -92,12 +97,23 @@ What changed in each release of Melodex. Versions follow [semantic versioning](h
   too, is a jump with nothing to load. Songs come in an MP4 file the server makes and keeps, like the WebM copies for
   Safari: their own sound where the phone takes it, otherwise AAC at 256 kbps. Stream URLs take `as=mp4` and `keep` for
   it (#109).
+- **Even volume**: Melodex works out how loud each song and album is and writes it into the files as ReplayGain (R128
+  tags for Opus), from **Tools**, an artist's or album's page, and for new music as it's added while it's on. The player turns songs
+  up or down by it, for each song or each album as chosen under **Settings → Playback**, to -18 LUFS or a loudness you
+  choose, and Subsonic players get it as OpenSubsonic's `replayGain`. Files that have ReplayGain already are left as
+  they are unless you ask. The API has `POST /library/replaygain`, and songs' play info carries their gains (#23).
 - **Import from Apple Music** on the Tools page, from the copy of your data Apple gives you (no Apple account linked):
   your favourite songs and library songs become playlists, and so does each playlist you made. Only Apple Music's
   library and favourites are read from the zip, and importing a later copy brings only what's new (#25).
 
 ### Changed
 
+- **Checking lossless files and making the visualiser's bars are on Tools**, under **Maintenance**, and no longer
+  scheduled tasks: new music gets them as it comes, so they're only needed for music that was there before. Schedules
+  that had them ticked carry on without them, and their buttons in Settings → Quality and Playback have moved there,
+  as has **Look for upgrades** (#237).
+- **Tools** is in sections: **Import / Export**, **Maintenance** (with the new Even volume) and **Formatting**.
+  Formatting the whole library has moved there, from the Library page's Scan menu (#23).
 - **Settings in sections**: your account comes first, a large button with your initial and name, with your login and
   media server logins in sections and **Sign out** at the foot. The rest are under **Library** (with **Fetching** and
   **Scheduled tasks**), **Web app** (**Appearance**, and **Notifications**, out of Appearance), **Server** (with
@@ -141,6 +157,9 @@ What changed in each release of Melodex. Versions follow [semantic versioning](h
 
 ### Fixed
 
+- **Previous** works once the queue has run out, playing its last song again; it was greyed out (#241).
+- An artist, album or song page opened from Review, Activity or a link shows the Library as the page you're on in the top
+  bar, where nothing was (#240).
 - Starting a song you don't have, or skipping to one, no longer sometimes plays the song after it instead, or skips
   songs on its own while they're fetched: a song not yet asked for was remembered as having nothing to play. And a song
   chosen while another is still playing is no longer skipped past when that one ends first (#109).

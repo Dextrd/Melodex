@@ -99,6 +99,13 @@ public sealed class LibraryScanner(MelodexDbContext db, IOptions<MelodexOptions>
                     if (++probed % 200 == 0)
                         await db.SaveChangesAsync(ct);
                 }
+                // And their ReplayGain (#23).
+                if (!existing.GainsRead)
+                {
+                    existing.SetGains(ReadGains(fullPath));
+                    if (++probed % 200 == 0)
+                        await db.SaveChangesAsync(ct);
+                }
                 continue;
             }
 
@@ -136,6 +143,7 @@ public sealed class LibraryScanner(MelodexDbContext db, IOptions<MelodexOptions>
             existing.SetQuality(read.Value.Quality);
             existing.TagsJson = read.Value.Tags.ToJson();
             existing.Genres = read.Value.Genres;
+            existing.SetGains(read.Value.Gains);
             existing.Lyrics = read.Value.Lyrics;
             existing.LyricsCheckedAt = null;
             existing.ScannedAt = DateTime.UtcNow;
@@ -207,7 +215,7 @@ public sealed class LibraryScanner(MelodexDbContext db, IOptions<MelodexOptions>
         return $"Found no audio files in {root} ({walk.Files.Count} other files). Check that MUSIC_PATH points at your music library.";
     }
 
-    private (FileTags Tags, TimeSpan? Duration, LyricsKind Lyrics, FileQuality Quality, string Genres)? Read(string path)
+    private (FileTags Tags, TimeSpan? Duration, LyricsKind Lyrics, FileQuality Quality, string Genres, FileGains Gains)? Read(string path)
     {
         try
         {
@@ -239,6 +247,19 @@ public sealed class LibraryScanner(MelodexDbContext db, IOptions<MelodexOptions>
         }
     }
 
+    private static FileGains ReadGains(string path)
+    {
+        try
+        {
+            using var file = TagLib.File.Create(path);
+            return FileGains.Of(file);
+        }
+        catch (Exception e) when (e is not OperationCanceledException)
+        {
+            return new FileGains(null, null, null, null);
+        }
+    }
+
     /// <summary>A file's genres, a line each: some tags hold several in one, split by semicolons or slashes.</summary>
     private static string GenresOf(TagLib.Tag tag) =>
         string.Join('\n', tag.Genres.SelectMany(g => g.Split([';', '/', '\0'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
@@ -248,7 +269,7 @@ public sealed class LibraryScanner(MelodexDbContext db, IOptions<MelodexOptions>
     /// A file's tags, length, lyrics (from an .lrc beside it, else its tags) and quality. Throws if it can't be read as
     /// audio.
     /// </summary>
-    public static (FileTags Tags, TimeSpan? Duration, LyricsKind Lyrics, FileQuality Quality, string Genres) ReadTags(string path)
+    public static (FileTags Tags, TimeSpan? Duration, LyricsKind Lyrics, FileQuality Quality, string Genres, FileGains Gains) ReadTags(string path)
     {
         using var file = TagLib.File.Create(path);
         var tag = file.Tag;
@@ -269,7 +290,7 @@ public sealed class LibraryScanner(MelodexDbContext db, IOptions<MelodexOptions>
             MusicBrainzReleaseGroupId = Blank(tag.MusicBrainzReleaseGroupId),
             MusicBrainzArtistId = Blank(tag.MusicBrainzArtistId?.Split('/', ';')[0]),
             MusicBrainzAlbumArtistId = Blank(tag.MusicBrainzReleaseArtistId?.Split('/', ';')[0]),
-        }, file.Properties?.Duration is { Ticks: > 0 } d ? d : null, lyrics, MediaTypes.QualityOf(file, path), GenresOf(tag));
+        }, file.Properties?.Duration is { Ticks: > 0 } d ? d : null, lyrics, MediaTypes.QualityOf(file, path), GenresOf(tag), FileGains.Of(file));
     }
 
     private string RelativePath(string path) =>
