@@ -57,7 +57,7 @@ public sealed class Schedules(MelodexClient api)
     {
         ScheduledTask.Scan or ScheduledTask.CatalogueUpdate => ("Scan menu", "library"),
         ScheduledTask.LosslessCheck => ("Settings → Quality", "settings/quality#lossless"),
-        ScheduledTask.Lyrics => ("Settings → Library", "settings#lyrics"),
+        ScheduledTask.Lyrics => ("Tools → Look for missing lyrics", "tools"),
         ScheduledTask.Bars => ("Settings → Playback", "settings/playback#visualiser"),
         ScheduledTask.RetryFailed => ("Activity → Downloads", "activity/downloads"),
         ScheduledTask.Wishlist => ("Wishlist", "wishlist"),

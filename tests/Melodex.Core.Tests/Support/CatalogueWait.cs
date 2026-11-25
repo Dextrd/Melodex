@@ -7,6 +7,9 @@ public static class CatalogueWait
     /// <summary>Waits for the catalogue update a scan queues after it, so the catalogue is filled in.</summary>
     public static async Task WaitForCatalogueAsync(this MelodexClient api)
     {
+        // A scan doesn't update the catalogue itself, so one is started, as the Scan menu does, unless one's going.
+        if (!(await api.ListTasksAsync(active: true)).Any(t => t.Kind == "catalogue-update"))
+            await api.UpdateCatalogueAsync();
         var deadline = DateTime.UtcNow + TimeSpan.FromMinutes(3);
         while (DateTime.UtcNow < deadline)
         {

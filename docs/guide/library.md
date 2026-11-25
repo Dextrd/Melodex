@@ -108,9 +108,9 @@ scan.
   knows what's out there.
 - **Format the whole library**: see [Formatting](#formatting).
 
-After each scan, Melodex queues a catalogue update of its own, which shows on Activity as a separate task. To update
-the catalogue only when you ask, turn off **Update the catalogue after each scan** under **Settings → Fetching →
-Matching**.
+A scan doesn't update the catalogue itself: **Update the catalogue** is a scheduled task of its own, right after the
+scan in the daily window to start with, and the Scan menu's **Update catalogue** starts one whenever you like. It shows
+on Activity as a separate task.
 
 Scans and other long jobs show on **Activity**, where they can be paused, cancelled or moved in the queue, one by one
 or all at once.

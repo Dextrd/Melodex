@@ -4,28 +4,23 @@
 @inject NavigationManager Nav
 
 @*
-    Settings (#238), in sections: your own account first, as a large button with your initial and name, with your look
-    and API keys, then the rest, each page shown to those who may use it. Down the left, or across the top on narrow
+    Settings (#238): your own account first, as a large button with your initial and name, then the rest in sections,
+    each page shown to those who may use it. Down the left, or across the top on narrow
     screens. Only the page beside them changes as you go between them.
 *@
 <h1 class="settings-title">Settings</h1>
 <div class="settings-page">
     <nav class="settings-nav" aria-label="Settings sections">
-        <div class="settings-group" role="group" aria-labelledby="settings-you">
-            <h2 id="settings-you">Your account</h2>
-            @if (Auth.Status is { Username: { } name } status)
-            {
-                <a href="settings/account" class="settings-account @(OnAccount ? "active" : "")" aria-current="@(OnAccount ? "page" : null)">
-                    <span class="avatar" aria-hidden="true">@Initial(name)</span>
-                    <span class="settings-account-text">
-                        <strong class="ellipsis">@name</strong>
-                        <span class="muted small">@(status.IsAdmin ? "Admin" : "Your account")</span>
-                    </span>
-                </a>
-            }
-            <NavLink href="settings/appearance">Appearance</NavLink>
-            <NavLink href="settings/api">API keys</NavLink>
-        </div>
+        @if (Auth.Status is { Username: { } name } status)
+        {
+            <a href="settings/account" class="settings-account @(OnAccount ? "active" : "")" aria-current="@(OnAccount ? "page" : null)">
+                <span class="avatar" aria-hidden="true">@Initial(name)</span>
+                <span class="settings-account-text">
+                    <strong class="ellipsis">@name</strong>
+                    <span class="muted small">@(status.IsAdmin ? "Admin" : "Your account")</span>
+                </span>
+            </a>
+        }
         @if (Auth.May(UserPermissions.Settings))
         {
             <div class="settings-group" role="group" aria-labelledby="settings-library">
@@ -33,35 +28,35 @@
                 <NavLink href="settings" Match="NavLinkMatch.All">Library</NavLink>
                 <NavLink href="settings/quality">Quality</NavLink>
                 <NavLink href="settings/playback">Playback</NavLink>
-            </div>
-            <div class="settings-group" role="group" aria-labelledby="settings-downloads">
-                <h2 id="settings-downloads">Downloads</h2>
                 <NavLink href="settings/fetching">Fetching</NavLink>
                 <NavLink href="settings/schedule">Scheduled tasks</NavLink>
             </div>
         }
-        @if (Auth.May(UserPermissions.Settings) || Auth.May(UserPermissions.Users) || Auth.May(UserPermissions.Keys))
-        {
-            <div class="settings-group" role="group" aria-labelledby="settings-server">
-                <h2 id="settings-server">Server</h2>
-                @if (Auth.May(UserPermissions.Settings))
-                {
-                    <NavLink href="settings/plugins">Plugins</NavLink>
-                }
-                @if (Auth.May(UserPermissions.Users))
-                {
-                    <NavLink href="settings/users">Users</NavLink>
-                }
-                @if (Auth.May(UserPermissions.Keys))
-                {
-                    <NavLink href="settings/webhooks">Webhooks</NavLink>
-                }
-                @if (Auth.May(UserPermissions.Settings))
-                {
-                    <NavLink href="settings/log">Log</NavLink>
-                }
-            </div>
-        }
+        <div class="settings-group" role="group" aria-labelledby="settings-web-app">
+            <h2 id="settings-web-app">Web app</h2>
+            <NavLink href="settings/appearance">Appearance</NavLink>
+            <NavLink href="settings/notifications">Notifications</NavLink>
+        </div>
+        <div class="settings-group" role="group" aria-labelledby="settings-server">
+            <h2 id="settings-server">Server</h2>
+            @if (Auth.May(UserPermissions.Settings))
+            {
+                <NavLink href="settings/plugins">Plugins</NavLink>
+            }
+            @if (Auth.May(UserPermissions.Users))
+            {
+                <NavLink href="settings/users">Users</NavLink>
+            }
+            <NavLink href="settings/api">API keys</NavLink>
+            @if (Auth.May(UserPermissions.Keys))
+            {
+                <NavLink href="settings/webhooks">Webhooks</NavLink>
+            }
+            @if (Auth.May(UserPermissions.Settings))
+            {
+                <NavLink href="settings/log">Log</NavLink>
+            }
+        </div>
         <div class="settings-group" role="group" aria-labelledby="settings-melodex">
             <h2 id="settings-melodex">Melodex</h2>
             <NavLink href="settings/help">Help</NavLink>
@@ -91,7 +86,7 @@
     {
         "settings/users" or "settings/security" => UserPermissions.Users,
         "settings/webhooks" => UserPermissions.Keys,
-        "settings/account" or "account" or "settings/api" or "settings/appearance" or "settings/about" => null,
+        "settings/account" or "account" or "settings/api" or "settings/appearance" or "settings/notifications" or "settings/about" => null,
         var help when help == "settings/help" || help.StartsWith("settings/help/") => null,
         _ => UserPermissions.Settings,
     };

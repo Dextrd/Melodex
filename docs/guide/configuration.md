@@ -17,20 +17,22 @@ Variables named `Navidex__…`, from before the rename, still work; a `Melodex__
 
 ## In the web app
 
-Settings is in sections, each page shown to whoever may use it. **Your account** comes first, with what's only yours:
-a large button with your initial and name for your account itself (your login, media-server logins and
-[scrobbling](library.md#history)), **Appearance** (see [Appearance](appearance.md)) and **API keys** (see the [client
-guide](../client-guide.md)). Then:
+Settings opens with **your account** at the top, a large button with your initial and name: your login, media-server
+logins, [scrobbling](library.md#history), and signing out. The rest are in sections, each page shown to whoever may
+use it:
 
 | Section | Page | Holds |
 | --- | --- | --- |
 | Library | **Library** | Songs on more than one release, the missing view (each kind of release shown, hidden, or for new songs only), the library format (the folder layout, for new albums and formatting), file metadata, and lyrics |
 | | **Quality** | The [quality profile](requests-and-listening.md#quality) and [upgrades](requests-and-listening.md#upgrades) |
 | | **Playback** | Which songs play [without a gap](requests-and-listening.md#gapless-playback), when [the visualiser](requests-and-listening.md#the-visualiser)'s bars are made, if at all, how much of a [radio](requests-and-listening.md#radio) is songs you don't have, and whether radios carry on when a queue runs out |
-| Downloads | **Fetching** | How many fetches run at once, on the schedule or not, how close a file must be to the song's length, listen now's (how long its songs are kept, and how far ahead they're fetched), and matching |
+| | **Fetching** | How many fetches run at once, on the schedule or not, how close a file must be to the song's length, listen now's (how long its songs are kept, and how far ahead they're fetched), and matching |
 | | **Scheduled tasks** | What runs on its own, and when: see [Scheduled tasks](#scheduled-tasks) |
+| Web app | **Appearance** | Your look: see [Appearance](appearance.md) |
+| | **Notifications** | Which [notifications](appearance.md#notifications) you see |
 | Server | **Plugins** | See [Plugins](plugins.md) |
-| | **Users**, **Webhooks** | See [Users and permissions](users-and-permissions.md) and the [client guide](../client-guide.md) |
+| | **Users** | See [Users and permissions](users-and-permissions.md) |
+| | **API keys**, **Webhooks** | Your keys for apps and players, and calls out to other apps: see the [client guide](../client-guide.md) |
 | | **Log** | Recent activity, and how long logs are kept |
 | Melodex | **Help** | This guide |
 | | **About** | The version, links to GitHub, who made Melodex, and for the admin, resetting it |
@@ -77,8 +79,7 @@ weekly one is Mondays at the same times, for lyrics, failed downloads, wishlists
 
 Below each schedule are when it next runs, and how its last run went, a line for each task, with a link to its task on
 Activity. Every task can still be run straight away from its own place, which says which schedule it's on and links
-here: **Scan** and **Update catalogue** in the Library page's Scan menu, **Look for missing lyrics now** under **Settings →
-General → Lyrics**, **Make missing bars now** under **Settings → Playback**, **Check the rest** of the lossless files and **Look for upgrades now** under **Settings → Quality**, **Retry
+here: **Scan** and **Update catalogue** in the Library page's Scan menu, **Look for missing lyrics** on Tools, **Make missing bars now** under **Settings → Playback**, **Check the rest** of the lossless files and **Look for upgrades now** under **Settings → Quality**, **Retry
 failed** on **Activity → Downloads**, and **Get them all** on the wishlist. Those last two ask for everything at once.
 
 **Sync playlists every** sets how often playlists sync with the media server for changes made there, from 1 minute to

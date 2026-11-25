@@ -98,12 +98,16 @@ What changed in each release of Melodex. Versions follow [semantic versioning](h
 
 ### Changed
 
-- **Settings in sections**: **Your account** comes first, a large button with your initial and name, with your look
-  (**Appearance**) and your **API keys**. The rest are under **Library**, **Downloads**, **Server** and **Melodex**.
-  **General** is gone: its library settings are the **Library** page, with the folder layout as **Library format**;
-  fetching, matching, listen now's settings and how many scheduled fetches go at once have a **Fetching** page; how
-  long logs are kept is on the **Log** page; and resetting Melodex is on **About**. The old `/account` link still opens
-  your account (#238).
+- **Settings in sections**: your account comes first, a large button with your initial and name, with your login and
+  media server logins in sections and **Sign out** at the foot. The rest are under **Library** (with **Fetching** and
+  **Scheduled tasks**), **Web app** (**Appearance**, and **Notifications**, out of Appearance), **Server** (with
+  **API keys**) and **Melodex**. **General** is gone: its library settings are the **Library** page, with the folder
+  layout as **Library format**; fetching, matching, listen now's settings and how many scheduled fetches go at once
+  have a **Fetching** page; how long logs are kept is on the **Log** page; and resetting Melodex is on **About**. The
+  old `/account` link still opens your account (#238).
+- **A scan no longer updates the catalogue after it**, and its setting is gone: **Update the catalogue** runs on its
+  own schedule, after the scan in the daily window to start with, or from the Scan menu (#238).
+- **Look for missing lyrics** is a card on Tools, rather than a button under Settings → Library (#238).
 - **Editing someone under Settings → Users changes what they may do**, alone: their login and media server logins are
   theirs to change, on their own account, and your own card opens yours (#238).
 - **Plugins with nothing to set have no settings button**, and buttons that delete or can't be undone are outlined in

@@ -2,9 +2,10 @@
 @inject AuthState Auth
 
 @*
-    Someone's account in three tabs: their login, what they may do, and their login on each media server that syncs
-    playlists. One Save keeps it all. On Your account it's the page, for yourself; under Settings → Users it's a dialog
-    for adding someone, or for what someone else may do, alone.
+    Someone's account: their login, what they may do, and their login on each media server that syncs playlists. One
+    Save keeps it all. Under Settings → Users it's a dialog, in tabs, for adding someone, or for what someone else may
+    do, alone. On Your account it's the page, for yourself, in sections: your login and media server logins, as what
+    you may do is the admin's to change.
 *@
 @if (_accounts is null)
 {
@@ -12,6 +13,22 @@
 }
 else
 {
+    @if (Self)
+    {
+        <h2>Login</h2>
+        <section class="panel" aria-label="Login">
+            <div class="panel-body">@Body(EditorTab.Login)</div>
+        </section>
+        @if (_accounts.Count > 0)
+        {
+            <h2>Media server accounts</h2>
+            <section class="panel" aria-label="Media server accounts">
+                <div class="panel-body">@Body(EditorTab.Servers)</div>
+            </section>
+        }
+    }
+    else
+    {
     @if (!PermissionsOnly)
     {
     <nav class="page-tabs editor-tabs" role="tablist" aria-label="@(Self ? "Your account" : "User")">
@@ -24,137 +41,16 @@ else
     </nav>
     }
 
-    <div role="tabpanel">
-        @switch (_tab)
-        {
-            case EditorTab.Login:
-                <label class="field">
-                    <span class="field-label">Username</span>
-                    <input type="text" autocomplete="@(Self ? "username" : "off")" @bind="_username" @bind:event="oninput" />
-                </label>
-                <label class="field">
-                    <span class="field-label">@(New ? "Password" : "New password")</span>
-                    <input type="password" autocomplete="new-password" placeholder="@(New ? "" : "Leave empty to keep it")" @bind="_password" @bind:event="oninput" />
-                    <span class="muted small">
-                        At least 8 characters.@(New ? " Tell them it, and they can change it under their account." : Self ? " Changing it signs out your other browsers." : " A new one signs them out everywhere.")
-                    </span>
-                </label>
-                @if (Self)
-                {
-                    <label class="field">
-                        <span class="field-label">Current password</span>
-                        <input type="password" autocomplete="current-password" @bind="_current" @bind:event="oninput" />
-                        <span class="muted small">Needed to change your username or password.</span>
-                    </label>
-                }
-                @if (_loginError is not null) { <p class="error small">@_loginError</p> }
-                break;
+    <div role="tabpanel">@Body(_tab)</div>
+    }
 
-            case EditorTab.Permissions:
-                @if (Admin)
-                {
-                    <p class="muted small">@(Self ? "You're the admin, who may do everything." : "The admin may do everything; that can't change.")</p>
-                }
-                else if (Self)
-                {
-                    <p class="muted small">What you may do. To do more, ask the admin.</p>
-                    @foreach (var permission in UserPermissions.All)
-                    {
-                        <label class="dialog-choice dim">
-                            <input type="checkbox" disabled checked="@_permissions.Contains(permission.Id)" />
-                            <span><strong>@permission.Name</strong><span class="muted small">@permission.Hint</span></span>
-                        </label>
-                    }
-                }
-                else
-                {
-                    @foreach (var permission in UserPermissions.All)
-                    {
-                        var allowed = Auth.May(permission.Id);
-                        <label class="dialog-choice @(allowed ? "" : "dim")" title="@(allowed ? "" : "You can only give permissions you have yourself")">
-                            <input type="checkbox" disabled="@(!allowed)" checked="@_permissions.Contains(permission.Id)" @onchange="e => Toggle(permission.Id, (bool)e.Value!)" />
-                            <span><strong>@permission.Name</strong><span class="muted small">@permission.Hint</span></span>
-                        </label>
-                    }
-                }
-                @if (PermissionsOnly && _loginError is not null) { <p class="error small">@_loginError</p> }
-                break;
-
-            case EditorTab.Servers:
-                <p class="muted small">
-                    @(Self ? "Your login" : "Their login") on each media server that syncs playlists, the one you sign in to it with. Playlists sync with the
-                    one in use; the others' logins are kept for switching to them. Each is checked when you save, and kept encrypted.
-                </p>
-                @foreach (var account in _accounts)
-                {
-                    <div class="server-account">
-                        <div class="row">
-                            <strong>@account.Account.Server</strong>
-                            @if (account.Account.InUse) { <span class="badge owned">In use</span> }
-                        </div>
-                        @if (account.Account.Linked && !account.Changing)
-                        {
-                            <p class="small @(account.Unlink ? "muted" : "")">
-                                @if (account.Unlink)
-                                {
-                                    <span>Unlinked when you save.</span>
-                                }
-                                else
-                                {
-                                    <span>Linked as <strong>@account.Account.Username</strong>@(Self && account.Account.InUse && _sync?.SyncedAt is { } at ? $", last synced {Format.Ago(at)}" : "").</span>
-                                }
-                            </p>
-                            @if (Self && account.Account.InUse && !account.Unlink && _sync?.Error is { } failed)
-                            {
-                                <p class="error small">The last sync failed: @failed</p>
-                            }
-                            <div class="toolbar">
-                                @if (account.Unlink)
-                                {
-                                    <button class="small" @onclick="() => account.Unlink = false">Keep it</button>
-                                }
-                                else
-                                {
-                                    <button class="small" @onclick="() => Change(account)">Change</button>
-                                    <button class="small" @onclick="() => account.Unlink = true">Unlink</button>
-                                    @if (Self && account.Account.InUse)
-                                    {
-                                        <button class="small" disabled="@_busy" @onclick="SyncNowAsync">Sync now</button>
-                                    }
-                                }
-                            </div>
-                        }
-                        else
-                        {
-                            <label class="field">
-                                <span class="field-label">@account.Account.Server username</span>
-                                <input type="text" autocomplete="off" @bind="account.Username" @bind:event="oninput" />
-                            </label>
-                            <label class="field">
-                                <span class="field-label">@account.Account.Server password</span>
-                                <input type="password" autocomplete="off" @bind="account.Password" @bind:event="oninput" />
-                            </label>
-                            @if (account.Changing)
-                            {
-                                <button class="small" @onclick="() => KeepLinked(account)">Keep the linked login</button>
-                            }
-                        }
-                        @if (account.Error is not null) { <p class="error small">@account.Error</p> }
-                    </div>
-                }
-                break;
-        }
-    </div>
-
-    <div class="toolbar @(Self ? "" : "dialog-buttons")">
+    <div class="toolbar @(Self ? "account-save" : "dialog-buttons")">
         @if (Self)
         {
             <button class="primary" disabled="@(_busy || string.IsNullOrWhiteSpace(_username))" @onclick="SaveAsync">
                 @if (_busy) { <span class="spinner"></span> }Save
             </button>
             @if (_saved) { <span class="muted small">Saved.</span> }
-            <span class="spacer"></span>
-            <button @onclick="SignOutAsync">Sign out</button>
         }
         else
         {
@@ -233,6 +129,130 @@ else
     private RenderFragment Tab(EditorTab tab, string label, bool problem) =>
         @<button type="button" role="tab" class="@(_tab == tab ? "active" : null) @(problem ? "tab-problem" : null)" aria-selected="@(_tab == tab ? "true" : "false")"
                  @onclick="() => _tab = tab">@label</button>;
+
+    // A tab's body, or on your own account, a section's.
+    private RenderFragment Body(EditorTab tab) => __builder =>
+    {
+        switch (tab)
+        {
+            case EditorTab.Login:
+                <label class="field">
+                    <span class="field-label">Username</span>
+                    <input type="text" autocomplete="@(Self ? "username" : "off")" @bind="_username" @bind:event="oninput" />
+                </label>
+                <label class="field">
+                    <span class="field-label">@(New ? "Password" : "New password")</span>
+                    <input type="password" autocomplete="new-password" placeholder="@(New ? "" : "Leave empty to keep it")" @bind="_password" @bind:event="oninput" />
+                    <span class="muted small">
+                        At least 8 characters.@(New ? " Tell them it, and they can change it under their account." : Self ? " Changing it signs out your other browsers." : " A new one signs them out everywhere.")
+                    </span>
+                </label>
+                @if (Self)
+                {
+                    <label class="field">
+                        <span class="field-label">Current password</span>
+                        <input type="password" autocomplete="current-password" @bind="_current" @bind:event="oninput" />
+                        <span class="muted small">Needed to change your username or password.</span>
+                    </label>
+                }
+                @if (_loginError is not null) { <p class="error small">@_loginError</p> }
+                break;
+
+            case EditorTab.Permissions:
+                @if (Admin)
+                {
+                    <p class="muted small">@(Self ? "You're the admin, who may do everything." : "The admin may do everything; that can't change.")</p>
+                }
+                else if (Self)
+                {
+                    <p class="muted small">What you may do. To do more, ask the admin.</p>
+                    @foreach (var permission in UserPermissions.All)
+                    {
+                        <label class="dialog-choice dim">
+                            <input type="checkbox" disabled checked="@_permissions.Contains(permission.Id)" />
+                            <span><strong>@permission.Name</strong><span class="muted small">@permission.Hint</span></span>
+                        </label>
+                    }
+                }
+                else
+                {
+                    @foreach (var permission in UserPermissions.All)
+                    {
+                        var allowed = Auth.May(permission.Id);
+                        <label class="dialog-choice @(allowed ? "" : "dim")" title="@(allowed ? "" : "You can only give permissions you have yourself")">
+                            <input type="checkbox" disabled="@(!allowed)" checked="@_permissions.Contains(permission.Id)" @onchange="e => Toggle(permission.Id, (bool)e.Value!)" />
+                            <span><strong>@permission.Name</strong><span class="muted small">@permission.Hint</span></span>
+                        </label>
+                    }
+                }
+                @if (PermissionsOnly && _loginError is not null) { <p class="error small">@_loginError</p> }
+                break;
+
+            case EditorTab.Servers:
+                <p class="muted small">
+                    @(Self ? "Your login" : "Their login") on each media server that syncs playlists, the one you sign in to it with. Playlists sync with the
+                    one in use; the others' logins are kept for switching to them. Each is checked when you save, and kept encrypted.
+                </p>
+                @foreach (var account in _accounts!)
+                {
+                    <div class="server-account">
+                        <div class="row">
+                            <strong>@account.Account.Server</strong>
+                            @if (account.Account.InUse) { <span class="badge owned">In use</span> }
+                        </div>
+                        @if (account.Account.Linked && !account.Changing)
+                        {
+                            <p class="small @(account.Unlink ? "muted" : "")">
+                                @if (account.Unlink)
+                                {
+                                    <span>Unlinked when you save.</span>
+                                }
+                                else
+                                {
+                                    <span>Linked as <strong>@account.Account.Username</strong>@(Self && account.Account.InUse && _sync?.SyncedAt is { } at ? $", last synced {Format.Ago(at)}" : "").</span>
+                                }
+                            </p>
+                            @if (Self && account.Account.InUse && !account.Unlink && _sync?.Error is { } failed)
+                            {
+                                <p class="error small">The last sync failed: @failed</p>
+                            }
+                            <div class="toolbar">
+                                @if (account.Unlink)
+                                {
+                                    <button class="small" @onclick="() => account.Unlink = false">Keep it</button>
+                                }
+                                else
+                                {
+                                    <button class="small" @onclick="() => Change(account)">Change</button>
+                                    <button class="small" @onclick="() => account.Unlink = true">Unlink</button>
+                                    @if (Self && account.Account.InUse)
+                                    {
+                                        <button class="small" disabled="@_busy" @onclick="SyncNowAsync">Sync now</button>
+                                    }
+                                }
+                            </div>
+                        }
+                        else
+                        {
+                            <label class="field">
+                                <span class="field-label">@account.Account.Server username</span>
+                                <input type="text" autocomplete="off" @bind="account.Username" @bind:event="oninput" />
+                            </label>
+                            <label class="field">
+                                <span class="field-label">@account.Account.Server password</span>
+                                <input type="password" autocomplete="off" @bind="account.Password" @bind:event="oninput" />
+                            </label>
+                            @if (account.Changing)
+                            {
+                                <button class="small" @onclick="() => KeepLinked(account)">Keep the linked login</button>
+                            }
+                        }
+                        @if (account.Error is not null) { <p class="error small">@account.Error</p> }
+                    </div>
+                }
+                break;
+        }
+    };
 
     private static void KeepLinked(ServerLogin account)
     {
@@ -376,11 +396,5 @@ else
                 inUse.Error = e.Message;
         }
         _busy = false;
-    }
-
-    private async Task SignOutAsync()
-    {
-        await Api.SignOutAsync();
-        Auth.Set(await Api.GetAuthStatusAsync());
     }
 }

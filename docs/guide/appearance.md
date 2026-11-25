@@ -1,6 +1,6 @@
 # Appearance
 
-Choose how Melodex looks under **Settings → Your account → Appearance**. It's kept with your account, so it follows you to every
+Choose how Melodex looks under **Settings → Web app → Appearance**. It's kept with your account, so it follows you to every
 device you sign in on, and everyone chooses their own.
 
 - **Colour**: pink (Melodex's own), green, blue, grey, purple or amber.
@@ -33,7 +33,7 @@ turned off.
 Each shows the cover of what it's about, or an icon for the kind of thing it is. Each closes itself after a few seconds
 (not while the pointer is over them), opens what it's about when you click it, and its **×** dismisses it at once. Past
 a few, the oldest are grouped into one line. Work that runs on its own, such as finding lyrics after a scan, doesn't pop
-up. Turn each kind on or off under **Settings → Your account → Appearance → Notifications**; like the rest of your look, it's kept with
+up. Turn each kind on or off under **Settings → Web app → Notifications**; like the rest of your look, it's kept with
 your account.
 
 Next: [Plugins](plugins.md).

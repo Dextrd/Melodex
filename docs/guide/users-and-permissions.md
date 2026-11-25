@@ -10,14 +10,15 @@ Each user's card lists what they may do; click the list to see all of it. Its se
 do; the admin may do everything, so theirs has none. On your own card it opens your account.
 
 Everyone changes their own account under **Your account**, at the top of Settings or in the account menu at the top
-right, in three tabs, saved together:
+right, saved together:
 
 - **Login**: their username and password. Changing either needs their current password, and a new password signs
   them out everywhere else.
-- **Permissions**: what they may do, to read.
 - **Media server accounts**, when a media server that's set up syncs playlists: their login on each, to sync their
   playlists. The one in use is marked; the others' logins are kept for switching to them. Each login is checked with
-  its server when they save, and a tab with something to fix is marked.
+  its server when they save.
+
+**Sign out**, at the foot of the page, signs them out in that browser.
 
 ## What each permission allows
 
@@ -38,7 +39,7 @@ Someone who just listens needs Browse and Listen. Buttons for what someone may n
 
 ## API keys
 
-Apps use a key from **Settings → Your account → API keys**. Anyone signed in can make keys there, as many as they like, but each can do only
+Apps use a key from **Settings → Server → API keys**. Anyone signed in can make keys there, as many as they like, but each can do only
 what its maker may. A key belongs to whoever made it and can never do more than they may: if their
 permissions shrink, or they're removed, so does the key. **Everything you may do** gives a key all its owner's
 permissions, now and later. See the [client guide](../client-guide.md) for the API itself.

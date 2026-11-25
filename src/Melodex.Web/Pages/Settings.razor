@@ -1,7 +1,6 @@
 @page "/settings"
 @layout SettingsLayout
 @inject MelodexClient Api
-@inject TaskNotices Tasks
 
 <PageTitle>Library settings · Melodex</PageTitle>
 
@@ -97,12 +96,8 @@ else
                 <span class="muted small">For songs without them. A song no source has lyrics for is asked about again after a month. Each song's page can look for them any time.</span>
             </span>
         </label>
-        <div class="setting-line">
-            <ScheduleNote Task="ScheduledTask.Lyrics" />
-            <span class="spacer"></span>
-            <button disabled="@_findingLyrics" @onclick="FindLyricsAsync">@if (_findingLyrics) { <span class="spinner"></span> }Look for missing lyrics now</button>
-        </div>
-        @if (_lyricsError is not null) { <div class="error small">@_lyricsError</div> }
+        <ScheduleNote Task="ScheduledTask.Lyrics" />
+        <div class="muted small">To look for missing lyrics now, use <a href="tools">Tools → Look for missing lyrics</a>.</div>
         <div class="muted small">Where lyrics go:</div>
         @foreach (var (storage, name, hint) in LyricsStorages)
         {
@@ -125,24 +120,6 @@ else
 }
 
 @code {
-    private bool _findingLyrics;
-    private string? _lyricsError;
-
-    private async Task FindLyricsAsync()
-    {
-        _findingLyrics = true;
-        _lyricsError = null;
-        try
-        {
-            Tasks.Started(await Api.FindLyricsAsync());
-        }
-        catch (Exception e) when (e is HttpRequestException or MelodexApiException)
-        {
-            _lyricsError = e.Message;
-        }
-        _findingLyrics = false;
-    }
-
     private static readonly (LyricsStorage Storage, string Name, string Hint)[] LyricsStorages =
     [
         (LyricsStorage.Sidecar, "Beside each song", "An .lrc file with the song's name. Navidrome and most players read these, and the music files themselves aren't changed."),

@@ -18,7 +18,7 @@ with them, and everything in it can be changed later under **Settings**. Until t
    Commons and Deezer pictures, and LRCLIB lyrics. Remove any you don't want, or add others: see [Plugins](plugins.md).
 4. **Apps and webhooks.** API keys for other apps, and webhooks to tell them when things happen. Most people can skip
    this.
-5. **Look.** How Melodex looks for everyone. Each person can choose their own later, under **Settings → Your account → Appearance**.
+5. **Look.** How Melodex looks for everyone. Each person can choose their own later, under **Settings → Web app → Appearance**.
 6. **The first scan.** Melodex reads every file and matches it against the catalogue.
 
 ## The first scan

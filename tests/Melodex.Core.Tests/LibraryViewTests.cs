@@ -81,31 +81,30 @@ public sealed class LibraryViewTests : IDisposable
     }
 
     [TestLibraryFact]
-    public async Task A_scan_queues_the_catalogue_update_as_its_own_task_unless_the_settings_say_not_to()
+    public async Task A_scan_leaves_the_catalogue_to_be_updated_as_its_own_task()
     {
-        await ScanAsync();
-        var update = Assert.Single(await _api.ListTasksAsync(), t => t.Kind == "catalogue-update");
-        Assert.Equal("Catalogue update", update.Title);
-        Assert.Equal(TaskState.Succeeded, update.State);
-        Assert.EndsWith("artists updated", update.Progress);
-        var scan = Assert.Single(await _api.ListTasksAsync(), t => t.Kind == "library-scan");
-        Assert.DoesNotContain("catalogue", scan.Progress, StringComparison.OrdinalIgnoreCase);
-
-        // Turned off, a scan leaves the catalogue alone, and the Scan menu updates it when asked.
+        // Scanned on its own, the catalogue isn't touched; the Scan menu, or its schedule, updates it.
         using (var scope = _factory.Services.CreateScope())
-            await scope.ServiceProvider.GetRequiredService<Melodex.Core.Library.SettingsService>()
-                .SaveLibraryAsync(new LibrarySettings { FetchLyrics = false, UpdateCatalogueAfterScan = false }, default);
-        var again = await _api.ScanLibraryAsync();
-        while (again.Active)
+            await scope.ServiceProvider.GetRequiredService<Melodex.Core.Library.SettingsService>().SaveLibraryAsync(new LibrarySettings { FetchLyrics = false }, default);
+        var scan = await _api.ScanLibraryAsync();
+        while (scan.Active)
         {
             await Task.Delay(100);
-            again = (await _api.GetTaskAsync(again.Id))!;
+            scan = (await _api.GetTaskAsync(scan.Id))!;
         }
-        Assert.Single(await _api.ListTasksAsync(), t => t.Kind == "catalogue-update");
-        var asked = await _api.UpdateCatalogueAsync();
-        Assert.Equal("Catalogue update", asked.Title);
-        await _api.WaitForCatalogueAsync();
-        Assert.Equal(2, (await _api.ListTasksAsync()).Count(t => t.Kind == "catalogue-update" && t.State == TaskState.Succeeded));
+        Assert.Equal(TaskState.Succeeded, scan.State);
+        Assert.DoesNotContain("catalogue", scan.Progress, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(await _api.ListTasksAsync(), t => t.Kind == "catalogue-update");
+
+        var update = await _api.UpdateCatalogueAsync();
+        Assert.Equal("Catalogue update", update.Title);
+        while (update.Active)
+        {
+            await Task.Delay(100);
+            update = (await _api.GetTaskAsync(update.Id))!;
+        }
+        Assert.Equal(TaskState.Succeeded, update.State);
+        Assert.EndsWith("artists updated", update.Progress);
     }
 
     [TestLibraryFact]

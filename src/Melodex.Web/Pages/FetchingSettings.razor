@@ -93,13 +93,10 @@ else
             @(_library.AttemptsWhenBusy == 1 ? "time" : "times") before leaving it for next time
         </div>
         <div class="muted small">A busy album goes to the back of the queue, so MusicBrainz gets time to recover before it's tried again.</div>
-        <label class="dialog-choice">
-            <input type="checkbox" checked="@_library.UpdateCatalogueAfterScan" @onchange="e => SetLibrary(_library with { UpdateCatalogueAfterScan = (bool)e.Value! })" />
-            <span>
-                <strong>Update the catalogue after each scan</strong>
-                <span class="muted small">Looks up your artists' discographies and their albums' editions, as its own task, so the missing view stays current. The Scan menu's <em>Update catalogue</em> starts one any time.</span>
-            </span>
-        </label>
+        <div class="muted small">
+            The catalogue, your artists' discographies and their albums' editions, is updated on its own schedule, or by the Scan menu's
+            <em>Update catalogue</em> whenever you like; a scan leaves it alone.
+        </div>
         <ScheduleNote Task="ScheduledTask.Scan" />
         <ScheduleNote Task="ScheduledTask.CatalogueUpdate" />
     </div>

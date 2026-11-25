@@ -30,7 +30,7 @@ guide covers what the reference can't: how the pieces fit together.
 
 ## Getting a key
 
-Apps authenticate with an API key. Someone with the API keys permission makes one under **Settings → Your account → API keys**,
+Apps authenticate with an API key. Someone with the API keys permission makes one under **Settings → Server → API keys**,
 choosing what it may do, and gives it to your app. A key belongs to whoever made it and can never do more than they
 may: if their permissions shrink, or they're removed, so does the key. Send it on every call in the `X-Api-Key` header:
 

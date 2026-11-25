@@ -212,7 +212,8 @@ main { max-width: 1100px; margin: 0 auto; padding: 1.25rem 1rem 3rem; }
         position: sticky; top: 0; z-index: 6; background: var(--bg);
         margin: -1.25rem 0 0; padding: 1.25rem 0 .75rem; height: 2rem; line-height: 2rem; box-sizing: content-box;
     }
-    .settings-nav { top: 4.25rem; }
+    /* Stuck exactly where it sits at the top of the page, below the title, so going between pages doesn't move it. */
+    .settings-nav { top: 4rem; }
 }
 
 /*
@@ -1391,8 +1392,8 @@ svg.flip { transform: scaleY(-1); }
 .settings-nav a { padding: .45rem .75rem; border-radius: 6px; color: var(--muted); text-decoration: none; }
 .settings-nav a:hover { background: var(--surface); color: var(--text); }
 .settings-nav a.active { background: var(--surface); color: var(--text); font-weight: 600; box-shadow: inset 3px 0 0 var(--accent); }
-/* In titled groups, your account first, with a large button with your initial and name (#238). */
-.settings-nav a.settings-account { display: flex; align-items: center; gap: .65rem; padding: .6rem .7rem; margin-bottom: .2rem; color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: 10px; }
+/* Your account first, as a large button with your initial and name (#238); the rest in titled groups. */
+.settings-nav a.settings-account { display: flex; align-items: center; gap: .65rem; padding: .6rem .7rem; margin-bottom: 1.4rem; color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: 10px; }
 .settings-nav a.settings-account:hover { border-color: var(--accent); }
 .settings-nav a.settings-account.active { border-color: var(--accent); box-shadow: none; }
 .settings-account .avatar { flex: none; width: 2.6rem; height: 2.6rem; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; background: var(--accent); color: var(--accent-text); font-size: 1.15rem; }
@@ -1403,6 +1404,9 @@ svg.flip { transform: scaleY(-1); }
 .log-retention { margin-bottom: 1rem; }
 .log-retention > summary { cursor: pointer; color: var(--muted); margin-bottom: .5rem; }
 .settings-body > :first-child { margin-top: 0; }
+/* At least as tall as the list beside it, so a page that's loading doesn't leave it nothing to stick to. */
+.settings-body { min-height: 100%; }
+.settings-page { min-height: calc(100dvh - 12rem); }
 @media (max-width: 720px) {
     .settings-page { grid-template-columns: minmax(0, 1fr); gap: .75rem; }
     /* Every page in sight, on as many lines as it takes, without the groups' titles. */

@@ -2,21 +2,18 @@
 @page "/account"
 @layout SettingsLayout
 @inject AuthState Auth
+@inject MelodexClient Api
 
 <PageTitle>Your account · Melodex</PageTitle>
 
-@* Your own login, what you may do, and your login on each media server: the page version of editing a user. Below
-   it, the ListenBrainz and Last.fm accounts your plays are sent to. It heads Settings, with your look and API keys. *@
+@* Your own login and your login on each media server, then the ListenBrainz and Last.fm accounts your plays are sent
+   to, and signing out at the foot. It heads Settings. *@
 @if (Auth.Status is { } status)
 {
     <p class="muted">
         Signed in as <strong>@status.Username</strong>@(status.IsAdmin ? ", the admin, who may do everything." : ".")
     </p>
-    <section class="panel" aria-label="Your account">
-        <div class="panel-body">
-            <UserEditor Self="true" />
-        </div>
-    </section>
+    <UserEditor Self="true" />
     @if (Auth.May(UserPermissions.Listen))
     {
         <h2 id="scrobbling">Scrobbling</h2>
@@ -29,5 +26,22 @@
                 <ScrobbleLinks />
             </div>
         </section>
+    }
+
+    <h2>Sign out</h2>
+    <div class="card settings-card">
+        <div class="setting-line">
+            <span>Sign out of Melodex in this browser.</span>
+            <span class="spacer"></span>
+            <button class="danger" @onclick="SignOutAsync">Sign out</button>
+        </div>
+    </div>
+}
+
+@code {
+    private async Task SignOutAsync()
+    {
+        await Api.SignOutAsync();
+        Auth.Set(await Api.GetAuthStatusAsync());
     }
 }
