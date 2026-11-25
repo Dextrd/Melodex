@@ -301,7 +301,7 @@
             var asked = await Tracker.CreateAsync(new CreateRequest(Get!.Value.Kind, Get.Value.Id, EditionId));
             // Another says when it's finished.
             Say(new Notice($"asked:{asked.Id}", NoticeKind.Download, asked.Title, "Asked for: follow it in Activity",
-                $"activity/downloads?open={asked.Id}", "get", asked.Target?.CoverUrl ?? Cover));
+                $"activity/fetches?open={asked.Id}", "get", asked.Target?.CoverUrl ?? Cover));
         }
         catch (Exception e) when (e is HttpRequestException or MelodexApiException)
         {
@@ -331,13 +331,13 @@
                 // To the one already going, for a song.
                 var going = one ? Tracker.Requests.FirstOrDefault(r => r.Upgrade && r.Active && r.TargetId == scope.Id) : null;
                 Say(new Notice(key, NoticeKind.Action, "Better copies are being looked for already", "Follow them in Activity",
-                    going is not null ? $"activity/downloads?open={going.Id}" : "activity/downloads", "upgrade", Cover), always: true);
+                    going is not null ? $"activity/fetches?open={going.Id}" : "activity/fetches", "upgrade", Cover), always: true);
             }
             else
             {
                 // Another says when they're finished.
                 Say(new Notice(key, NoticeKind.Action, one ? "Looking for a better copy" : $"Looking for better copies of {Format.Count(found.Queued, "song", "songs")}",
-                    "Follow it in Activity", asked.Count > 0 ? $"activity/downloads?open={asked[0].Id}" : "activity/downloads", "upgrade", Cover));
+                    "Follow it in Activity", asked.Count > 0 ? $"activity/fetches?open={asked[0].Id}" : "activity/fetches", "upgrade", Cover));
             }
         }
         catch (Exception e) when (e is HttpRequestException or MelodexApiException)

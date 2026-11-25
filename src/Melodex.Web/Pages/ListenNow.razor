@@ -11,7 +11,7 @@
 @*
     The songs fetched to listen to that are still here: a tab of the Library, to play them, add them to it, or delete
     them. Grouped by album, an album's songs in its order. Each song shows once, however many times it was fetched; what
-    was fetched, and what couldn't be, is under Activity → Downloads.
+    was fetched, and what couldn't be, is under Activity → Fetches.
 *@
 <h1>Library</h1>
 <LibraryTabs Current="listen-now" />
@@ -36,7 +36,7 @@ else if (Shown.Count == 0)
 {
     <div class="empty card">
         @if (_filter.Length > 0) { <span>Nothing matches.</span> }
-        else { <span>Nothing to play right now. Use the listen buttons on album and search pages; what's being fetched is under <a href="activity/downloads">Activity → Downloads</a>.</span> }
+        else { <span>Nothing to play right now. Use the listen buttons on album and search pages; what's being fetched is under <a href="activity/fetches">Activity → Fetches</a>.</span> }
     </div>
 }
 else

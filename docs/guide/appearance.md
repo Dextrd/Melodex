@@ -22,7 +22,7 @@ or leaves you something to review.
 
 - **Long tasks**: a scan, a catalogue update, an import or formatting says how it went when it finishes. A scan that
   leaves files to review says how many, and opens **Review**.
-- **Downloads**: one when you ask for something, and one when it's in your library, waiting for review, or failed.
+- **Fetches**: one when you ask for something, and one when it's in your library, waiting for review, or failed.
   Asking for many songs at once gives one notification for them all.
 - **Upgrades and the rest of a menu**: one when you look for a better copy, add something to your wishlist or take it
   off, and one when the better copies are in or none better was found.

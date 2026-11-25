@@ -205,7 +205,7 @@ else
                     <span>
                         Looking now@(run.ByHand ? "" : ", on the schedule"): @Format.Count(run.Asked, "song", "songs") asked for so far, @run.Going going
                         @(run.Until is { } until ? $", until {until.ToLocalTime():HH:mm}" : "").
-                        <a href="activity/downloads">Follow it in Activity</a>.
+                        <a href="activity/fetches">Follow it in Activity</a>.
                     </span>
                 }
                 else

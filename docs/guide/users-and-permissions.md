@@ -7,7 +7,7 @@ need: adding someone gives them a username and password to start with. Nobody ca
 Removing someone signs them out and revokes their API keys; what they asked for stays.
 
 Each user's card lists what they may do; click the list to see all of it. Its settings button changes what they may
-do; the admin may do everything, so theirs has none. On your own card it opens your account.
+do, and can set them a new password if they've forgotten theirs; the admin's card has none. On your own card it opens your account.
 
 Everyone changes their own account under **Your account**, at the top of Settings or in the account menu at the top
 right, saved together:

@@ -50,7 +50,7 @@ ticking it on one takes it off another; one on none only runs when you start it.
 - **Make the visualiser's bars**: for songs without them. Only while **Settings → Playback** keeps bars beside songs:
   made as songs play, or with the visualiser off, it's greyed out, saying why, and one ticked already is left out of
   runs until they're kept beside songs again.
-- **Retry failed downloads**: ask again for downloads that failed. Any not started when the window closes go back to
+- **Retry failed fetches**: ask again for fetches that failed. Any not started when the window closes go back to
   failed, for the next window.
 - **Get what's on wishlists**: ask for what's on everyone's wishlist, each in the name of whoever wished for it, when a
   retriever is on to fetch it. Any not started when the window closes are cancelled, and stay on the wishlist.
@@ -80,7 +80,7 @@ weekly one is Mondays at the same times, for lyrics, failed downloads, wishlists
 Below each schedule are when it next runs, and how its last run went, a line for each task, with a link to its task on
 Activity. Every task can still be run straight away from its own place, which says which schedule it's on and links
 here: **Scan** and **Update catalogue** in the Library page's Scan menu, **Look for missing lyrics** on Tools, **Make missing bars now** under **Settings → Playback**, **Check the rest** of the lossless files and **Look for upgrades now** under **Settings → Quality**, **Retry
-failed** on **Activity → Downloads**, and **Get them all** on the wishlist. Those last two ask for everything at once.
+failed** on **Activity → Fetches**, and **Get them all** on the wishlist. Those last two ask for everything at once.
 
 **Sync playlists every** sets how often playlists sync with the media server for changes made there, from 1 minute to
 a day (10 minutes to start with).

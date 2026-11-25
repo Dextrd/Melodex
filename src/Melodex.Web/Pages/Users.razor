@@ -82,7 +82,7 @@ else
 
 @if (_editing is { } editing)
 {
-    <Dialog Title="@(editing.User is null ? "Add user" : $"What {editing.User.Username} may do")" OnClose="() => _editing = null" Class="wide">
+    <Dialog Title="@(editing.User is null ? "Add user" : $"Edit {editing.User.Username}")" OnClose="() => _editing = null" Class="wide">
         <UserEditor User="editing.User" PermissionsOnly="editing.User is not null" OnSaved="SavedAsync" OnCancel="() => _editing = null" />
     </Dialog>
 }

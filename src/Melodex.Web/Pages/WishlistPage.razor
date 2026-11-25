@@ -102,7 +102,7 @@ else
             var asked = (await Api.GetWishlistItemsAsync()).Asked;
             Notices.Show(new Notice($"wishlist:{Guid.NewGuid()}", NoticeKind.Action, "Your wishlist",
                 asked == 0 ? "Everything on it is being fetched already" : $"Asked for {Format.Count(asked, "song or album", "songs and albums")}",
-                "activity/downloads", "get"), always: true);
+                "activity/fetches", "get"), always: true);
         }
         catch (Exception e) when (e is HttpRequestException or MelodexApiException)
         {

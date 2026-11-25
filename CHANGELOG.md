@@ -79,7 +79,7 @@ What changed in each release of Melodex. Versions follow [semantic versioning](h
   visualiser's bars daily from 01:00 to 06:00, and do the rest weekly on Mondays (#112).
 - Every scheduled task can still be run straight away where it lives, which says which schedule it's on: **Look for
   missing lyrics now** under **Settings → General**, **Make missing bars now** under **Settings → Playback**, **Retry
-  failed** on **Activity → Downloads** and **Get them all** on the wishlist are new (#112).
+  failed** on **Activity → Fetches** and **Get them all** on the wishlist are new (#112).
 - How often playlists sync for changes made in the media server can be set, under **Settings → Scheduled tasks** (#112).
 - Each song's spectrum, which the visualiser's bars are drawn from, is a documented part of the API for any app to
   use, at `/spectrum` beside a song's stream: each band's level unsmoothed, from 40 Hz to 16 kHz over a wider range of
@@ -108,10 +108,13 @@ What changed in each release of Melodex. Versions follow [semantic versioning](h
 - **A scan no longer updates the catalogue after it**, and its setting is gone: **Update the catalogue** runs on its
   own schedule, after the scan in the daily window to start with, or from the Scan menu (#238).
 - **Look for missing lyrics** is a card on Tools, rather than a button under Settings → Library (#238).
+- **Activity's Downloads tab is Fetches**, as Melodex calls them everywhere else; old links to it still work, and the
+  scheduled task is **Retry failed fetches** (#238).
 - **API keys** shows **Your keys**, and for the admin, **Other people's keys** in a section of its own, any of which
   they can revoke (#238).
-- **Editing someone under Settings → Users changes what they may do**, alone: their login and media server logins are
-  theirs to change, on their own account, and your own card opens yours (#238).
+- **Editing someone under Settings → Users changes what they may do**, and can set a new password for someone who's
+  forgotten theirs: the rest of their login, and their media server logins, are theirs to change, on their own account.
+  Your own card opens yours (#238).
 - **Plugins with nothing to set have no settings button**, and buttons that delete or can't be undone are outlined in
   red (#238).
 - **Retrieval plugins have repositories of their own**, `dextrd/melodex-retriever-<name>`, each with its own releases

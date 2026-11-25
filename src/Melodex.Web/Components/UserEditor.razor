@@ -65,7 +65,10 @@ else
     /// <summary>Your own account, on Your account. Otherwise someone else's, or a new user's when <see cref="User"/> is null.</summary>
     [Parameter] public bool Self { get; set; }
 
-    /// <summary>Only what someone else may do: their login and media server logins are theirs, on their own account.</summary>
+    /// <summary>
+    /// Only what someone else may do, and a new password for them if they've forgotten theirs: the rest of their login,
+    /// and their media server logins, are theirs, on their own account.
+    /// </summary>
     [Parameter] public bool PermissionsOnly { get; set; }
 
     /// <summary>The user being changed; null to add one.</summary>
@@ -157,6 +160,16 @@ else
                 break;
 
             case EditorTab.Permissions:
+                @if (PermissionsOnly)
+                {
+                    @* For someone who's forgotten theirs: their login is otherwise theirs to change. *@
+                    <label class="field">
+                        <span class="field-label">New password</span>
+                        <input type="password" autocomplete="new-password" placeholder="Leave empty to keep it" @bind="_password" @bind:event="oninput" />
+                        <span class="muted small">For someone who's forgotten theirs. At least 8 characters; it signs them out everywhere.</span>
+                    </label>
+                    <div class="field-label">What they may do</div>
+                }
                 @if (Admin)
                 {
                     <p class="muted small">@(Self ? "You're the admin, who may do everything." : "The admin may do everything; that can't change.")</p>

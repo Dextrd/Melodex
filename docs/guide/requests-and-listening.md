@@ -19,7 +19,7 @@ a copy was turned away only for its quality, **Keep it anyway**, as it is.
 Requests run one at a time, in order. Move them up and down the queue, pause them or cancel them from Activity, one by
 one or with **Pause all** and **Cancel all** (with a filter, **Pause these** and **Cancel these** act on what's shown).
 
-Activity's **Recent** view, on both **Downloads** and **Tasks**, is in three sections: **Running**, **Queued** (the next
+Activity's **Recent** view, on both **Fetches** and **Tasks**, is in three sections: **Running**, **Queued** (the next
 to run at the top) and **Completed** (the most recently finished at the top). Click a section's heading to close or
 open it; each tab remembers. As something starts or finishes it slides from one section into the next.
 
@@ -88,7 +88,7 @@ cutoff is met.
   looked for longest ago go first, and the worst of those. It's on from the start, and can be unticked. Upgrades go
   after anything you ask for.
 - **Look for upgrades now** starts a look the same way, whatever the time: it stops when everything's been tried, or
-  with the window if it starts in one. While a look is going, **Settings → Quality** and **Activity → Downloads** say
+  with the window if it starts in one. While a look is going, **Settings → Quality** and **Activity → Fetches** say
   so, with **Stop looking**, which cancels the upgrades it asked for that haven't started.
 - **Only a copy that reaches the cutoff is kept.** Sources are only asked for copies that may be better than what you
   have and reach the cutoff, so a source that can only get lossy copies, such as yt-dlp, is passed over when the cutoff
@@ -135,7 +135,7 @@ fetch** in the queue, and are fetched as the queue comes near them. Change how m
 
 **Library → Listen now** has the songs fetched to listen to that are still here, each once, grouped by album: play
 them, or add them to your library or delete them now from their ⋯ menus. Every fetch, and any that couldn't be found,
-is under **Activity → Downloads**.
+is under **Activity → Fetches**.
 
 ## Wishlist
 
