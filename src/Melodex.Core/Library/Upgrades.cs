@@ -303,7 +303,7 @@ public sealed class Upgrades(
             var better = h.LibraryFileId is { } id ? now.GetValueOrDefault(id) : null;
             // The better copy's cover, which is the old one's: it took its tags and art.
             return new HeldFileInfo(h.Id, h.TrackId, h.Title, h.Path, h.ReplacedBy, h.Quality, better?.Quality, h.HeldAt, h.DeleteAt,
-                better is null ? null : LocalMusic.CoverUrl(better.Id), (better?.Duration ?? h.Duration)?.TotalSeconds);
+                better is null ? null : LocalMusic.CoverUrl(better.Id), (better?.Duration ?? h.Duration)?.TotalSeconds, better?.Id);
         }).ToList();
     }
 
@@ -476,11 +476,17 @@ public sealed class Upgrades(
             logger.LogInformation("Deleted {Count} files upgrades replaced, held long enough", due.Count);
     }
 
-    private void DeleteHeld(HeldFile held)
+    /// <summary>Where a held file is, or null when it isn't in the staging folder where it should be.</summary>
+    public string? HeldFullPath(HeldFile held)
     {
         var staging = Path.GetFullPath(options.Value.StagingPath);
         var full = Path.GetFullPath(Path.Combine(staging, held.HeldPath));
-        if (!full.StartsWith(staging + Path.DirectorySeparatorChar))
+        return held.HeldPath != "" && full.StartsWith(staging + Path.DirectorySeparatorChar) ? full : null;
+    }
+
+    private void DeleteHeld(HeldFile held)
+    {
+        if (HeldFullPath(held) is not { } full)
             return;
         try
         {

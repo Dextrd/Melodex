@@ -20,6 +20,9 @@ public sealed class PlayerEntry
     /// <summary>A file of your own that no catalogue knows: it's played as the file, and its album is a local one.</summary>
     public Guid? FileId { get; init; }
 
+    /// <summary>A file an upgrade replaced, played from where it's held to compare it with the better copy (#239). Not kept in listening history.</summary>
+    public Guid? HeldId { get; init; }
+
     /// <summary>The listen-now track, for a track you don't have.</summary>
     public Guid? ListenId { get; set; }
 
@@ -910,7 +913,8 @@ public sealed class Player : IAsyncDisposable
     private async Task WarmNextAsync()
     {
         var next = Repeat == RepeatMode.One ? -1 : Current + 1 < _queue.Count ? Current + 1 : Repeat == RepeatMode.All ? 0 : -1;
-        if (next < 0 || next == Current || _queue[next] is not { Unplayable: false } entry)
+        // A held original has no bars of its own to make.
+        if (next < 0 || next == Current || _queue[next] is not { Unplayable: false, HeldId: null } entry)
             return;
         try
         {
@@ -1080,14 +1084,17 @@ public sealed class Player : IAsyncDisposable
                     return (null, null, null);
                 // Added since: play it from the library.
             }
-            if (await (entry.FileId is { } file ? _api.GetFilePlayInfoAsync(file) : _api.GetPlayInfoAsync(entry.TrackId, entry.EditionId)) is { } play)
+            var info = entry.HeldId is { } held ? _api.GetHeldPlayInfoAsync(held)
+                : entry.FileId is { } file ? _api.GetFilePlayInfoAsync(file)
+                : _api.GetPlayInfoAsync(entry.TrackId, entry.EditionId);
+            if (await info is { } play)
             {
                 entry.DurationSeconds = play.DurationSeconds ?? entry.DurationSeconds;
                 entry.Gain = play.Gain;
                 return (play.StreamUrl, play.MediaType, play.DurationSeconds);
             }
             entry.Unplayable = true;
-            entry.Detail = "It's no longer in your library.";
+            entry.Detail = entry.HeldId is null ? "It's no longer in your library." : "It's been deleted or put back.";
         }
         catch (HttpRequestException e)
         {
@@ -1258,7 +1265,7 @@ public sealed class Player : IAsyncDisposable
         // A jump either way is a seek; the time comes about four times a second as it plays.
         if (step is > 0 and < 2 && Playing)
             _heard += step;
-        if (_recorded || _owner is null || Duration <= 0 || _heard < Math.Min(Duration / 2, 240))
+        if (_recorded || _owner is null || entry.HeldId is not null || Duration <= 0 || _heard < Math.Min(Duration / 2, 240))
             return;
         _recorded = true;
         var started = DateTime.UtcNow.AddSeconds(-position);

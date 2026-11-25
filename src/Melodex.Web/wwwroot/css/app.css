@@ -2024,3 +2024,6 @@ a.toast-body:hover .toast-title { text-decoration: underline; }
 .song-slot:last-child { border-bottom: none; }
 .song-slot .cover { width: 2.5rem; }
 .song-slot > div:last-child { display: flex; flex-direction: column; gap: .45rem; }
+
+/* Review's upgrades: play the original or the upgrade, under each (#239). */
+.review-item .held-play { margin-top: .4rem; }
