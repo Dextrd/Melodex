@@ -43,6 +43,9 @@ public static class ContractVersions
     /// <summary>Discovery plugins: music related to what someone plays.</summary>
     public static readonly ContractVersion Discovery = new(1, 1);
 
+    /// <summary>Scrobbling plugins: what people play, sent to listening services.</summary>
+    public static readonly ContractVersion Scrobbling = new(1, 0);
+
     /// <summary>The version the core supports for a given plugin type.</summary>
     public static ContractVersion For(PluginType type) => type switch
     {
@@ -52,6 +55,7 @@ public static class ContractVersions
         PluginType.Artwork => Artwork,
         PluginType.Lyrics => Lyrics,
         PluginType.Discovery => Discovery,
+        PluginType.Scrobbling => Scrobbling,
         _ => throw new ArgumentOutOfRangeException(nameof(type), type, null),
     };
 }

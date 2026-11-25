@@ -1,13 +1,16 @@
 using Microsoft.EntityFrameworkCore;
 using Melodex.Client;
+using Melodex.Contracts.Plugins;
+using Melodex.Contracts.Plugins.Scrobbling;
 using Melodex.Core.Access;
 using Melodex.Core.Data;
 using Melodex.Core.Library;
 using Melodex.Core.Listening;
+using Melodex.Core.Plugins;
 
 namespace Melodex.Core.Api;
 
-/// <summary>Each person's listening history (#2), and the ListenBrainz and Last.fm accounts their plays are sent to.</summary>
+/// <summary>Each person's listening history (#2), and the scrobbling accounts their plays are sent to (#236).</summary>
 public static class PlayEndpoints
 {
     public static RouteGroupBuilder MapPlayEndpoints(this RouteGroupBuilder api)
@@ -51,7 +54,7 @@ public static class PlayEndpoints
             .RequireScope(Scopes.Listen)
             .WithName("RecordPlay")
             .WithSummary("Record a song you played, once it's played for half its length or four minutes, whichever comes first. It's sent "
-                         + "on to your linked ListenBrainz and Last.fm accounts. The same song again within 30 seconds is taken for the same play, "
+                         + "on to your linked scrobbling accounts. The same song again within 30 seconds is taken for the same play, "
                          + "and the one already recorded comes back.")
             .Produces<PlayRecord>().ProducesValidationProblem();
 
@@ -82,128 +85,119 @@ public static class PlayEndpoints
                 Owner(http) is not { } user ? NoOwner() : await service.DeleteAsync(user, id, ct) ? Results.NoContent() : Results.NotFound())
             .RequireScope(Scopes.Listen)
             .WithName("DeletePlay")
-            .WithSummary("Take a play out of your history. One already sent to ListenBrainz or Last.fm stays there.")
+            .WithSummary("Take a play out of your history. One already sent to a scrobbling service stays there.")
             .Produces(StatusCodes.Status204NoContent).Produces(StatusCodes.Status404NotFound);
 
         var scrobbling = api.MapGroup("/account/scrobbling").WithTags("Listening history").RequireScope(Scopes.SignedIn);
 
-        scrobbling.MapGet("", async (HttpContext http, MelodexDbContext db, SettingsService settings, CancellationToken ct) =>
-            {
-                if (Owner(http) is not { } user)
-                    return NoOwner();
-                return Results.Ok(new ScrobbleStatus(await LinksAsync(db, user, ct), await LastFmKeyAsync(settings, ct)));
-            })
+        scrobbling.MapGet("", async (HttpContext http, MelodexDbContext db, ScrobblingPlugins plugins, CancellationToken ct) =>
+                Owner(http) is { } user ? Results.Ok(await ServicesAsync(db, plugins, user, ct)) : NoOwner())
             .WithName("GetScrobbling")
-            .WithSummary("Your linked ListenBrainz and Last.fm accounts, and the API key to link Last.fm with, if the admin has set one.")
-            .Produces<ScrobbleStatus>();
+            .WithSummary("The scrobbling services the admin set up, such as ListenBrainz and Last.fm, and your account on each, if you linked one.")
+            .Produces<IReadOnlyList<ScrobbleService>>();
 
-        scrobbling.MapPut("/listenbrainz", async (LinkListenBrainz body, HttpContext http, MelodexDbContext db, Scrobbler scrobbler, CancellationToken ct) =>
+        scrobbling.MapPost("/{id:guid}/link-page", async (Guid id, ScrobbleLinkPageRequest body, HttpContext http, MelodexDbContext db,
+                ScrobblingPlugins plugins, CancellationToken ct) =>
             {
-                if (Owner(http) is not { } user)
+                if (Owner(http) is null)
                     return NoOwner();
-                try
-                {
-                    var name = await scrobbler.ListenBrainzUserAsync(body.Token, ct);
-                    return Results.Ok(await LinkAsync(db, scrobbler, user, ScrobbleService.ListenBrainz, name, body.Token.Trim(), ct));
-                }
-                catch (ScrobbleException e)
-                {
-                    return Results.ValidationProblem(new Dictionary<string, string[]> { ["token"] = [e.Message] });
-                }
-            })
-            .WithName("LinkListenBrainz")
-            .WithSummary("Link your ListenBrainz account with the user token from your ListenBrainz settings. Plays from now on are sent there.")
-            .Produces<ScrobbleLink>().ProducesValidationProblem();
-
-        scrobbling.MapPut("/lastfm", async (LinkLastFm body, HttpContext http, MelodexDbContext db, Scrobbler scrobbler, CancellationToken ct) =>
-            {
-                if (Owner(http) is not { } user)
-                    return NoOwner();
-                try
-                {
-                    var (name, session) = await scrobbler.LastFmSessionAsync(body.Token, ct);
-                    return Results.Ok(await LinkAsync(db, scrobbler, user, ScrobbleService.LastFm, name, session, ct));
-                }
-                catch (ScrobbleException e)
-                {
-                    return Results.ValidationProblem(new Dictionary<string, string[]> { ["token"] = [e.Message] });
-                }
-            })
-            .WithName("LinkLastFm")
-            .WithSummary($"Link your Last.fm account: send someone to {Scrobbler.LastFmAuth}?api_key=KEY&cb=URL, and Last.fm sends them back to "
-                         + "the URL with a token, which this takes. Plays from now on are sent there.")
-            .Produces<ScrobbleLink>().ProducesValidationProblem();
-
-        scrobbling.MapDelete("/{service}", async (string service, HttpContext http, MelodexDbContext db, CancellationToken ct) =>
-            {
-                if (Owner(http) is not { } user)
-                    return NoOwner();
-                if (!Enum.TryParse<ScrobbleService>(service, ignoreCase: true, out var parsed) || !Enum.IsDefined(parsed))
+                if (await PluginAsync(db, plugins, id, ct) is not { } found)
                     return Results.NotFound();
-                return await db.ScrobbleAccounts.Where(a => a.UserId == user && a.Service == parsed).ExecuteDeleteAsync(ct) > 0
+                if (!Uri.TryCreate(body.Callback, UriKind.Absolute, out var callback) || callback.Scheme is not ("http" or "https"))
+                    return Results.ValidationProblem(new Dictionary<string, string[]> { ["callback"] = ["That isn't a web address."] });
+                if (!found.Manifest.Capabilities.Contains(ScrobblingCapabilities.LinkWeb))
+                    return Results.ValidationProblem(new Dictionary<string, string[]> { ["callback"] = [$"{found.Manifest.Name} is linked with a token."] });
+                try
+                {
+                    return Results.Ok(new ScrobbleLinkPage((await found.Plugin.LinkPageAsync(callback, ct)).ToString()));
+                }
+                catch (Exception e) when (e is ScrobbleLinkException or HttpRequestException or RemotePluginException)
+                {
+                    return Results.ValidationProblem(new Dictionary<string, string[]> { ["callback"] = [e.Message] });
+                }
+            })
+            .WithName("GetScrobbleLinkPage")
+            .WithSummary("Where to send you to allow Melodex on a service that's linked on its own page, such as Last.fm. It sends you back to the "
+                         + "callback with a token in the address, as token, which linking takes.")
+            .Produces<ScrobbleLinkPage>().ProducesValidationProblem().Produces(StatusCodes.Status404NotFound);
+
+        scrobbling.MapPut("/{id:guid}", async (Guid id, LinkScrobbling body, HttpContext http, MelodexDbContext db, ScrobblingPlugins plugins,
+                Scrobbler scrobbler, CancellationToken ct) =>
+            {
+                if (Owner(http) is not { } user)
+                    return NoOwner();
+                if (await PluginAsync(db, plugins, id, ct) is not { } found)
+                    return Results.NotFound();
+                if (string.IsNullOrWhiteSpace(body.Token))
+                    return Results.ValidationProblem(new Dictionary<string, string[]> { ["token"] = ["Paste the token to link with."] });
+                try
+                {
+                    var linked = await found.Plugin.LinkAsync(body.Token.Trim(), ct);
+                    return Results.Ok(await LinkAsync(db, scrobbler, user, id, linked, ct));
+                }
+                catch (Exception e) when (e is ScrobbleLinkException or HttpRequestException or TaskCanceledException or RemotePluginException
+                                              && !ct.IsCancellationRequested)
+                {
+                    return Results.ValidationProblem(new Dictionary<string, string[]> { ["token"] = [e is TaskCanceledException ? "It didn't answer in time." : e.Message] });
+                }
+            })
+            .WithName("LinkScrobbling")
+            .WithSummary("Link your account on a scrobbling service with a token: one you pasted, such as a ListenBrainz user token, or the one the "
+                         + "service sent you back with. Plays from now on are sent there; linking again sends the ones that waited.")
+            .Produces<ScrobbleLink>().ProducesValidationProblem().Produces(StatusCodes.Status404NotFound);
+
+        scrobbling.MapDelete("/{id:guid}", async (Guid id, HttpContext http, MelodexDbContext db, CancellationToken ct) =>
+            {
+                if (Owner(http) is not { } user)
+                    return NoOwner();
+                return await db.ScrobbleAccounts.Where(a => a.UserId == user && a.PluginInstanceId == id).ExecuteDeleteAsync(ct) > 0
                     ? Results.NoContent() : Results.NotFound();
             })
             .WithName("UnlinkScrobbling")
-            .WithSummary("Stop sending your plays to ListenBrainz (listenbrainz) or Last.fm (lastfm). Plays not sent yet aren't sent.")
+            .WithSummary("Stop sending your plays to a scrobbling service. Plays not sent yet aren't sent.")
             .Produces(StatusCodes.Status204NoContent).Produces(StatusCodes.Status404NotFound);
-
-        var settings = api.MapGroup("/settings/scrobbling").WithTags("Settings").RequireScope(Scopes.Settings);
-
-        settings.MapGet("", async (SettingsService s, CancellationToken ct) =>
-            {
-                var saved = await s.GetScrobblingAsync(ct);
-                return new ScrobbleSettingsInfo(saved.LastFmApiKey, !string.IsNullOrEmpty(saved.LastFmSecret));
-            })
-            .WithName("GetScrobblingSettings")
-            .WithSummary("The Last.fm API account people's plays are sent with. The shared secret is never shown.");
-
-        settings.MapPut("", async (SaveScrobbleSettings body, SettingsService s, Scrobbler scrobbler, CancellationToken ct) =>
-            {
-                var saved = await s.GetScrobblingAsync(ct);
-                saved.LastFmApiKey = string.IsNullOrWhiteSpace(body.LastFmApiKey) ? null : body.LastFmApiKey.Trim();
-                if (body.LastFmSecret is { } secret)
-                    saved.LastFmSecret = secret.Trim() is { Length: > 0 } trimmed ? scrobbler.Protect(trimmed) : null;
-                await s.SaveScrobblingAsync(saved, ct);
-                scrobbler.Wake();
-                return Results.NoContent();
-            })
-            .WithName("SaveScrobblingSettings")
-            .WithSummary("Set the Last.fm API key and shared secret (from last.fm/api/account/create) that people link Last.fm with. A secret "
-                         + "left out stays as it was; an empty one takes it away.")
-            .Produces(StatusCodes.Status204NoContent);
 
         return api;
     }
 
-    private static async Task<string?> LastFmKeyAsync(SettingsService settings, CancellationToken ct) =>
-        (await settings.GetScrobblingAsync(ct)) is { LastFmApiKey: { Length: > 0 } key, LastFmSecret: { Length: > 0 } } ? key : null;
+    /// <summary>A scrobbling plugin that's on, by its set-up ID.</summary>
+    private static async Task<(IScrobblingPlugin Plugin, PluginManifest Manifest)?> PluginAsync(MelodexDbContext db, ScrobblingPlugins plugins, Guid id,
+        CancellationToken ct) =>
+        await db.PluginInstances.FirstOrDefaultAsync(p => p.Id == id && p.Type == PluginType.Scrobbling && p.Enabled, ct) is { } instance
+            ? await plugins.GetAsync(instance, ct)
+            : null;
 
-    private static async Task<IReadOnlyList<ScrobbleLink>> LinksAsync(MelodexDbContext db, Guid user, CancellationToken ct)
+    private static async Task<IReadOnlyList<ScrobbleService>> ServicesAsync(MelodexDbContext db, ScrobblingPlugins plugins, Guid user, CancellationToken ct)
     {
-        var accounts = await db.ScrobbleAccounts.AsNoTracking().Where(a => a.UserId == user).OrderBy(a => a.Service).ToListAsync(ct);
+        var accounts = await db.ScrobbleAccounts.AsNoTracking().Where(a => a.UserId == user).ToDictionaryAsync(a => a.PluginInstanceId, ct);
         var waiting = await db.ScrobbleSends.Where(s => s.Account.UserId == user).GroupBy(s => s.AccountId)
             .Select(g => new { g.Key, Count = g.Count() }).ToDictionaryAsync(g => g.Key, g => g.Count, ct);
-        return accounts.Select(a => Link(a, waiting.GetValueOrDefault(a.Id))).ToList();
+        return (await plugins.GetAsync(ct)).Select(p => new ScrobbleService(
+                p.Instance.Id, p.Instance.Name, p.Instance.PluginId,
+                p.Manifest.Capabilities.Contains(ScrobblingCapabilities.LinkWeb) ? ScrobbleLinkKind.Web : ScrobbleLinkKind.Token,
+                p.Manifest.Homepage, p.Manifest.Description,
+                accounts.TryGetValue(p.Instance.Id, out var account) ? Link(account, waiting.GetValueOrDefault(account.Id)) : null))
+            .ToList();
     }
 
     private static ScrobbleLink Link(ScrobbleAccount a, int waiting) =>
-        new(a.Service, a.Username, DateTime.SpecifyKind(a.LinkedAt, DateTimeKind.Utc),
+        new(a.Username, DateTime.SpecifyKind(a.LinkedAt, DateTimeKind.Utc),
             a.LastSentAt is { } sent ? DateTime.SpecifyKind(sent, DateTimeKind.Utc) : null, a.Error, waiting);
 
     /// <summary>Links an account, or links it again: plays held while it didn't work are sent now.</summary>
-    private static async Task<ScrobbleLink> LinkAsync(MelodexDbContext db, Scrobbler scrobbler, Guid user, ScrobbleService service, string username,
-        string secret, CancellationToken ct)
+    private static async Task<ScrobbleLink> LinkAsync(MelodexDbContext db, Scrobbler scrobbler, Guid user, Guid plugin, LinkedAccount linked,
+        CancellationToken ct)
     {
-        var account = await db.ScrobbleAccounts.FirstOrDefaultAsync(a => a.UserId == user && a.Service == service, ct);
+        var account = await db.ScrobbleAccounts.FirstOrDefaultAsync(a => a.UserId == user && a.PluginInstanceId == plugin, ct);
         if (account is null)
         {
-            account = new ScrobbleAccount { UserId = user, Service = service, Username = username, Secret = scrobbler.Protect(secret) };
+            account = new ScrobbleAccount { UserId = user, PluginInstanceId = plugin, Username = linked.Name, Secret = scrobbler.Protect(linked.Secret) };
             db.ScrobbleAccounts.Add(account);
         }
         else
         {
-            account.Username = username;
-            account.Secret = scrobbler.Protect(secret);
+            account.Username = linked.Name;
+            account.Secret = scrobbler.Protect(linked.Secret);
             account.LinkedAt = DateTime.UtcNow;
             account.Refused = false;
             account.Error = null;

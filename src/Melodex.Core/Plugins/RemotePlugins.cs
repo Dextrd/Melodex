@@ -9,11 +9,12 @@ using Melodex.Contracts.Plugins.Discovery;
 using Melodex.Contracts.Plugins.Index;
 using Melodex.Contracts.Plugins.Lyrics;
 using Melodex.Contracts.Plugins.Remote;
+using Melodex.Contracts.Plugins.Scrobbling;
 
 namespace Melodex.Core.Plugins;
 
 /// <summary>
-/// A catalogue, artwork, lyrics, discovery or media-server plugin that isn't loaded into Melodex but reached at an address, over
+/// A catalogue, artwork, lyrics, discovery, scrobbling or media-server plugin that isn't loaded into Melodex but reached at an address, over
 /// the HTTP contract for its kind (docs/contracts/remote-plugins.md). It's used just as one loaded in process is.
 /// </summary>
 public abstract class RemotePlugin(HttpClient http, JsonElement settings, PluginManifest manifest) : IPlugin
@@ -27,6 +28,7 @@ public abstract class RemotePlugin(HttpClient http, JsonElement settings, Plugin
         PluginType.Artwork => new RemoteArtworkPlugin(http, settings, manifest),
         PluginType.Lyrics => new RemoteLyricsPlugin(http, settings, manifest),
         PluginType.Discovery => new RemoteDiscoveryPlugin(http, settings, manifest),
+        PluginType.Scrobbling => new RemoteScrobblingPlugin(http, settings, manifest),
         PluginType.Connector => RemoteConnector.Create(http, settings, manifest),
         _ => throw new InvalidOperationException($"{type} plugins aren't reached this way."),
     };
@@ -79,13 +81,13 @@ public abstract class RemotePlugin(HttpClient http, JsonElement settings, Plugin
             {
             }
             var message = error?.Error ?? $"{Manifest.Name} answered {(int)response.StatusCode} {response.ReasonPhrase}";
-            throw Failure(message, error?.Code == RemoteErrorCodes.Unavailable
-                                   || response.StatusCode is HttpStatusCode.ServiceUnavailable or HttpStatusCode.TooManyRequests);
+            throw Failure(message, error?.Code, error?.Code == RemoteErrorCodes.Unavailable
+                                                || response.StatusCode is HttpStatusCode.ServiceUnavailable or HttpStatusCode.TooManyRequests);
         }
     }
 
     /// <summary>What the plugin's refusal is to Melodex: a catalogue that can't answer now is tried again later.</summary>
-    protected virtual Exception Failure(string message, bool unavailable) => new RemotePluginException(message, unavailable);
+    protected virtual Exception Failure(string message, string? code, bool unavailable) => new RemotePluginException(message, unavailable);
 }
 
 /// <summary>A plugin at an address said no, with its reason.</summary>
@@ -131,8 +133,8 @@ public sealed class RemoteIndexPlugin(HttpClient http, JsonElement settings, Plu
             ? ListAsync<IdInput, IndexGenre>("v1/artist-genres", new IdInput(artistId), cancellationToken)
             : Task.FromResult<IReadOnlyList<IndexGenre>>([]);
 
-    protected override Exception Failure(string message, bool unavailable) =>
-        unavailable ? new IndexUnavailableException(message) : base.Failure(message, unavailable);
+    protected override Exception Failure(string message, string? code, bool unavailable) =>
+        unavailable ? new IndexUnavailableException(message) : base.Failure(message, code, unavailable);
 }
 
 public sealed class RemoteArtworkPlugin(HttpClient http, JsonElement settings, PluginManifest manifest)
@@ -179,6 +181,43 @@ public sealed class RemoteDiscoveryPlugin(HttpClient http, JsonElement settings,
         Declares(DiscoveryCapabilities.ArtistGenres)
             ? ListAsync<ArtistGenresInput, DiscoveredGenre>("v1/artist-genres", new(artist, count), cancellationToken)
             : Task.FromResult<IReadOnlyList<DiscoveredGenre>>([]);
+}
+
+public sealed class RemoteScrobblingPlugin(HttpClient http, JsonElement settings, PluginManifest manifest)
+    : RemotePlugin(http, settings, manifest), IScrobblingPlugin
+{
+    public async Task<Uri> LinkPageAsync(Uri callback, CancellationToken cancellationToken) =>
+        (await CallAsync<LinkPageInput, LinkPageOutput>("v1/link-page", new(callback), cancellationToken))?.Url
+        ?? throw new ScrobbleLinkException($"{Manifest.Name} has no page to link on.");
+
+    public async Task<LinkedAccount> LinkAsync(string token, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await CallAsync<LinkInput, LinkedAccount>("v1/link", new(token), cancellationToken)
+                   ?? throw new ScrobbleLinkException($"{Manifest.Name} doesn't know that token.");
+        }
+        catch (RemotePluginException e)
+        {
+            throw new ScrobbleLinkException(e.Message);
+        }
+    }
+
+    public Task ScrobbleAsync(string secret, IReadOnlyList<Listen> listens, CancellationToken cancellationToken) =>
+        SendAsync("v1/scrobble", new ScrobbleInput(secret, listens), cancellationToken);
+
+    public Task NowPlayingAsync(string secret, Listen listen, CancellationToken cancellationToken) =>
+        Declares(ScrobblingCapabilities.NowPlaying)
+            ? SendAsync("v1/now-playing", new NowPlayingInput(secret, listen), cancellationToken)
+            : Task.CompletedTask;
+
+    protected override Exception Failure(string message, string? code, bool unavailable) => code switch
+    {
+        RemoteErrorCodes.LinkRefused => new ScrobbleLinkRefusedException(message),
+        RemoteErrorCodes.Rejected => new ScrobbleRejectedException(message),
+        RemoteErrorCodes.BadToken => new ScrobbleLinkException(message),
+        _ => base.Failure(message, code, unavailable),
+    };
 }
 
 /// <summary>

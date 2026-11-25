@@ -1,7 +1,7 @@
 # Plugin contracts
 
 Melodex is pluggable on three axes (what exists, how music is fetched, and where it ends up), plus the pictures that
-go with the catalogue, the words of the songs, and music like what's played. Each has its own contract:
+go with the catalogue, the words of the songs, music like what's played, and where plays are sent. Each has its own contract:
 
 | Type | Answers | Runs | Contract | Reference plugin |
 | --- | --- | --- | --- | --- |
@@ -11,8 +11,9 @@ go with the catalogue, the words of the songs, and music like what's played. Eac
 | [Artwork plugin](artwork-plugins.md) | What it looks like | In process (.NET assembly), or [at an address](remote-plugins.md) | `IArtworkPlugin` v1.0 | Cover Art Archive, Wikimedia Commons, Deezer |
 | [Lyrics plugin](lyrics-plugins.md) | What the words are | In process (.NET assembly), or [at an address](remote-plugins.md) | `ILyricsPlugin` v1.1 | LRCLIB |
 | [Discovery plugin](discovery-plugins.md) | What else you'd like | In process (.NET assembly), or [at an address](remote-plugins.md) | `IDiscoveryPlugin` v1.1 | ListenBrainz, Last.fm |
+| [Scrobbling plugin](scrobbling-plugins.md) | Where plays are sent | In process (.NET assembly), or [at an address](remote-plugins.md) | `IScrobblingPlugin` v1.0 | ListenBrainz, Last.fm |
 
-Plugins that come with Melodex run in process, but a catalogue, artwork, lyrics, discovery or media-server plugin can also run
+Plugins that come with Melodex run in process, but a catalogue, artwork, lyrics, discovery, scrobbling or media-server plugin can also run
 on its own, in any language, and be added by its address: see [plugins at an address](remote-plugins.md).
 
 The .NET types live in the `Melodex.Contracts` package (`src/Melodex.Contracts`). The XML docs on those types

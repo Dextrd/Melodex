@@ -224,6 +224,28 @@ def test_formatting_writes_genres_one_on_each_line_as_several(client, roots):
 
 
 @pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="needs ffmpeg")
+def test_replaygain_is_written_as_each_format_has_it(client, roots):
+    library = roots[1]
+    silent_flac(library / "a" / "song.flac", title="Song")
+    subprocess.run(["ffmpeg", "-v", "error", "-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo", "-t", "1", "-c:a", "libopus",
+                    str(library / "a" / "song.opus")], check=True)
+    gains = {"replaygain_track_gain": "-7.25", "replaygain_track_peak": "0.988", "replaygain_album_gain": "-6.5",
+             "replaygain_album_peak": "1.02"}
+    response = client.post("/v1/format", json={"files": [{"path": "a/song.flac", "tags": gains}, {"path": "a/song.opus", "tags": gains}]})
+    assert all("newPath" in f for f in response.json()["files"]), response.json()
+    flac = MediaFile(library / "a" / "song.flac")
+    assert (flac.rg_track_gain, flac.rg_track_peak, flac.rg_album_gain, flac.rg_album_peak) == (-7.25, 0.988, -6.5, 1.02)
+    # Opus takes R128 tags, to -23 LUFS, and no ReplayGain ones.
+    opus = MediaFile(library / "a" / "song.opus")
+    assert (opus.r128_track_gain, opus.r128_album_gain) == (-12.25, -11.5)
+    assert "replaygain_track_gain" not in opus.mgfile.tags
+
+    # Empty, they're taken away.
+    client.post("/v1/format", json={"files": [{"path": "a/song.flac", "tags": {"replaygain_track_gain": ""}}]})
+    assert "REPLAYGAIN_TRACK_GAIN" not in MediaFile(library / "a" / "song.flac").mgfile.tags
+
+
+@pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="needs ffmpeg")
 def test_formatting_writes_a_copy_that_takes_the_files_place(client, roots):
     library = roots[1]
     song = library / "a" / "song.flac"

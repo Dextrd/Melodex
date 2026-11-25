@@ -88,7 +88,7 @@ public sealed class LibraryFormatter(MelodexDbContext db, IImportWorker worker, 
         return errors;
     }
 
-    private static async Task<string?> TitleAsync(MelodexDbContext db, FormatScope scope, CancellationToken ct) => scope.Kind switch
+    internal static async Task<string?> TitleAsync(MelodexDbContext db, FormatScope scope, CancellationToken ct) => scope.Kind switch
     {
         FormatScopeKind.Library => "the whole library",
         FormatScopeKind.Artist => await db.Artists.Where(a => a.Id == scope.Id).Select(a => a.Name).FirstOrDefaultAsync(ct),
@@ -261,9 +261,10 @@ public sealed class FormatTask(
         file.Format = Path.GetExtension(full).TrimStart('.').ToLowerInvariant();
         try
         {
-            var (tags, duration, lyrics, quality, genres) = LibraryScanner.ReadTags(full);
+            var (tags, duration, lyrics, quality, genres, gains) = LibraryScanner.ReadTags(full);
             file.TagsJson = tags.ToJson();
             file.Genres = genres;
+            file.SetGains(gains);
             // Only its tags were rewritten, so its music's spectrum is as it was checked.
             var (cutoff, checkedAt) = (file.CutoffHz, file.SpectrumCheckedAt);
             file.SetQuality(quality);

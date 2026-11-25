@@ -1905,8 +1905,9 @@ table.slots thead th { height: 32px; box-sizing: border-box; }
 
 /* Tools: a card for each, and imports from a list. */
 .tool-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr)); gap: .75rem; margin: 1rem 0; }
-a.card.tool-card { display: flex; gap: .85rem; align-items: flex-start; padding: 1rem; color: var(--text); text-decoration: none; transition: border-color .15s; }
-a.card.tool-card:hover { border-color: var(--accent); text-decoration: none; }
+button.card.tool-card { font: inherit; text-align: left; width: 100%; cursor: pointer; }
+:is(a, button).card.tool-card { display: flex; gap: .85rem; align-items: flex-start; padding: 1rem; color: var(--text); text-decoration: none; transition: border-color .15s; }
+:is(a, button).card.tool-card:hover { border-color: var(--accent); text-decoration: none; }
 .tool-card > .glyph { flex: none; width: 1.6rem; height: 1.6rem; color: var(--accent); fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .tool-card > span { display: flex; flex-direction: column; gap: .3rem; }
 .tool-card > .glyph .fill { fill: currentColor; stroke: none; }
@@ -2023,3 +2024,6 @@ a.toast-body:hover .toast-title { text-decoration: underline; }
 .song-slot:last-child { border-bottom: none; }
 .song-slot .cover { width: 2.5rem; }
 .song-slot > div:last-child { display: flex; flex-direction: column; gap: .45rem; }
+
+/* Review's upgrades: play the original or the upgrade, under each (#239). */
+.review-item .held-play { margin-top: .4rem; }

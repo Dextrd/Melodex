@@ -28,7 +28,31 @@ public static class RemoteErrorCodes
     /// later rather than taking it as "not found". A 503 or 429 means the same.
     /// </summary>
     public const string Unavailable = "unavailable";
+
+    /// <summary>A scrobbling plugin's service no longer takes the account's link: it has to be linked again.</summary>
+    public const string LinkRefused = "link-refused";
+
+    /// <summary>A scrobbling plugin's service turned the plays down, so they aren't sent again.</summary>
+    public const string Rejected = "rejected";
+
+    /// <summary>A scrobbling plugin's service doesn't take the token to link with; the message says why.</summary>
+    public const string BadToken = "bad-token";
 }
+
+/// <summary>Where a scrobbling plugin's service should send someone back to once they've allowed Melodex.</summary>
+public sealed record LinkPageInput(Uri Callback);
+
+/// <summary>Where to send them.</summary>
+public sealed record LinkPageOutput(Uri Url);
+
+/// <summary>A token to link an account with.</summary>
+public sealed record LinkInput(string Token);
+
+/// <summary>Plays to send, with the account's secret.</summary>
+public sealed record ScrobbleInput(string Secret, IReadOnlyList<Melodex.Contracts.Plugins.Scrobbling.Listen> Listens);
+
+/// <summary>What's playing now, with the account's secret.</summary>
+public sealed record NowPlayingInput(string Secret, Melodex.Contracts.Plugins.Scrobbling.Listen Listen);
 
 /// <summary>An ID to look up.</summary>
 public sealed record IdInput(string Id);

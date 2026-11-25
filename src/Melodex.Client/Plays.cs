@@ -73,31 +73,36 @@ public sealed record TopItem(
     DateTime LastPlayedAt,
     bool Local);
 
-/// <summary>A service plays are sent on to (#2).</summary>
-public enum ScrobbleService { ListenBrainz, LastFm }
+/// <summary>How an account is linked with a scrobbling plugin (#236).</summary>
+public enum ScrobbleLinkKind
+{
+    /// <summary>With a token pasted from the service, such as a ListenBrainz user token.</summary>
+    Token,
+
+    /// <summary>On the service's own page, which sends you back with one: ask for it with <c>POST .../link-page</c>.</summary>
+    Web,
+}
+
+/// <summary>A scrobbling plugin the admin set up, which plays can be sent on to, and your account on it if you linked one.</summary>
+/// <param name="Id">The plugin's set-up ID, which linking takes.</param>
+/// <param name="Homepage">The service's website.</param>
+/// <param name="Description">What it is, from the plugin.</param>
+/// <param name="Linked">Your account there; null if you haven't linked one.</param>
+public sealed record ScrobbleService(Guid Id, string Name, string PluginId, ScrobbleLinkKind Link, string? Homepage, string? Description, ScrobbleLink? Linked);
 
 /// <summary>Someone's account on a scrobbling service, linked so their plays are sent there.</summary>
 /// <param name="Error">Why sending last failed, if it did; once it's because the link no longer works, nothing's sent until it's linked again.</param>
 /// <param name="Waiting">Plays not sent yet, tried again later.</param>
-public sealed record ScrobbleLink(ScrobbleService Service, string Username, DateTime LinkedAt, DateTime? LastSentAt, string? Error, int Waiting);
+public sealed record ScrobbleLink(string Username, DateTime LinkedAt, DateTime? LastSentAt, string? Error, int Waiting);
 
-/// <summary>Your linked scrobbling accounts, and whether Last.fm can be linked here.</summary>
-/// <param name="LastFmApiKey">The admin's Last.fm API key, which linking a Last.fm account asks Last.fm with; null if there's none yet.</param>
-public sealed record ScrobbleStatus(IReadOnlyList<ScrobbleLink> Links, string? LastFmApiKey);
+/// <summary>Body of <c>PUT /account/scrobbling/{id}</c>: the token you pasted, or the one the service sent you back with.</summary>
+public sealed record LinkScrobbling(string Token);
 
-/// <summary>Body of <c>PUT /account/scrobbling/listenbrainz</c>: the user token from your ListenBrainz settings.</summary>
-public sealed record LinkListenBrainz(string Token);
+/// <summary>Body of <c>POST /account/scrobbling/{id}/link-page</c>: where the service should send you back to, with a token.</summary>
+public sealed record ScrobbleLinkPageRequest(string Callback);
 
-/// <summary>Body of <c>PUT /account/scrobbling/lastfm</c>: the token Last.fm gave back after you allowed Melodex.</summary>
-public sealed record LinkLastFm(string Token);
-
-/// <summary>What the admin set for scrobbling: the Last.fm API account people's plays are sent with.</summary>
-/// <param name="HasLastFmSecret">Whether the shared secret is set; it's never shown again.</param>
-public sealed record ScrobbleSettingsInfo(string? LastFmApiKey, bool HasLastFmSecret);
-
-/// <summary>Body of <c>PUT /settings/scrobbling</c>.</summary>
-/// <param name="LastFmSecret">The shared secret; null keeps the one set, empty takes it away.</param>
-public sealed record SaveScrobbleSettings(string? LastFmApiKey, string? LastFmSecret = null);
+/// <summary>Where to go to allow Melodex on the service.</summary>
+public sealed record ScrobbleLinkPage(string Url);
 
 /// <summary>Someone playing a song now, as Subsonic players' now playing shows.</summary>
 public sealed record NowPlayingInfo(string Username, PlayRecord Play, DateTime StartedAt);

@@ -103,7 +103,9 @@ cutoff is met.
   deleted straight away. While it's held the upgrade waits under **Review → Upgraded** (and on the song's page):
   **Approve** keeps it and deletes the old file now, and **Roll back** deletes the better copy and puts the old file
   back, where a later upgrade may replace it again; **Roll back, never upgrade** also sets the song never to be
-  upgraded. An upgrade left alone is auto-approved once its time is up.
+  upgraded. An upgrade left alone is auto-approved once its time is up. To check one by ear, **Play the upgrade** or
+  **Play the original** under it: either plays the rest of the upgrades, or their originals, after it, so you can skip
+  through them. Originals aren't kept in your listening history.
 
 #### What your player keeps
 
@@ -232,6 +234,18 @@ their own sound where the phone takes it that way (AAC, and FLAC and Opus on rec
 256 kbps; like the WebM copies below, they're made the first time a song plays and kept up to about 1 GB. AirPlay
 isn't offered while it plays this way. Before iOS 17.1, each song starts once the one before has ended, with the next
 made ready on the server ahead of time so it starts quickly.
+
+### Even volume
+
+Songs are mastered at very different volumes, so one song can be much louder than the next. With **ReplayGain** in
+your files, the player turns loud songs down and quiet ones up so they all play at about the same volume. Under
+**Settings → Playback → Even volume** choose **Each song**, the default, which suits playlists, radios and shuffle;
+**Each album**, which keeps an album's songs as loud as each other as they were made, so a quiet intro stays quiet; or
+**Off**. A song is never turned up so far that it would clip. A browser can't play louder than its full volume, so
+songs are turned up only as far as the player's volume leaves room for: keep it below full, around three quarters,
+and turn your speakers up instead, and quiet songs come up as far as loud ones go down. Files that came with ReplayGain use theirs; for the rest,
+see [Even volume](library.md#even-volume). On iPhones and iPads the volume is the phone's own, which a web page can't
+set, so songs play as they are there.
 
 ### Opus in Safari
 

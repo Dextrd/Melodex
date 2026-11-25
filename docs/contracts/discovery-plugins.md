@@ -38,8 +38,9 @@ Leave out what was asked about itself; the core leaves it out too.
 `DiscoveryRecording` has the song's title, artist credit, IDs (its MusicBrainz recording ID and ISRCs), the credited
 artists with their IDs, and its length.
 
-`DiscoveryListener` has the person's `accounts` on services they've linked to Melodex for scrobbling, by service
-(`listenbrainz` or `lastfm`), and what they've played most over the last 90 days: up to ten `topArtists` and ten
+`DiscoveryListener` has the person's `accounts` on services they've linked to Melodex with a
+[scrobbling plugin](scrobbling-plugins.md), by the last part of its ID (`listenbrainz` or `lastfm` for the ones that
+come with Melodex), and what they've played most over the last 90 days: up to ten `topArtists` and ten
 `topRecordings`, most first. A plugin that recommends from what its service knows of someone answers only when they've
 linked it; one that recommends from what's played can use the rest.
 

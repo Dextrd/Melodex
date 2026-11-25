@@ -286,6 +286,14 @@ public sealed class MelodexClient(HttpClient http)
         (await http.GetFromJsonAsync<FormatPlan>($"{Api}/library/format?kind={scope.Kind}{(scope.Id is { } id ? $"&id={id}" : "")}", MelodexJson.Options, ct))!;
 
     /// <summary>Starts formatting in the background; the task reports progress like a scan.</summary>
+    /// <summary>Works out songs' loudness and writes it into their files as ReplayGain, in the background.</summary>
+    public async Task<TaskInfo> StartReplayGainAsync(StartReplayGain body, CancellationToken ct = default)
+    {
+        var response = await http.PostAsJsonAsync($"{Api}/library/replaygain", body, MelodexJson.Options, ct);
+        await EnsureAsync(response, ct);
+        return (await response.Content.ReadFromJsonAsync<TaskInfo>(MelodexJson.Options, ct))!;
+    }
+
     public async Task<TaskInfo> StartFormatAsync(StartFormat body, CancellationToken ct = default)
     {
         var response = await http.PostAsJsonAsync($"{Api}/library/format", body, MelodexJson.Options, ct);
@@ -522,6 +530,10 @@ public sealed class MelodexClient(HttpClient http)
 
     /// <summary>Puts a replaced file back, deleting the copy that replaced it; its song is set never to be upgraded.</summary>
     /// <summary>Rolls an upgrade back; with never, its song is never upgraded again.</summary>
+    /// <summary>How to play a file an upgrade replaced, while it's held, to compare it with the better copy.</summary>
+    public Task<PlayInfo?> GetHeldPlayInfoAsync(Guid id, CancellationToken ct = default) =>
+        GetOrNullAsync<PlayInfo>($"{Api}/upgrades/held/{id}/play", ct);
+
     public async Task RestoreHeldFileAsync(Guid id, bool never = false, CancellationToken ct = default)
     {
         using var response = await http.PostAsync($"{Api}/upgrades/held/{id}/restore{(never ? "?never=true" : "")}", null, ct);
@@ -1016,36 +1028,27 @@ public sealed class MelodexClient(HttpClient http)
         await EnsureAsync(response, ct);
     }
 
-    /// <summary>Your linked ListenBrainz and Last.fm accounts.</summary>
-    public async Task<ScrobbleStatus> GetScrobblingAsync(CancellationToken ct = default) =>
-        (await http.GetFromJsonAsync<ScrobbleStatus>($"{Api}/account/scrobbling", MelodexJson.Options, ct))!;
+    /// <summary>The scrobbling services set up here, and your accounts on them.</summary>
+    public async Task<IReadOnlyList<ScrobbleService>> GetScrobblingAsync(CancellationToken ct = default) =>
+        (await http.GetFromJsonAsync<IReadOnlyList<ScrobbleService>>($"{Api}/account/scrobbling", MelodexJson.Options, ct))!;
 
-    public async Task<ScrobbleLink> LinkListenBrainzAsync(string token, CancellationToken ct = default)
+    public async Task<string> GetScrobbleLinkPageAsync(Guid service, string callback, CancellationToken ct = default)
     {
-        using var response = await http.PutAsJsonAsync($"{Api}/account/scrobbling/listenbrainz", new LinkListenBrainz(token), MelodexJson.Options, ct);
+        using var response = await http.PostAsJsonAsync($"{Api}/account/scrobbling/{service}/link-page", new ScrobbleLinkPageRequest(callback), MelodexJson.Options, ct);
+        await EnsureAsync(response, ct);
+        return (await response.Content.ReadFromJsonAsync<ScrobbleLinkPage>(MelodexJson.Options, ct))!.Url;
+    }
+
+    public async Task<ScrobbleLink> LinkScrobblingAsync(Guid service, string token, CancellationToken ct = default)
+    {
+        using var response = await http.PutAsJsonAsync($"{Api}/account/scrobbling/{service}", new LinkScrobbling(token), MelodexJson.Options, ct);
         await EnsureAsync(response, ct);
         return (await response.Content.ReadFromJsonAsync<ScrobbleLink>(MelodexJson.Options, ct))!;
     }
 
-    public async Task<ScrobbleLink> LinkLastFmAsync(string token, CancellationToken ct = default)
+    public async Task UnlinkScrobblingAsync(Guid service, CancellationToken ct = default)
     {
-        using var response = await http.PutAsJsonAsync($"{Api}/account/scrobbling/lastfm", new LinkLastFm(token), MelodexJson.Options, ct);
-        await EnsureAsync(response, ct);
-        return (await response.Content.ReadFromJsonAsync<ScrobbleLink>(MelodexJson.Options, ct))!;
-    }
-
-    public async Task UnlinkScrobblingAsync(ScrobbleService service, CancellationToken ct = default)
-    {
-        using var response = await http.DeleteAsync($"{Api}/account/scrobbling/{service.ToString().ToLowerInvariant()}", ct);
-        await EnsureAsync(response, ct);
-    }
-
-    public async Task<ScrobbleSettingsInfo> GetScrobblingSettingsAsync(CancellationToken ct = default) =>
-        (await http.GetFromJsonAsync<ScrobbleSettingsInfo>($"{Api}/settings/scrobbling", MelodexJson.Options, ct))!;
-
-    public async Task SaveScrobblingSettingsAsync(SaveScrobbleSettings settings, CancellationToken ct = default)
-    {
-        using var response = await http.PutAsJsonAsync($"{Api}/settings/scrobbling", settings, MelodexJson.Options, ct);
+        using var response = await http.DeleteAsync($"{Api}/account/scrobbling/{service}", ct);
         await EnsureAsync(response, ct);
     }
 

@@ -299,7 +299,8 @@ public sealed class DiscoveryTests : IDisposable
         using (var scope = _factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<MelodexDbContext>();
-            db.ScrobbleAccounts.Add(new ScrobbleAccount { UserId = db.Users.Single().Id, Service = ScrobbleService.ListenBrainz, Username = "someone", Secret = "x" });
+            var plugin = db.PluginInstances.Single(p => p.PluginId == ListenBrainzScrobblingFactory.PluginId);
+            db.ScrobbleAccounts.Add(new ScrobbleAccount { UserId = db.Users.Single().Id, PluginInstanceId = plugin.Id, Username = "someone", Secret = "x" });
             await db.SaveChangesAsync();
         }
         DiscoveryCache.Clear();

@@ -11,6 +11,7 @@ Melodex is pluggable in six ways. Manage them under **Settings → Plugins**, wh
 | **Artwork** | Covers and artist pictures | Cover Art Archive, Deezer, Wikimedia Commons, fanart.tv (with your own key) |
 | **Lyrics** | The words of songs, synced where they can be | LRCLIB |
 | **Discovery** | Similar artists and songs, and recommendations | ListenBrainz, Last.fm (with your own key) |
+| **Scrobbling** | Where people's plays are sent, on accounts they link | ListenBrainz, Last.fm (with your own key) |
 
 ## Without a catalogue
 
@@ -37,6 +38,22 @@ seconds is left out for that page, so one that's slow doesn't keep the others' a
 
 [Your own plugins](#your-own-plugins) can be discovery plugins too: see the
 [discovery contract](../contracts/discovery-plugins.md).
+
+## Scrobbling
+
+Scrobbling plugins are the services people can send what they play to. You add them here; each person then links
+their own account under **Scrobbling** on their account page, and every service they've linked gets their plays.
+Plays that can't be sent wait and go later, and while a plugin's off they wait for it to come back. Removing one
+removes the accounts linked with it.
+
+- **ListenBrainz** is set up from the start and needs nothing. People link it with the user token from their
+  ListenBrainz settings.
+- **Last.fm** needs an API account of your own, free from
+  [last.fm/api/account/create](https://www.last.fm/api/account/create): enter its API key and shared secret. It can be
+  the same one as for the Last.fm discovery plugin. People link it on Last.fm's own page, which sends them back.
+
+[Your own plugins](#your-own-plugins) can be scrobbling plugins too: see the
+[scrobbling contract](../contracts/scrobbling-plugins.md).
 
 ## Retrieval plugins
 

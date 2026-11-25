@@ -97,7 +97,7 @@
                         aria-pressed="@(Player.Shuffle ? "true" : "false")" disabled="@(now is null)" @onclick="() => Player.SetShuffleAsync(!Player.Shuffle)">
                     <svg viewBox="0 0 24 24"><path d="M4 7h3.5c4.5 0 4.5 10 9 10H20M4 17h3.5c1.6 0 2.6-1.3 3.4-3M13.1 10c.8-1.7 1.8-3 3.4-3H20M17.5 4.5 20 7l-2.5 2.5M17.5 14.5 20 17l-2.5 2.5" /></svg>
                 </button>
-                <button class="icon" title="Previous (Shift+←)" disabled="@(now is null)" @onclick="Player.PreviousAsync">
+                <button class="icon" title="Previous (Shift+←)" disabled="@(!Player.HasPrevious)" @onclick="Player.PreviousAsync">
                     <svg viewBox="0 0 24 24"><path d="M6 5v14M18 5 8 12l10 7z" /></svg>
                 </button>
                 <button class="icon play" title="@(Player.Playing ? "Pause (Space)" : "Play (Space)")" disabled="@(now is null)" @onclick="Player.ToggleAsync">

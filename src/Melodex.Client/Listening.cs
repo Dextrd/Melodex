@@ -92,7 +92,14 @@ public sealed record PlayInfo(
     double? DurationSeconds,
     string? Codec,
     string MediaType,
-    string StreamUrl);
+    string StreamUrl)
+{
+    /// <summary>The file's ReplayGain, which the web player evens out volume by (#23).</summary>
+    public SongGain? Gain { get; init; }
+}
+
+/// <summary>A song's ReplayGain: gains in dB to -18 LUFS, peaks with 1 as full scale; null where it has none.</summary>
+public sealed record SongGain(double? TrackGain, double? TrackPeak, double? AlbumGain, double? AlbumPeak);
 
 /// <summary>A server-sent event from <c>GET /events</c>: what changed, so a client can reload what it shows.</summary>
 /// <param name="Type"><c>requests</c>, <c>listen</c>, <c>library</c> or <c>tasks</c>.</param>

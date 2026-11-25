@@ -95,7 +95,10 @@ public static class DiscoveryCapabilities
     public const string ArtistGenres = "artist-genres";
 }
 
-/// <summary>Service names in <see cref="DiscoveryListener.Accounts"/>.</summary>
+/// <summary>
+/// Service names in <see cref="DiscoveryListener.Accounts"/>: for each account the listener linked with a scrobbling
+/// plugin, the last part of that plugin's ID, so <c>melodex.scrobbling.listenbrainz</c> gives <c>listenbrainz</c>.
+/// </summary>
 public static class DiscoveryAccounts
 {
     /// <summary>A ListenBrainz user name.</summary>

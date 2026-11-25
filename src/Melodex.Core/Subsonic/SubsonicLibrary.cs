@@ -13,7 +13,7 @@ namespace Melodex.Core.Subsonic;
 /// <summary>A song as players see it: one file in the library.</summary>
 public sealed record SubsonicSong(
     LibraryTrack Track, long Size, int? BitrateKbps, int? BitDepth, int? SampleRate, string? Codec, int? Year,
-    IReadOnlyList<string> Genres, DateTime Created, string? MusicBrainzId)
+    IReadOnlyList<string> Genres, DateTime Created, string? MusicBrainzId, FileGains? Gains = null)
 {
     public Guid Id => Track.FileId;
     public string ContentType => MediaTypes.Bare(MediaTypes.For(Track.Path, Codec));
@@ -81,7 +81,7 @@ public sealed class SubsonicLibrary(LibraryCache cache, IServiceScopeFactory sco
         using var scope = scopes.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<MelodexDbContext>();
         var files = await db.LibraryFiles.AsNoTracking().Where(f => f.HiddenAt == null)
-            .Select(f => new { f.Id, f.Size, f.BitrateKbps, f.BitDepth, f.SampleRate, f.Codec, f.Genres, f.TagsJson })
+            .Select(f => new { f.Id, f.Size, f.BitrateKbps, f.BitDepth, f.SampleRate, f.Codec, f.Genres, f.TagsJson, f.TrackGain, f.TrackPeak, f.AlbumGain, f.AlbumPeak })
             .ToDictionaryAsync(f => f.Id, ct);
         // Songs whose files have no genres take the catalogue's, for their album or else its artist.
         var albumGenres = await db.Albums.AsNoTracking().Where(a => a.Genres != null && a.Genres != "")
@@ -102,7 +102,7 @@ public sealed class SubsonicLibrary(LibraryCache cache, IServiceScopeFactory sco
             var genres = SongGenres.Of(file.Genres, track.AlbumId is { } a ? albumGenres.GetValueOrDefault(a) : null,
                 artist is { } r ? artistGenres.GetValueOrDefault(r) : null);
             songs.Add(new SubsonicSong(track, file.Size, file.BitrateKbps, file.BitDepth, file.SampleRate, file.Codec, YearOf(tags.Date), genres,
-                CreatedOf(track.FileId), tags.MusicBrainzRecordingId));
+                CreatedOf(track.FileId), tags.MusicBrainzRecordingId, new FileGains(file.TrackGain, file.TrackPeak, file.AlbumGain, file.AlbumPeak)));
         }
         var byAlbum = songs.Where(s => s.Track.AlbumId is not null).ToLookup(s => s.Track.AlbumId!.Value);
 
@@ -255,6 +255,14 @@ public sealed class SubsonicLibrary(LibraryCache cache, IServiceScopeFactory sco
         ["sortName"] = song.Track.Title,
         ["musicBrainzId"] = song.MusicBrainzId,
         ["genres"] = new JsonArray(song.Genres.Select(g => (JsonNode)new JsonObject { ["name"] = g }).ToArray()),
+        // OpenSubsonic's, as the file's ReplayGain has it (#23).
+        ["replayGain"] = song.Gains is { TrackGain: not null } or { AlbumGain: not null } ? Compact(new JsonObject
+        {
+            ["trackGain"] = song.Gains.TrackGain,
+            ["albumGain"] = song.Gains.AlbumGain,
+            ["trackPeak"] = song.Gains.TrackPeak,
+            ["albumPeak"] = song.Gains.AlbumPeak,
+        }) : null,
         // Melodex's own (the melodex extension): the song's ID in Melodex's API, where a file of your own goes by its file's.
         ["melodexTrackId"] = song.Track.TrackId.ToString(),
     });

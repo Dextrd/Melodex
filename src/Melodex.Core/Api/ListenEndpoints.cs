@@ -142,7 +142,7 @@ public static class ListenEndpoints
                     .Select(f => new
                     {
                         f.Id, f.Path, f.Duration, f.EditionId, f.Track!.Title, f.Track.ArtistCredit, f.Track.ArtistId,
-                        AlbumId = (Guid?)f.Edition!.AlbumId, AlbumTitle = f.Edition.Album.Title,
+                        AlbumId = (Guid?)f.Edition!.AlbumId, AlbumTitle = f.Edition.Album.Title, f.TrackGain, f.TrackPeak, f.AlbumGain, f.AlbumPeak,
                     })
                     .FirstOrDefaultAsync(ct);
                 if (file is null)
@@ -150,7 +150,10 @@ public static class ListenEndpoints
                 var codec = MediaTypes.CodecFor(file.Path);
                 return Results.Ok(new PlayInfo(id, file.Id, file.Title, file.ArtistCredit, file.ArtistId, file.AlbumId, file.AlbumTitle,
                     file.AlbumId is { } album ? LibraryView.CoverUrl(album, file.EditionId) : null, file.Duration?.TotalSeconds,
-                    codec, MediaTypes.For(file.Path, codec), signer.Sign(LibraryStreamPath(file.Id))));
+                    codec, MediaTypes.For(file.Path, codec), signer.Sign(LibraryStreamPath(file.Id)))
+                {
+                    Gain = new SongGain(file.TrackGain, file.TrackPeak, file.AlbumGain, file.AlbumPeak),
+                });
             })
             .WithTags("Library")
             .RequireScope(Scopes.Listen).WithName("PlayTrack").WithSummary("How to play a track you have: a signed stream URL for its file in your music folder. 404 if you don't have it.")
@@ -168,7 +171,10 @@ public static class ListenEndpoints
                 return Results.Ok(new PlayInfo(file.TrackId ?? file.Id, file.Id, file.Track?.Title ?? tags.Title ?? Path.GetFileNameWithoutExtension(file.Path),
                     file.Track?.ArtistCredit ?? tags.Artist ?? tags.AlbumArtist ?? "", file.Track?.ArtistId, album?.Id, album?.Title ?? tags.Album,
                     album is not null ? LibraryView.CoverUrl(album.Id, file.EditionId) : LocalMusic.CoverUrl(file.Id),
-                    (file.Duration ?? file.Track?.Duration)?.TotalSeconds, codec, MediaTypes.For(file.Path, codec), signer.Sign(LibraryStreamPath(file.Id))));
+                    (file.Duration ?? file.Track?.Duration)?.TotalSeconds, codec, MediaTypes.For(file.Path, codec), signer.Sign(LibraryStreamPath(file.Id)))
+                {
+                    Gain = new SongGain(file.TrackGain, file.TrackPeak, file.AlbumGain, file.AlbumPeak),
+                });
             })
             .WithTags("Library")
             .RequireScope(Scopes.Listen).WithName("PlayFile")
