@@ -114,7 +114,7 @@ out every value from its catalogue; the worker only writes them.
 
 | Field | Meaning |
 | --- | --- |
-| `files[].tags` | Tags to write, by beets field name. The rest stay as they are, and an empty value clears one. Melodex writes `title`, `artist`, `album`, `albumartist`, `track`, `tracktotal`, `disc`, `disctotal`, `date` and `original_date` (as `yyyy`, `yyyy-MM` or `yyyy-MM-dd`), `country`, `media`, `albumtype`, `label`, `catalognum`, `isrc`, `lyrics`, `genres` (one on each line, written as several) and the `mb_*` IDs; any other name fails that file. |
+| `files[].tags` | Tags to write, by beets field name. The rest stay as they are, and an empty value clears one. Melodex writes `title`, `artist`, `album`, `albumartist`, `track`, `tracktotal`, `disc`, `disctotal`, `date` and `original_date` (as `yyyy`, `yyyy-MM` or `yyyy-MM-dd`), `country`, `media`, `albumtype`, `label`, `catalognum`, `isrc`, `lyrics`, `genres` (one on each line, written as several), the `mb_*` IDs and `replaygain_track_gain`, `replaygain_track_peak`, `replaygain_album_gain` and `replaygain_album_peak` (gains in dB, peaks with 1 as full scale); any other name fails that file. An Opus file is given the gains as `R128_TRACK_GAIN` and `R128_ALBUM_GAIN` instead, 5 dB lower as R128 has them, and any ReplayGain tags it had are taken out. |
 | `files[].artwork` | The key of an image in `artwork` to embed as the front cover, replacing what's there. Omit it to leave the embedded art. |
 | `files[].removeArtwork` | Take the embedded art out. |
 | `files[].lrc` | Lyrics to write to an `.lrc` file beside the file, with its name. Omit it to leave any there. |

@@ -106,7 +106,6 @@ scan.
   library this takes a while.
 - **Update catalogue**: look up every artist's discography, and the editions of their albums, so the missing view
   knows what's out there.
-- **Format the whole library**: see [Formatting](#formatting).
 
 After each scan, Melodex queues a catalogue update of its own, which shows on Activity as a separate task. To update
 the catalogue only when you ask, turn off **Update the catalogue after each scan** under **Settings → General →
@@ -196,7 +195,7 @@ a deluxe edition, a compilation) is fetched once or for each, and whether owning
 ## Formatting
 
 **Format** rewrites files' tags and covers from the catalogue, and moves them to where your naming scheme says. It's on
-each artist, album and track page, and for the whole library in the Scan menu. It shows what will change first, and
+each artist, album and track page, and for the whole library under **Tools → Formatting**. It shows what will change first, and
 nothing is written until you confirm. Set the folder layout under **Settings → General**. **Genres** writes the
 catalogue's [genres](#genres) into files that have none of their own, or into every file the catalogue has some for,
 over its own, when you choose the catalogue's **over the file's own**.
@@ -211,6 +210,20 @@ before you confirm; a folder of an album's artwork beside its music, such as `Sc
 to a copy that then takes its place, so a song already playing carries on, but a song whose file has just been moved
 can't be found until the media server catches up. Melodex tells it what's changed every 20 seconds or so, and again
 at the end. Over a whole library, it's best to format when nobody's listening.
+
+## Even volume
+
+**Even volume** works out how loud each song is, and each album as a whole, and writes it into the files as
+ReplayGain, which Melodex's [player](requests-and-listening.md#even-volume), most Subsonic players and media servers
+use to play everything at about the same volume. It's under **Tools → Formatting** for the whole library, and on each artist and
+album page. Like formatting, it only writes files matched to the catalogue, and asks before it starts; Activity shows
+each file and how loud it was. It takes a second or two a song, so a whole library takes a while.
+
+Loudness is measured as ReplayGain 2 does (EBU R128's way of hearing it), and each song is brought to -18 LUFS, which
+**Settings → Playback → Even volume** can change. Opus files get the R128 tags Opus players read instead. Files that
+have ReplayGain already, as many rips do, are left as they are, unless you tick **Work it out again for files that
+have it already**; an album that's gained a song is done again whole, as its album gain changes. While even volume is on,
+for each song or each album, new music is done as it's added.
 
 ## Choosing a cover
 

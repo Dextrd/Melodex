@@ -61,6 +61,9 @@ at most at some bitrate, Melodex turns the song into that as it plays, which sui
 A song already small enough in that format is sent as it is. Downloading for offline listening always gives the file
 as it is in your library.
 
+Songs' ReplayGain, where their files have it, goes to players as OpenSubsonic's `replayGain`, so a player that evens
+out volume can use it (see [Even volume](library.md#even-volume)).
+
 A player's **instant mix**, or similar songs, is a [radio](requests-and-listening.md#radio) from the song, album or
 artist: songs you have only, as players can only play those.
 

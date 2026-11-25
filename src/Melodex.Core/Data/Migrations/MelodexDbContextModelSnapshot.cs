@@ -524,6 +524,12 @@ namespace Melodex.Core.Data.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("TEXT");
 
+                    b.Property<double?>("AlbumGain")
+                        .HasColumnType("REAL");
+
+                    b.Property<double?>("AlbumPeak")
+                        .HasColumnType("REAL");
+
                     b.Property<Guid?>("ArtistId")
                         .HasColumnType("TEXT");
 
@@ -556,6 +562,9 @@ namespace Melodex.Core.Data.Migrations
 
                     b.Property<DateTime?>("FormattedAt")
                         .HasColumnType("TEXT");
+
+                    b.Property<bool>("GainsRead")
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Genres")
                         .HasColumnType("TEXT");
@@ -621,8 +630,14 @@ namespace Melodex.Core.Data.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<double?>("TrackGain")
+                        .HasColumnType("REAL");
+
                     b.Property<Guid?>("TrackId")
                         .HasColumnType("TEXT");
+
+                    b.Property<double?>("TrackPeak")
+                        .HasColumnType("REAL");
 
                     b.Property<DateTime?>("TrustedAt")
                         .HasColumnType("TEXT");

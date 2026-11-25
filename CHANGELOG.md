@@ -92,12 +92,19 @@ What changed in each release of Melodex. Versions follow [semantic versioning](h
   too, is a jump with nothing to load. Songs come in an MP4 file the server makes and keeps, like the WebM copies for
   Safari: their own sound where the phone takes it, otherwise AAC at 256 kbps. Stream URLs take `as=mp4` and `keep` for
   it (#109).
+- **Even volume**: Melodex works out how loud each song and album is and writes it into the files as ReplayGain (R128
+  tags for Opus), from **Tools**, an artist's or album's page, and for new music as it's added while it's on. The player turns songs
+  up or down by it, for each song or each album as chosen under **Settings → Playback**, to -18 LUFS or a loudness you
+  choose, and Subsonic players get it as OpenSubsonic's `replayGain`. Files that have ReplayGain already are left as
+  they are unless you ask. The API has `POST /library/replaygain`, and songs' play info carries their gains (#23).
 - **Import from Apple Music** on the Tools page, from the copy of your data Apple gives you (no Apple account linked):
   your favourite songs and library songs become playlists, and so does each playlist you made. Only Apple Music's
   library and favourites are read from the zip, and importing a later copy brings only what's new (#25).
 
 ### Changed
 
+- **Tools** is in two sections, **Import / Export** and **Formatting**. Formatting the whole library has moved there,
+  from the Library page's Scan menu, beside the new Even volume (#23).
 - **Retrieval plugins have repositories of their own**, `dextrd/melodex-retriever-<name>`, each with its own releases
   and image, which keeps its name. Each README has the lines to add to your compose file. Melodex's own compose file
   is just Melodex now: the core and the beets worker, with no plugins and no `COMPOSE_PROFILES`. The guide's Plugins

@@ -26,12 +26,36 @@ public enum GaplessPlayback
     Always,
 }
 
+/// <summary>How Melodex's own player evens out songs' volume, by the ReplayGain in their files (#23).</summary>
+public enum VolumeLevelling
+{
+    /// <summary>Each song as loud as it is.</summary>
+    Off,
+
+    /// <summary>Every song brought to the same loudness.</summary>
+    Track,
+
+    /// <summary>Every album brought to the same loudness, its songs as loud as each other as on the record.</summary>
+    Album,
+}
+
 /// <summary>How music is played.</summary>
 public sealed record PlaybackSettings
 {
     public VisualiserBars Visualiser { get; init; } = VisualiserBars.OnDemand;
 
     public GaplessPlayback Gapless { get; init; } = GaplessPlayback.SameAlbum;
+
+    /// <summary>How the web player evens out songs' volume.</summary>
+    public VolumeLevelling Levelling { get; init; } = VolumeLevelling.Track;
+
+    /// <summary>The loudness, in LUFS, ReplayGain brings songs to: ReplayGain 2's -18 to start with.</summary>
+    public double LoudnessTarget { get; init; } = DefaultLoudnessTarget;
+
+    /// <summary>Work out ReplayGain again for files that have it already, rather than leaving them.</summary>
+    public bool RedoGains { get; init; }
+
+    public const double DefaultLoudnessTarget = -18;
 }
 
 /// <summary>Playback's settings, with what bars beside every song would take.</summary>
@@ -43,4 +67,5 @@ public sealed record PlaybackStatus(PlaybackSettings Settings, int Songs, long E
 
 /// <summary>Playback's settings to save.</summary>
 /// <param name="DeleteBarsFiles">Delete the .bars files beside the library's songs too.</param>
-public sealed record SavePlayback(VisualiserBars Visualiser, bool DeleteBarsFiles = false, GaplessPlayback Gapless = GaplessPlayback.SameAlbum);
+public sealed record SavePlayback(VisualiserBars Visualiser, bool DeleteBarsFiles = false, GaplessPlayback Gapless = GaplessPlayback.SameAlbum,
+    VolumeLevelling Levelling = VolumeLevelling.Track, double LoudnessTarget = PlaybackSettings.DefaultLoudnessTarget, bool RedoGains = false);
