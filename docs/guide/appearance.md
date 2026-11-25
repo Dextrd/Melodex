@@ -1,6 +1,6 @@
 # Appearance
 
-Choose how Melodex looks under **Settings → Appearance**. It's kept with your account, so it follows you to every
+Choose how Melodex looks under **Settings → Web app → Appearance**. It's kept with your account, so it follows you to every
 device you sign in on, and everyone chooses their own.
 
 - **Colour**: pink (Melodex's own), green, blue, grey, purple or amber.
@@ -22,7 +22,7 @@ or leaves you something to review.
 
 - **Long tasks**: a scan, a catalogue update, an import or formatting says how it went when it finishes. A scan that
   leaves files to review says how many, and opens **Review**.
-- **Downloads**: one when you ask for something, and one when it's in your library, waiting for review, or failed.
+- **Fetches**: one when you ask for something, and one when it's in your library, waiting for review, or failed.
   Asking for many songs at once gives one notification for them all.
 - **Upgrades and the rest of a menu**: one when you look for a better copy, add something to your wishlist or take it
   off, and one when the better copies are in or none better was found.
@@ -33,7 +33,7 @@ turned off.
 Each shows the cover of what it's about, or an icon for the kind of thing it is. Each closes itself after a few seconds
 (not while the pointer is over them), opens what it's about when you click it, and its **×** dismisses it at once. Past
 a few, the oldest are grouped into one line. Work that runs on its own, such as finding lyrics after a scan, doesn't pop
-up. Turn each kind on or off under **Settings → Appearance → Notifications**; like the rest of your look, it's kept with
+up. Turn each kind on or off under **Settings → Web app → Notifications**; like the rest of your look, it's kept with
 your account.
 
 Next: [Plugins](plugins.md).

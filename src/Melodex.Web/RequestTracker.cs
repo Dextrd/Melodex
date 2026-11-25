@@ -227,7 +227,7 @@ public sealed class RequestTracker : IDisposable
             : Format.Count(requests.Count, "thing", "things");
 
     // To the first of them in Activity, flashed, so where they are is plain.
-    private static string Href(Lot lot) => $"activity/downloads?open={lot.Asked[0].Id}";
+    private static string Href(Lot lot) => $"activity/fetches?open={lot.Asked[0].Id}";
 
     private void Schedule(TimeSpan delay)
     {

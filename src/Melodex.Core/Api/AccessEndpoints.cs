@@ -183,7 +183,7 @@ public static class AccessEndpoints
             })
             .RequireScope(Scopes.Settings)
             .WithName("SetDefaultAppearance")
-            .WithSummary("Choose how Melodex looks for everyone who hasn't chosen their own look. Each person can choose their own under Settings → Appearance.");
+            .WithSummary("Choose how Melodex looks for everyone who hasn't chosen their own look. Each person can choose their own under Settings → Your account → Appearance.");
 
         MapUsers(api);
         MapKeys(api);

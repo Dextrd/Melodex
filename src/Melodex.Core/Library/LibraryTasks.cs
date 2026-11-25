@@ -70,9 +70,8 @@ public sealed class LibraryScanTask(
             notes.Add(Count(match.StillDeferred, "deferred file", "deferred files") + " still not a confident match");
         progress.Report($"{scan.Files} files: {match.Matched} newly matched, {match.Review} to review" + string.Concat(notes.Select(n => "; " + n)));
 
+        // The catalogue is updated on its own schedule, or from the Scan menu, not after every scan.
         var library = await settings.GetLibraryAsync(ct);
-        if (library.UpdateCatalogueAfterScan)
-            await queue.EnqueueAsync(CatalogueUpdateTask.TaskKind, null, ct);
         if (library.FetchLyrics && await lyrics.HaveSourcesAsync(ct) && await lyrics.Wanting().AnyAsync(ct))
             await queue.EnqueueAsync(LyricsTask.TaskKind, null, ct);
         // While they're made when matching, new songs get the visualiser's bars.

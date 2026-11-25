@@ -96,10 +96,8 @@
         }
     }
 
-    // The first settings tab they may open.
-    private string SettingsHref => Auth.May(UserPermissions.Settings) ? "settings"
-        : Auth.May(UserPermissions.Users) ? "settings/users"
-        : "settings/api";
+    // Settings opens on the library's, or for someone who may not change those, on their own account.
+    private string SettingsHref => Auth.May(UserPermissions.Settings) ? "settings" : "settings/account";
 
     protected override async Task OnInitializedAsync()
     {

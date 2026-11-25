@@ -1,12 +1,13 @@
 @page "/settings"
 @layout SettingsLayout
 @inject MelodexClient Api
-@inject TaskNotices Tasks
 
-<PageTitle>Settings · Melodex</PageTitle>
+<PageTitle>Library settings · Melodex</PageTitle>
+
+@* How the library is shown, laid out and filled in: the Library section of Settings (#238). *@
 
 
-@if (_settings is null || _fetch is null || _log is null)
+@if (_settings is null || _pathTemplate is null)
 {
     <Loading />
 }
@@ -44,30 +45,25 @@ else
         }
     </ReleaseKindsEditor>
 
-    <h2>Matching</h2>
+    <h2 id="format">Library format</h2>
+    <p class="muted small">
+        Where each album's files go in the music folder: new albums as they're fetched, and the library's files when they're
+        <a href="tools">formatted</a>.
+    </p>
     <div class="card settings-card">
-        <div class="setting-line">
-            Send fuzzy matches under
-            <NumberField Min="50" Max="100" Label="Confidence, in percent" Value="(int)Math.Round(_settings.MatchThreshold * 100)"
-                         ValueChanged="n => Set(_settings with { MatchThreshold = n / 100.0 })" />
-            % confidence to review
+        <div class="field">
+            <label class="field-label" for="path-template">Folder layout</label>
+            <input id="path-template" type="text" style="width: 100%; max-width: 32rem;" @bind="_pathTemplate" @bind:after="FetchChanged" />
+            <div class="muted small">
+                A <a href="https://beets.readthedocs.io/en/stable/reference/pathformat.html" target="_blank" rel="noopener noreferrer">beets path format</a>.
+                The default, <code>@FetchSettings.DefaultPathTemplate</code>, gives <code>Portishead/Dummy/11 Glory Box.opus</code>.
+                A track for an album you already have goes next to that album's files instead.
+                @if (_pathTemplate != FetchSettings.DefaultPathTemplate)
+                {
+                    <button class="link small" @onclick="() => { _pathTemplate = FetchSettings.DefaultPathTemplate; FetchChanged(); }">Use the default</button>
+                }
+            </div>
         </div>
-        <div class="muted small">Applies from the next scan.</div>
-        <div class="setting-line">
-            When MusicBrainz is busy, try each album
-            <NumberField Min="1" Max="10" Label="Attempts" Value="_settings.AttemptsWhenBusy" ValueChanged="n => Set(_settings with { AttemptsWhenBusy = n })" />
-            @(_settings.AttemptsWhenBusy == 1 ? "time" : "times") before leaving it for next time
-        </div>
-        <div class="muted small">A busy album goes to the back of the queue, so MusicBrainz gets time to recover before it's tried again.</div>
-        <label class="dialog-choice">
-            <input type="checkbox" checked="@_settings.UpdateCatalogueAfterScan" @onchange="e => Set(_settings with { UpdateCatalogueAfterScan = (bool)e.Value! })" />
-            <span>
-                <strong>Update the catalogue after each scan</strong>
-                <span class="muted small">Looks up your artists' discographies and their albums' editions, as its own task, so the missing view stays current. The Scan menu's <em>Update catalogue</em> starts one any time.</span>
-            </span>
-        </label>
-        <ScheduleNote Task="ScheduledTask.Scan" />
-        <ScheduleNote Task="ScheduledTask.CatalogueUpdate" />
     </div>
 
     <h2>File metadata</h2>
@@ -100,12 +96,8 @@ else
                 <span class="muted small">For songs without them. A song no source has lyrics for is asked about again after a month. Each song's page can look for them any time.</span>
             </span>
         </label>
-        <div class="setting-line">
-            <ScheduleNote Task="ScheduledTask.Lyrics" />
-            <span class="spacer"></span>
-            <button disabled="@_findingLyrics" @onclick="FindLyricsAsync">@if (_findingLyrics) { <span class="spinner"></span> }Look for missing lyrics now</button>
-        </div>
-        @if (_lyricsError is not null) { <div class="error small">@_lyricsError</div> }
+        <ScheduleNote Task="ScheduledTask.Lyrics" />
+        <div class="muted small">To look for missing lyrics now, use <a href="tools">Tools → Look for missing lyrics</a>.</div>
         <div class="muted small">Where lyrics go:</div>
         @foreach (var (storage, name, hint) in LyricsStorages)
         {
@@ -119,89 +111,15 @@ else
         }
     </div>
 
-    <h2>Fetching</h2>
-    <div class="card settings-card">
-        <div class="field">
-            <label class="field-label" for="path-template">Folder layout for new albums</label>
-            <input id="path-template" type="text" style="width: 100%; max-width: 32rem;" @bind="_fetchTemplate" @bind:after="Changed" />
-            <div class="muted small">
-                A <a href="https://beets.readthedocs.io/en/stable/reference/pathformat.html" target="_blank" rel="noopener noreferrer">beets path format</a>.
-                The default, <code>@FetchSettings.DefaultPathTemplate</code>, gives <code>Portishead/Dummy/11 Glory Box.opus</code>.
-                A track for an album you already have goes next to that album's files instead.
-                @if (_fetchTemplate != FetchSettings.DefaultPathTemplate)
-                {
-                    <button class="link small" @onclick="() => { _fetchTemplate = FetchSettings.DefaultPathTemplate; Changed(); }">Use the default</button>
-                }
-            </div>
-        </div>
-        <div class="setting-line">
-            Fetch
-            <NumberField Min="1" Max="8" Label="Fetches at once" Value="_fetch.ParallelFetches" ValueChanged="n => SetFetch(_fetch with { ParallelFetches = n })" />
-            at once
-        </div>
-        <div class="setting-line">
-            Accept a file within
-            <NumberField Min="0" Max="120" Label="Seconds" Value="_fetch.DurationToleranceSeconds" ValueChanged="n => SetFetch(_fetch with { DurationToleranceSeconds = n })" />
-            seconds or
-            <NumberField Min="0" Max="50" Label="Percent" Value="_fetch.DurationTolerancePercent" ValueChanged="n => SetFetch(_fetch with { DurationTolerancePercent = n })" />
-            % of the song's length, whichever is more
-        </div>
-        <div class="muted small">A file further off is probably a different version, such as a live take or a radio edit.</div>
-        <div class="setting-line">
-            Try
-            <NumberField Min="1" Max="5" Label="Results per source" Value="_fetch.CandidatesPerPlugin" ValueChanged="n => SetFetch(_fetch with { CandidatesPerPlugin = n })" />
-            of each source's best results, best first whichever source they're from
-        </div>
-        <div class="muted small">How long listen-now tracks are kept is under <a href="settings/playback">Playback</a>.</div>
-    </div>
-
-    <h2>Log</h2>
-    <div class="card settings-card">
-        <div class="setting-line">
-            Show the last
-            <NumberField Min="1" Max="90" Label="Days" Value="_log!.MemoryDays" ValueChanged="n => SetLog(_log with { MemoryDays = n })" />
-            days on the Log page
-        </div>
-        <div class="setting-line">
-            Keep backup files for
-            <NumberField Min="1" Max="3650" Label="Days" Value="_log.FileDays" ValueChanged="n => SetLog(_log with { FileDays = n })" />
-            days
-        </div>
-        <div class="muted small">Every entry is written to a file per day under <code>data/logs</code> as it happens, so a restart loses nothing. Older files are deleted.</div>
-        <div class="setting-line">
-            Keep tasks' lists for
-            <NumberField Min="1" Max="3650" Label="Days" Value="_log.TaskDays" ValueChanged="n => SetLog(_log with { TaskDays = n })" />
-            days
-        </div>
-        <div class="muted small">What each scan, format, lyrics search and catalogue update did, row by row, as Activity shows it. A task's list is written under <code>data/tasks</code> when it finishes.</div>
-    </div>
-
     <AutoSave @ref="_saver" Save="SaveAsync" />
 
-    <p class="muted small">Plugins (sources, the media server and the catalogue) are set up under <a href="settings/plugins">Plugins</a>.</p>
-
-    <FactoryResetPanel />
+    <p class="muted small">
+        How music is fetched and matched is under <a href="settings/fetching">Fetching</a>; plugins (sources, the media server and the catalogue)
+        under <a href="settings/plugins">Plugins</a>.
+    </p>
 }
 
 @code {
-    private bool _findingLyrics;
-    private string? _lyricsError;
-
-    private async Task FindLyricsAsync()
-    {
-        _findingLyrics = true;
-        _lyricsError = null;
-        try
-        {
-            Tasks.Started(await Api.FindLyricsAsync());
-        }
-        catch (Exception e) when (e is HttpRequestException or MelodexApiException)
-        {
-            _lyricsError = e.Message;
-        }
-        _findingLyrics = false;
-    }
-
     private static readonly (LyricsStorage Storage, string Name, string Hint)[] LyricsStorages =
     [
         (LyricsStorage.Sidecar, "Beside each song", "An .lrc file with the song's name. Navidrome and most players read these, and the music files themselves aren't changed."),
@@ -210,9 +128,9 @@ else
     ];
 
     private LibrarySettings? _settings;
-    private FetchSettings? _fetch;
-    private LogSettings? _log;
-    private string _fetchTemplate = "";
+    private string? _pathTemplate;
+    // What's changed since it was last saved: the library's settings, the folder layout (kept with fetching's), or both.
+    private bool _libraryChanged, _fetchChanged;
     private AutoSave? _saver;
 
     private static readonly (DuplicateTracks, string, string)[] DuplicateOptions =
@@ -227,10 +145,9 @@ else
 
     protected override async Task OnInitializedAsync()
     {
+        var fetch = Api.GetFetchSettingsAsync();
         _settings = await Api.GetLibrarySettingsAsync();
-        _fetch = await Api.GetFetchSettingsAsync();
-        _log = await Api.GetLogSettingsAsync();
-        _fetchTemplate = _fetch.PathTemplate;
+        _pathTemplate = (await fetch).PathTemplate;
     }
 
     private bool IsDefaultShowing => Enum.GetValues<ReleaseKind>().All(k => _settings!.ShowingOf(k) == ReleaseKinds.Default(k));
@@ -246,27 +163,28 @@ else
     private void Set(LibrarySettings settings)
     {
         _settings = settings;
-        Changed();
+        _libraryChanged = true;
+        _saver?.Changed();
     }
 
-    private void SetFetch(FetchSettings fetch)
+    private void FetchChanged()
     {
-        _fetch = fetch;
-        Changed();
+        _fetchChanged = true;
+        _saver?.Changed();
     }
 
-    private void SetLog(LogSettings log)
-    {
-        _log = log;
-        Changed();
-    }
-
-    private void Changed() => _saver?.Changed();
-
+    // The folder layout is saved over fetching's settings as they are now, so what's changed on Fetching meanwhile stays.
     private async Task SaveAsync()
     {
-        await Api.SaveLibrarySettingsAsync(_settings!);
-        await Api.SaveFetchSettingsAsync(_fetch! with { PathTemplate = _fetchTemplate });
-        await Api.SaveLogSettingsAsync(_log!);
+        if (_libraryChanged)
+        {
+            _libraryChanged = false;
+            await Api.SaveLibrarySettingsAsync(_settings!);
+        }
+        if (_fetchChanged)
+        {
+            _fetchChanged = false;
+            await Api.SaveFetchSettingsAsync(await Api.GetFetchSettingsAsync() with { PathTemplate = _pathTemplate! });
+        }
     }
 }

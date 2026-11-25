@@ -19,7 +19,7 @@ a copy was turned away only for its quality, **Keep it anyway**, as it is.
 Requests run one at a time, in order. Move them up and down the queue, pause them or cancel them from Activity, one by
 one or with **Pause all** and **Cancel all** (with a filter, **Pause these** and **Cancel these** act on what's shown).
 
-Activity's **Recent** view, on both **Downloads** and **Tasks**, is in three sections: **Running**, **Queued** (the next
+Activity's **Recent** view, on both **Fetches** and **Tasks**, is in three sections: **Running**, **Queued** (the next
 to run at the top) and **Completed** (the most recently finished at the top). Click a section's heading to close or
 open it; each tab remembers. As something starts or finishes it slides from one section into the next.
 
@@ -88,7 +88,7 @@ cutoff is met.
   looked for longest ago go first, and the worst of those. It's on from the start, and can be unticked. Upgrades go
   after anything you ask for.
 - **Tools → Look for upgrades** starts a look the same way, whatever the time: it stops when everything's been tried,
-  or with the window if it starts in one. While a look is going, that card and **Activity → Downloads** say so, with
+  or with the window if it starts in one. While a look is going, that card and **Activity → Fetches** say so, with
   **Stop looking**, which cancels the upgrades it asked for that haven't started.
 - **Only a copy that reaches the cutoff is kept.** Sources are only asked for copies that may be better than what you
   have and reach the cutoff, so a source that can only get lossy copies, such as yt-dlp, is passed over when the cutoff
@@ -128,16 +128,16 @@ upgrade settings, and while scheduled upgrades are on the web app says so once e
 
 Press **Listen** to hear something before deciding. It's fetched to a separate store, never your music folder, plays
 in the player at the bottom of the page beside the music you have, and is deleted a while after you last play it (an
-hour by default; change it under **Settings → Playback**). **Add to library** files the same file without fetching it
+hour by default; change it under **Settings → Fetching → Listen now**). **Add to library** files the same file without fetching it
 again.
 
 Playing an album you don't have all of puts the whole album in the queue, but only the songs you don't have near the
 one playing are fetched: by default the one playing, the three after it and the two before it. The rest show **To
-fetch** in the queue, and are fetched as the queue comes near them. Change how many under **Settings → Playback**.
+fetch** in the queue, and are fetched as the queue comes near them. Change how many under **Settings → Fetching → Listen now**.
 
 **Library → Listen now** has the songs fetched to listen to that are still here, each once, grouped by album: play
 them, or add them to your library or delete them now from their ⋯ menus. Every fetch, and any that couldn't be found,
-is under **Activity → Downloads**.
+is under **Activity → Fetches**.
 
 ## Wishlist
 

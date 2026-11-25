@@ -107,9 +107,9 @@ scan.
 - **Update catalogue**: look up every artist's discography, and the editions of their albums, so the missing view
   knows what's out there.
 
-After each scan, Melodex queues a catalogue update of its own, which shows on Activity as a separate task. To update
-the catalogue only when you ask, turn off **Update the catalogue after each scan** under **Settings → General →
-Matching**.
+A scan doesn't update the catalogue itself: **Update the catalogue** is a scheduled task of its own, right after the
+scan in the daily window to start with, and the Scan menu's **Update catalogue** starts one whenever you like. It shows
+on Activity as a separate task.
 
 Scans and other long jobs show on **Activity**, where they can be paused, cancelled or moved in the queue, one by one
 or all at once.
@@ -150,7 +150,7 @@ Excluded files with a title and an artist are listed as their tags say: under th
 that name, or one of their own, with the picture embedded in the file or beside it (such as `folder.jpg`). Excluded
 files without them are listed under *Incomplete metadata* on Review.
 
-**Settings → General → File metadata** shows matched music that way too, wherever its files have them: **Use your
+**Settings → Library → File metadata** shows matched music that way too, wherever its files have them: **Use your
 files' tags** for titles, artists and albums, and **Use your files' cover art** for covers. Each is on its own.
 
 ### Genres
@@ -167,7 +167,7 @@ them into the files.
 
 ## What counts as missing
 
-**Settings → General → Missing view** has a choice for each kind of release, in one list: the main types (albums,
+**Settings → Library → Missing view** has a choice for each kind of release, in one list: the main types (albums,
 EPs, singles, broadcasts) first, then the kinds a release can also be (live, compilations, remixes, demos, soundtracks,
 DJ mixes, mixtapes, spoken word, interviews, audiobooks, audio dramas, field recordings), and bootlegs. The **i**
 beside some says what they take in. Each can be:
@@ -196,7 +196,7 @@ a deluxe edition, a compilation) is fetched once or for each, and whether owning
 
 **Format** rewrites files' tags and covers from the catalogue, and moves them to where your naming scheme says. It's on
 each artist, album and track page, and for the whole library under **Tools → Formatting**. It shows what will change first, and
-nothing is written until you confirm. Set the folder layout under **Settings → General**. **Genres** writes the
+nothing is written until you confirm. Set the folder layout under **Settings → Library → Library format**. **Genres** writes the
 catalogue's [genres](#genres) into files that have none of their own, or into every file the catalogue has some for,
 over its own, when you choose the catalogue's **over the file's own**.
 
@@ -255,7 +255,7 @@ Below that the lyrics are shown line by line, with when each is sung, in a box t
 
 Whatever you save is written where the settings below say, replacing what was there.
 
-Set it up under **Settings → General → Lyrics**: whether scans look for lyrics, and where they go.
+Set it up under **Settings → Library → Lyrics**: whether scans look for lyrics, and where they go.
 
 - **Beside each song** (the default): an `.lrc` file with the song's name. Navidrome and most players read these, and
   the music files aren't changed.

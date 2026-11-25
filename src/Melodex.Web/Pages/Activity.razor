@@ -14,7 +14,7 @@
 
 @*
     What Melodex is doing and has done, in two tabs: tasks such as scans, formatting and catalogue updates; and
-    downloads, into the library or just to listen to. Each shows what's recent (still going, or changed in the last
+    fetches, into the library or just to listen to. Each shows what's recent (still going, or changed in the last
     hour) or what's earlier.
 *@
 <h1>Activity</h1>
@@ -33,7 +33,7 @@
         case "tasks":
             <span>Scans, formatting, lyrics, visualiser bars, quality checks and catalogue updates.</span>
             break;
-        case "downloads":
+        case "fetches":
             <span>Artists, albums, songs and upgrades asked for, and songs fetched to listen to now, newest first. Open one to see each attempt, its log, and the other candidates a plugin offered.</span>
             break;
     }
@@ -63,7 +63,7 @@
     }
     @if (_loaded && Shown != "tasks" && Auth.May(UserPermissions.Request) && FailedCount > 0)
     {
-        <IconButton Icon="retry" Label="Retry failed" Title="@($"Ask again for {Format.Count(FailedCount, "download that failed", "downloads that failed")}, as Retry does for each")"
+        <IconButton Icon="retry" Label="Retry failed" Title="@($"Ask again for {Format.Count(FailedCount, "fetch that failed", "fetches that failed")}, as Retry does for each")"
                     Disabled="_busy" OnClick="RetryFailedAsync" />
     }
 </div>
@@ -72,7 +72,7 @@
     <ScheduleNote Task="ScheduledTask.RetryFailed" />
 }
 
-@if (Shown == "downloads" && _upgradeRun is { } run)
+@if (Shown == "fetches" && _upgradeRun is { } run)
 {
     <div class="notice upgrade-run" role="status">
         <span class="spinner" aria-hidden="true"></span>
@@ -218,7 +218,7 @@ else
     }
     </div>
     @* The rest come as it's scrolled to: those already loaded, then, among earlier downloads, the ones before them. *@
-    _hasEnd = Drawable.Count() > _shown || (Shown == "downloads" && !_recent && Tracker.HasEarlier);
+    _hasEnd = Drawable.Count() > _shown || (Shown == "fetches" && !_recent && Tracker.HasEarlier);
     @if (_hasEnd)
     {
         <div class="list-end muted small" @ref="_end"><span class="spinner"></span> Loading more…</div>
@@ -228,7 +228,7 @@ else
 @code {
     [SupplyParameterFromQuery(Name = "open")] public Guid? OpenId { get; set; }
 
-    /// <summary>tasks or downloads, from the address; the one last shown when it doesn't say.</summary>
+    /// <summary>tasks or fetches, from the address; the one last shown when it doesn't say.</summary>
     [Parameter] public string? Tab { get; set; }
 
     private const string TabKey = "activity.tab", RecentKey = "activity.recent", SortKey = "activity.sort", DescendingKey = "activity.descending",
@@ -269,14 +269,14 @@ else
                 </span>
             }
         </text>;
-    private string _remembered = "downloads";
-    private string Shown => Tab is "tasks" or "downloads" ? Tab : _remembered;
+    private string _remembered = "fetches";
+    private string Shown => Tab is "tasks" or "fetches" ? Tab : _remembered;
 
     // Tabs with how many things in each are still going.
     private IEnumerable<(string Tab, string Label, int Count)> Tabs =>
     [
         ("tasks", "Tasks", _tasks.Count(t => t.Active)),
-        ("downloads", "Downloads", Tracker.Requests.Count(r => r.Active)),
+        ("fetches", "Fetches", Tracker.Requests.Count(r => r.Active)),
     ];
 
     private bool _loaded;
@@ -312,7 +312,7 @@ else
     {
         if (Drawable.Count() > _shown)
             _shown += Step;
-        else if (Shown == "downloads" && !_recent && Tracker.HasEarlier)
+        else if (Shown == "fetches" && !_recent && Tracker.HasEarlier)
         {
             var had = Tracker.Requests.Count;
             await Tracker.LoadEarlierAsync();
@@ -364,8 +364,8 @@ else
     // Pause all and Cancel all act on what's shown and still going, with the permission for the tab's kind.
     private bool MayChange => Auth.May(Shown == "tasks" ? UserPermissions.Scan : UserPermissions.Request);
     private List<Item> Changeable => Visible.Where(i => i.Active).ToList();
-    private string Noun => Shown == "tasks" ? "task" : "download";
-    private string Nouns => Shown == "tasks" ? "tasks" : "downloads";
+    private string Noun => Shown == "tasks" ? "task" : "fetch";
+    private string Nouns => Shown == "tasks" ? "tasks" : "fetches";
 
     // Failed downloads asked for into the library, which Retry failed asks for again: not upgrades, replacements or listening.
     private int FailedCount => Tracker.Requests.Count(r => r.State == RequestState.Failed && r.ParentId is null && !r.ListenNow && !r.Upgrade && !r.Replace);
@@ -440,7 +440,7 @@ else
     private readonly Dictionary<Guid, RequestInfo?> _open = [];
 
     // The tab's: what's running, then what's waiting in queue order, then the rest, most recently changed first.
-    // Downloads has every fetch, listen-now ones too; Library → Listen now is for playing what they fetched.
+    // Fetches has every fetch, listen-now ones too; Library → Listen now is for playing what they fetched.
     private IEnumerable<Item> Visible
     {
         get
@@ -527,7 +527,7 @@ else
         _ => "Completed",
     };
 
-    // Kept per tab, so Tasks and Downloads each remember theirs.
+    // Kept per tab, so Tasks and Fetches each remember theirs.
     private string SectionKey(Section section) => $"{Shown}:{section}";
 
     private HashSet<string> _closed = [];
@@ -562,7 +562,10 @@ else
 
     protected override async Task OnInitializedAsync()
     {
-        _remembered = await Prefs.GetAsync(TabKey, "downloads");
+        _remembered = await Prefs.GetAsync(TabKey, "fetches");
+        // Fetches was Downloads.
+        if (_remembered == "downloads")
+            _remembered = "fetches";
         _recent = await Prefs.GetAsync(RecentKey, true);
         _sort = await Prefs.GetAsync(SortKey, "newest");
         _descending = await Prefs.GetAsync(DescendingKey, true);
@@ -615,7 +618,13 @@ else
             Nav.NavigateTo("listen-now", replace: true);
             return;
         }
-        if (Tab is "tasks" or "downloads" && Tab != _remembered)
+        if (Tab == "downloads")
+        {
+            // Downloads became Fetches; old links, with what they open, go there.
+            Nav.NavigateTo("activity/fetches" + new Uri(Nav.Uri).Query, replace: true);
+            return;
+        }
+        if (Tab is "tasks" or "fetches" && Tab != _remembered)
         {
             _remembered = Tab;
             await Prefs.SetAsync(TabKey, Tab);
@@ -638,9 +647,9 @@ else
                 }
                 return;
             }
-            // A link to a request shows it under Downloads, recent or earlier as it is.
+            // A link to a request shows it under Fetches, recent or earlier as it is.
             if (Tab is null)
-                _remembered = "downloads";
+                _remembered = "fetches";
             // A link to a part opens its parent too, if it's one.
             var top = request.ParentId is { } parent ? await Api.GetRequestAsync(parent) : request;
             if (top is not null)
@@ -674,7 +683,7 @@ else
                 _shown = Math.Max(_shown, (index / Step + 1) * Step);
                 break;
             }
-            if (Shown != "downloads" || _recent || !Tracker.HasEarlier)
+            if (Shown != "fetches" || _recent || !Tracker.HasEarlier)
                 break;
             var had = Tracker.Requests.Count;
             await Tracker.LoadEarlierAsync();

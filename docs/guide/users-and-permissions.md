@@ -3,21 +3,22 @@
 ## Users
 
 The admin, made at setup, may do everything. Add other people under **Settings → Users**, giving each only what they
-need. Nobody can give a permission they don't have, and only the admin can change the admin's account. Removing
-someone signs them out and revokes their API keys; what they asked for stays.
+need: adding someone gives them a username and password to start with. Nobody can give a permission they don't have.
+Removing someone signs them out and revokes their API keys; what they asked for stays.
 
-Each user's card lists what they may do; click the list to see all of it. Its settings button opens their account in
-three tabs, saved together:
+Each user's card lists what they may do; click the list to see all of it. Its settings button changes what they may
+do, and can set them a new password if they've forgotten theirs; the admin's card has none. On your own card it opens your account.
 
-- **Login**: their username, and a new password, which signs them out everywhere.
-- **Permissions**: what they may do.
+Everyone changes their own account under **Your account**, at the top of Settings or in the account menu at the top
+right, saved together:
+
+- **Login**: their username and password. Changing either needs their current password, and a new password signs
+  them out everywhere else.
 - **Media server accounts**, when a media server that's set up syncs playlists: their login on each, to sync their
   playlists. The one in use is marked; the others' logins are kept for switching to them. Each login is checked with
-  its server when you save, and a tab with something to fix is marked.
+  its server when they save.
 
-Anyone can change their own account under **Your account**, in the account menu at the top right: the same three
-tabs, for themselves. Changing their username or password needs their current password, and a new password signs
-them out everywhere else.
+**Sign out**, at the foot of the page, signs them out in that browser.
 
 ## What each permission allows
 
@@ -38,10 +39,11 @@ Someone who just listens needs Browse and Listen. Buttons for what someone may n
 
 ## API keys
 
-Apps use a key from **Settings → API**. Anyone signed in can make keys there, as many as they like, but each can do only
+Apps use a key from **Settings → Server → API keys**. Anyone signed in can make keys there, as many as they like, but each can do only
 what its maker may. A key belongs to whoever made it and can never do more than they may: if their
 permissions shrink, or they're removed, so does the key. **Everything you may do** gives a key all its owner's
-permissions, now and later. See the [client guide](../client-guide.md) for the API itself.
+permissions, now and later. Your keys are under **Your keys**; the admin also sees everyone else's, under **Other
+people's keys**, and can revoke any of them. See the [client guide](../client-guide.md) for the API itself.
 
 ## A lost admin password
 

@@ -6,7 +6,7 @@ in the browser. You don't need Navidrome for this, though Melodex still works wi
 
 ## Signing in
 
-Players sign in with an API key, not your password. Under **Settings → API**, make a **New key**, named for the phone
+Players sign in with an API key, not your password. Under **Settings → Server → API keys**, make a **New key**, named for the phone
 or computer it's for, and tick **Let a Subsonic player sign in with it** (which gives it the **Listen** permission).
 Melodex then shows what to type into the player:
 
@@ -18,7 +18,7 @@ Melodex then shows what to type into the player:
 A player that signs in with an API key alone, as OpenSubsonic's newer players can, takes the key without a username,
 and any key with **Listen** works for that, ticked or not.
 
-Make one key for each player: if a phone is lost, revoke its key under **Settings → API** and the rest carry on.
+Make one key for each player: if a phone is lost, revoke its key under **Settings → Server → API keys** and the rest carry on.
 Nothing stops one key being used on several, but they'd all be signed out together. Your own password never works in
 a player, so it never sits in an app on a phone.
 

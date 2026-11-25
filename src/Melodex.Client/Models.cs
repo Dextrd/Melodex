@@ -184,12 +184,6 @@ public sealed record LibrarySettings
     /// <summary>Show covers from your files (an embedded picture, or one like folder.jpg beside them) rather than the catalogue's, wherever there's one.</summary>
     public bool PreferFileCovers { get; init; }
 
-    /// <summary>
-    /// Update the catalogue after each scan: every library artist's discography, and the editions of their albums. It runs
-    /// as its own task, and can be started from the Scan menu any time.
-    /// </summary>
-    public bool UpdateCatalogueAfterScan { get; init; } = true;
-
     /// <summary>Find lyrics for songs in the library that have none, after each scan, through the lyrics plugins.</summary>
     public bool FetchLyrics { get; init; } = true;
 

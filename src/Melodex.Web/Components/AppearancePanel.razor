@@ -4,8 +4,9 @@
 @implements IDisposable
 
 @*
-    How the web app looks: for whoever's signed in, kept with their account, or for everyone who hasn't chosen their own.
-    Each choice shows at once where it's what you see.
+    How the web app looks, or which notifications it shows: for whoever's signed in, kept with their account, or for
+    everyone who hasn't chosen their own. Each choice shows at once where it's what you see. Both are kept together, so
+    choosing either makes them your own.
 *@
 <section class="panel" aria-label="@Title">
     <header class="panel-head">
@@ -14,16 +15,16 @@
             <p class="muted small">
                 @if (ForEveryone)
                 {
-                    <span>How Melodex looks and behaves for everyone who hasn't chosen their own look. Each person can choose their own under Settings → Appearance.</span>
+                    <span>@(Notifications ? "The notifications" : "How Melodex looks") for everyone who hasn't chosen their own. Each person can choose their own under Settings → Web app.</span>
                 }
                 else if (Auth.Status?.OwnAppearance == true)
                 {
-                    <span>How Melodex looks and behaves for you, on every device you sign in on. </span>
-                    <button class="link" disabled="@_saving" @onclick="FollowEveryoneAsync">Use everyone's look instead</button>
+                    <span>@(Notifications ? "The notifications you see" : "How Melodex looks for you"), on every device you sign in on. </span>
+                    <button class="link" disabled="@_saving" @onclick="FollowEveryoneAsync">Use everyone's instead</button>
                 }
                 else
                 {
-                    <span>You're following the look chosen for everyone. Change anything here to make it your own, on every device you sign in on.</span>
+                    <span>You're following the @(Notifications ? "notifications" : "look") chosen for everyone. Change anything here to make @(Notifications ? "them" : "it") your own, on every device you sign in on.</span>
                 }
             </p>
         </div>
@@ -31,6 +32,19 @@
         @Switch
     </header>
     <div class="appearance">
+        @if (Notifications)
+        {
+            <p class="muted small">They slide in at the bottom right while you use Melodex.</p>
+            @foreach (var (name, hint, on, set) in NoticeKinds)
+            {
+                <label class="dialog-choice">
+                    <input type="checkbox" checked="@on(_appearance)" @onchange="e => SaveAsync(set(_appearance, (bool)e.Value!))" />
+                    <span><strong>@name</strong><span class="muted small">@hint</span></span>
+                </label>
+            }
+        }
+        else
+        {
         <div class="field-label">Colour</div>
         <div class="swatches" role="radiogroup" aria-label="Colour">
             @foreach (var (color, name, light, dark) in Theme.Colors)
@@ -62,14 +76,6 @@
             </span>
         </label>
 
-        <div class="field-label">Notifications</div>
-        <p class="muted small">They slide in at the bottom right while you use Melodex.</p>
-        @foreach (var (name, hint, on, set) in NoticeKinds)
-        {
-            <label class="dialog-choice">
-                <input type="checkbox" checked="@on(_appearance)" @onchange="e => SaveAsync(set(_appearance, (bool)e.Value!))" />
-                <span><strong>@name</strong><span class="muted small">@hint</span></span>
-            </label>
         }
         @if (_error is not null) { <p class="error small">@_error</p> }
     </div>
@@ -78,6 +84,9 @@
 @code {
     /// <summary>Everyone's look, rather than your own.</summary>
     [Parameter] public bool ForEveryone { get; set; }
+
+    /// <summary>Which notifications show, rather than the look.</summary>
+    [Parameter] public bool Notifications { get; set; }
 
     /// <summary>Shown at the top right, such as the switch between your own look and everyone's.</summary>
     [Parameter] public RenderFragment? Switch { get; set; }
@@ -90,13 +99,13 @@
     [
         ("Long tasks", "When a scan, catalogue update, import or formatting finishes or fails, and when a scan leaves files to review",
             a => a.TaskNotices, (a, on) => a with { TaskNotices = on }),
-        ("Downloads", "When you ask for something, and when it's in your library, waiting for review, or failed",
+        ("Fetches", "When you ask for something, and when it's in your library, waiting for review, or failed",
             a => a.DownloadNotices, (a, on) => a with { DownloadNotices = on }),
         ("Upgrades and menus", "When you look for a better copy or change your wishlist, and when the better copies are in",
             a => a.ActionNotices, (a, on) => a with { ActionNotices = on }),
     ];
 
-    private string Title => ForEveryone ? "Appearance for everyone" : "Appearance";
+    private string Title => (Notifications ? "Notifications" : "Appearance") + (ForEveryone ? " for everyone" : "");
 
     // Everyone's look shows as you change it only while you follow it.
     private bool Shown => !ForEveryone || Auth.Status?.OwnAppearance != true;

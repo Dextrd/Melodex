@@ -17,18 +17,25 @@ Variables named `Navidex__…`, from before the rename, still work; a `Melodex__
 
 ## In the web app
 
-| Settings section | Holds |
-| --- | --- |
-| **General** | Songs on more than one release, the missing view (each kind of release shown, hidden, or for new songs only), matching, file metadata, lyrics, the folder layout, and fetching |
-| **Quality** | The [quality profile](requests-and-listening.md#quality) and [upgrades](requests-and-listening.md#upgrades) |
-| **Scheduled tasks** | What runs on its own, and when: see [Scheduled tasks](#scheduled-tasks) |
-| **Playback** | Which songs play [without a gap](requests-and-listening.md#gapless-playback), when [the visualiser](requests-and-listening.md#the-visualiser)'s bars are made, if at all, how long listen-now songs are kept, how much of a [radio](requests-and-listening.md#radio) is songs you don't have, and whether radios carry on when a queue runs out |
-| **Log** | Recent activity, and how long logs are kept |
-| **Plugins** | See [Plugins](plugins.md) |
-| **Users**, **API**, **Webhooks** | See [Users and permissions](users-and-permissions.md) and the [client guide](../client-guide.md) |
-| **Appearance** | See [Appearance](appearance.md) |
-| **Help** | This guide |
-| **About** | The version, links to GitHub, and who made Melodex |
+Settings opens with **your account** at the top, a large button with your initial and name: your login, media-server
+logins, [scrobbling](library.md#history), and signing out. The rest are in sections, each page shown to whoever may
+use it:
+
+| Section | Page | Holds |
+| --- | --- | --- |
+| Library | **Library** | Songs on more than one release, the missing view (each kind of release shown, hidden, or for new songs only), the library format (the folder layout, for new albums and formatting), file metadata, and lyrics |
+| | **Quality** | The [quality profile](requests-and-listening.md#quality) and [upgrades](requests-and-listening.md#upgrades) |
+| | **Playback** | Which songs play [without a gap](requests-and-listening.md#gapless-playback), when [the visualiser](requests-and-listening.md#the-visualiser)'s bars are made, if at all, how much of a [radio](requests-and-listening.md#radio) is songs you don't have, and whether radios carry on when a queue runs out |
+| | **Fetching** | How many fetches run at once, on the schedule or not, how close a file must be to the song's length, listen now's (how long its songs are kept, and how far ahead they're fetched), and matching |
+| | **Scheduled tasks** | What runs on its own, and when: see [Scheduled tasks](#scheduled-tasks) |
+| Web app | **Appearance** | Your look: see [Appearance](appearance.md) |
+| | **Notifications** | Which [notifications](appearance.md#notifications) you see |
+| Server | **Plugins** | See [Plugins](plugins.md) |
+| | **Users** | See [Users and permissions](users-and-permissions.md) |
+| | **API keys**, **Webhooks** | Your keys for apps and players, and calls out to other apps: see the [client guide](../client-guide.md) |
+| | **Log** | Recent activity, and how long logs are kept |
+| Melodex | **Help** | This guide |
+| | **About** | The version, links to GitHub, who made Melodex, and for the admin, resetting it |
 
 ## Scheduled tasks
 
@@ -36,10 +43,10 @@ Variables named `Navidex__…`, from before the rename, still work; a `Melodex__
 times, and below each the tasks it runs: tick a task to put it on that schedule. A task is on one schedule at most, so
 ticking it on one takes it off another; one on none only runs when you start it.
 
-- **Scan the library**: read new and changed files and match them, then whatever **Settings → General** says follows a scan.
+- **Scan the library**: read new and changed files and match them, then whatever **Settings → Library** says follows a scan.
 - **Update the catalogue**: look up every library artist's discography.
 - **Look for missing lyrics**: look again for songs without lyrics.
-- **Retry failed downloads**: ask again for downloads that failed. Any not started when the window closes go back to
+- **Retry failed fetches**: ask again for fetches that failed. Any not started when the window closes go back to
   failed, for the next window.
 - **Get what's on wishlists**: ask for what's on everyone's wishlist, each in the name of whoever wished for it, when a
   retriever is on to fetch it. Any not started when the window closes are cancelled, and stay on the wishlist.
@@ -58,7 +65,8 @@ To start with, the daily window is 01:00 to 06:00 and scans and updates the cata
 - **A window runs its tasks once, in order**: scan, catalogue, lyrics, then failed downloads, wishlists and upgrades.
   The first three are tasks on **Activity**, one after another; the rest wait
   for them, as nothing can be asked for while a scan reads the library.
-- **Downloads go a few at a time.** Retries and wishlists keep **Downloads at a time** going (5 to start with), and
+- **Fetches go a few at a time.** Retries and wishlists keep a few fetches going, as many as **Settings → Fetching →
+  Scheduled fetches** says (5 to start with), and
   upgrades their own **Upgrades at a time**: as each finishes, the next is asked for in its place, so the queue never
   fills with a window's worth at once. Each waits for its downloads to finish before the next starts, and upgrades go
   last, filling what's left of the window. When the window closes, nothing more is asked for; those not started wait
@@ -68,9 +76,8 @@ To start with, the daily window is 01:00 to 06:00 and scans and updates the cata
 
 Below each schedule are when it next runs, and how its last run went, a line for each task, with a link to its task on
 Activity. Every task can still be run straight away from its own place, which says which schedule it's on and links
-here: **Scan** and **Update catalogue** in the Library page's Scan menu, **Look for missing lyrics now** under **Settings →
-General → Lyrics**, **Look for upgrades** on Tools, **Retry
-failed** on **Activity → Downloads**, and **Get them all** on the wishlist. Those last two ask for everything at once.
+here: **Scan** and **Update catalogue** in the Library page's Scan menu, **Look for missing lyrics** and **Look for upgrades** on Tools, **Retry
+failed** on **Activity → Fetches**, and **Get them all** on the wishlist. Those last two ask for everything at once.
 
 **Sync playlists every** sets how often playlists sync with the media server for changes made there, from 1 minute to
 a day (10 minutes to start with).

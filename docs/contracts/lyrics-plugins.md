@@ -5,7 +5,7 @@ under Lyrics in Settings → Plugins. Code: `Melodex.Contracts.Plugins.Lyrics`.
 
 ## How the core uses them
 
-1. After each scan, when **Settings → General → Lyrics** says to, the core queues a *Finding lyrics* task for every
+1. After each scan, when **Settings → Library → Lyrics** says to, the core queues a *Finding lyrics* task for every
    matched song in the library that has none. A song's page can also look for them at any time.
 2. A file that already has lyrics, in an `.lrc` file beside it or its lyrics tag, keeps them, and no plugin is asked.
 3. Otherwise the core asks the enabled lyrics plugins in the user's order, once per song however many files it has,

@@ -42,7 +42,7 @@ albums to tell apart.
 | `release` | The edition the files belong to. Its MusicBrainz ID pins the match; without one, the files are filed as tagged. |
 | `files` | Each file, relative to the staging folder, with the recording it is (empty without a release), its place on the release, and its ISRC if known. |
 | `destinationDirectory` | A folder relative to the library to put the files in, instead of the template's. Melodex sets it when you already own part of the album, so new tracks join the files you have wherever they live. Only the file name comes from the template. |
-| `pathTemplate` | A [beets path format](https://beets.readthedocs.io/en/stable/reference/pathformat.html), set under Settings → Fetching. |
+| `pathTemplate` | A [beets path format](https://beets.readthedocs.io/en/stable/reference/pathformat.html), set under Settings → Library → Library format. |
 | `musicBrainzServer` | The server Melodex's MusicBrainz plugin uses, so a mirror applies to imports too. |
 
 Steps:

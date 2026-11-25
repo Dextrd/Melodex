@@ -3,17 +3,18 @@
 @layout SettingsLayout
 @inject MelodexClient Api
 @inject AuthState Auth
+@inject NavigationManager Nav
 
 <SectionTitle>Users · Melodex</SectionTitle>
 
 @*
-    Everyone who signs in, and what each may do. The admin, made at setup, may do everything and only they can change
-    their account. Nobody can give a permission they don't have.
+    Everyone who signs in, and what each may do. The admin, made at setup, may do everything. Editing someone changes
+    what they may do, and nobody can give a permission they don't have; your own card opens your account.
 *@
 @if (!Auth.May(UserPermissions.Users))
 {
     <div class="empty card">
-        You can't manage users. To change your own username or password, open <a href="account">your account</a>.
+        You can't manage users. To change your own username or password, open <a href="settings/account">your account</a>.
     </div>
 }
 else if (_users is null)
@@ -60,9 +61,13 @@ else
                     </div>
                     <div class="plugin-actions">
                         <span class="spacer"></span>
-                        @if (!user.IsAdmin || Auth.Status?.IsAdmin == true)
+                        @if (you)
                         {
-                            <IconButton Icon="settings" Title="Edit" OnClick="() => StartEdit(user)" />
+                            <IconButton Icon="settings" Title="Your account" OnClick="@(() => Nav.NavigateTo("settings/account"))" />
+                        }
+                        else if (!user.IsAdmin)
+                        {
+                            <IconButton Icon="settings" Title="Permissions" OnClick="() => StartEdit(user)" />
                         }
                         @if (!user.IsAdmin && !you)
                         {
@@ -78,7 +83,7 @@ else
 @if (_editing is { } editing)
 {
     <Dialog Title="@(editing.User is null ? "Add user" : $"Edit {editing.User.Username}")" OnClose="() => _editing = null" Class="wide">
-        <UserEditor User="editing.User" OnSaved="SavedAsync" OnCancel="() => _editing = null" />
+        <UserEditor User="editing.User" PermissionsOnly="editing.User is not null" OnSaved="SavedAsync" OnCancel="() => _editing = null" />
     </Dialog>
 }
 

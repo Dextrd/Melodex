@@ -1,0 +1,165 @@
+@page "/settings/fetching"
+@layout SettingsLayout
+@inject MelodexClient Api
+
+<PageTitle>Fetching · Melodex</PageTitle>
+
+@*
+    How music is fetched and matched (#238): how a file is picked, how many fetches go at once, scheduled or not,
+    listen now's, and matching what's fetched or scanned to the catalogue. Where it goes is the library format, under
+    Library.
+*@
+@if (_fetch is null || _library is null || _schedules is null)
+{
+    <Loading />
+}
+else
+{
+    <h2>Fetching</h2>
+    <div class="card settings-card">
+        <div class="setting-line">
+            Fetch
+            <NumberField Min="1" Max="8" Label="Fetches at once" Value="_fetch.ParallelFetches" ValueChanged="n => SetFetch(_fetch with { ParallelFetches = n })" />
+            at once
+        </div>
+        <div class="setting-line">
+            Accept a file within
+            <NumberField Min="0" Max="120" Label="Seconds" Value="_fetch.DurationToleranceSeconds" ValueChanged="n => SetFetch(_fetch with { DurationToleranceSeconds = n })" />
+            seconds or
+            <NumberField Min="0" Max="50" Label="Percent" Value="_fetch.DurationTolerancePercent" ValueChanged="n => SetFetch(_fetch with { DurationTolerancePercent = n })" />
+            % of the song's length, whichever is more
+        </div>
+        <div class="muted small">A file further off is probably a different version, such as a live take or a radio edit.</div>
+        <div class="setting-line">
+            Try
+            <NumberField Min="1" Max="5" Label="Results per source" Value="_fetch.CandidatesPerPlugin" ValueChanged="n => SetFetch(_fetch with { CandidatesPerPlugin = n })" />
+            of each source's best results, best first whichever source they're from
+        </div>
+        <div class="muted small">
+            Where fetched albums go is the <a href="settings#format">library format</a>, under Library; which qualities are kept, under
+            <a href="settings/quality">Quality</a>.
+        </div>
+    </div>
+
+    <h2>Scheduled fetches</h2>
+    <div class="card settings-card">
+        <div class="setting-line">
+            Keep
+            <NumberField Value="_schedules.DownloadsAtATime" Min="1" Max="ScheduleSettings.MostDownloadsAtATime" Label="Fetches at a time"
+                         ValueChanged="n => SetSchedules(_schedules with { DownloadsAtATime = n })" />
+            @(_schedules.DownloadsAtATime == 1 ? "fetch" : "fetches") going at a time when retrying failed fetches and getting wishlists
+        </div>
+        <div class="muted small">
+            On the <a href="settings/schedule">schedule</a>: as each finishes, the next is asked for in its place, until all have been or the window
+            closes. Upgrades keep their own number, under <a href="settings/quality#upgrades">Quality</a>. <strong>Retry failed</strong> and
+            <strong>Get them all</strong> by hand ask for them all at once.
+        </div>
+    </div>
+
+    <h2 id="listen-now">Listen now</h2>
+    <div class="card settings-card">
+        <div class="setting-line">
+            Keep listen-now tracks for
+            <NumberField Min="5" Max="10080" Step="5" Label="Minutes" Value="_fetch.ListenNowExpiryMinutes" ValueChanged="n => SetFetch(_fetch with { ListenNowExpiryMinutes = n })" />
+            minutes after they were last played
+        </div>
+        <div class="muted small">A track fetched to listen to, and not added to the library, is deleted after this.</div>
+        <div class="setting-line">
+            Fetch
+            <NumberField Min="0" Max="20" Label="Songs ahead" Value="_fetch.ListenNowAhead" ValueChanged="n => SetFetch(_fetch with { ListenNowAhead = n })" />
+            songs ahead of the one playing, and
+            <NumberField Min="0" Max="20" Label="Songs behind" Value="_fetch.ListenNowBehind" ValueChanged="n => SetFetch(_fetch with { ListenNowBehind = n })" />
+            behind it
+        </div>
+        <div class="muted small">
+            Playing an album you don't have all of puts all of it in the queue, but only the songs you don't have this near the one playing are
+            fetched to listen to. The rest are fetched as the queue comes to them. The quality listen now aims for is under
+            <a href="settings/quality">Quality</a>.
+        </div>
+    </div>
+
+    <h2>Matching</h2>
+    <div class="card settings-card">
+        <div class="setting-line">
+            Send fuzzy matches under
+            <NumberField Min="50" Max="100" Label="Confidence, in percent" Value="(int)Math.Round(_library.MatchThreshold * 100)"
+                         ValueChanged="n => SetLibrary(_library with { MatchThreshold = n / 100.0 })" />
+            % confidence to review
+        </div>
+        <div class="muted small">Applies from the next scan.</div>
+        <div class="setting-line">
+            When MusicBrainz is busy, try each album
+            <NumberField Min="1" Max="10" Label="Attempts" Value="_library.AttemptsWhenBusy" ValueChanged="n => SetLibrary(_library with { AttemptsWhenBusy = n })" />
+            @(_library.AttemptsWhenBusy == 1 ? "time" : "times") before leaving it for next time
+        </div>
+        <div class="muted small">A busy album goes to the back of the queue, so MusicBrainz gets time to recover before it's tried again.</div>
+        <div class="muted small">
+            The catalogue, your artists' discographies and their albums' editions, is updated on its own schedule, or by the Scan menu's
+            <em>Update catalogue</em> whenever you like; a scan leaves it alone.
+        </div>
+        <ScheduleNote Task="ScheduledTask.Scan" />
+        <ScheduleNote Task="ScheduledTask.CatalogueUpdate" />
+    </div>
+
+    <AutoSave @ref="_saver" Save="SaveAsync" />
+}
+
+@code {
+    private FetchSettings? _fetch;
+    private LibrarySettings? _library;
+    private ScheduleSettings? _schedules;
+    // What's changed since it was last saved; each is kept with settings of its own.
+    private bool _fetchChanged, _libraryChanged, _schedulesChanged;
+    private AutoSave? _saver;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var fetch = Api.GetFetchSettingsAsync();
+        var library = Api.GetLibrarySettingsAsync();
+        var schedules = Api.GetSchedulesAsync();
+        (_fetch, _library, _schedules) = (await fetch, await library, (await schedules).Settings);
+    }
+
+    // Each change is saved in a moment, with whatever else changes meanwhile.
+    private void SetFetch(FetchSettings fetch)
+    {
+        _fetch = fetch;
+        _fetchChanged = true;
+        _saver?.Changed();
+    }
+
+    private void SetLibrary(LibrarySettings library)
+    {
+        _library = library;
+        _libraryChanged = true;
+        _saver?.Changed();
+    }
+
+    private void SetSchedules(ScheduleSettings schedules)
+    {
+        _schedules = schedules;
+        _schedulesChanged = true;
+        _saver?.Changed();
+    }
+
+    // Fetching's settings keep the library format as Library last saved it, and the schedules their windows as Scheduled
+    // tasks did: only what's set here is changed.
+    private async Task SaveAsync()
+    {
+        if (_fetchChanged)
+        {
+            _fetchChanged = false;
+            await Api.SaveFetchSettingsAsync(_fetch! with { PathTemplate = (await Api.GetFetchSettingsAsync()).PathTemplate });
+        }
+        if (_libraryChanged)
+        {
+            _libraryChanged = false;
+            await Api.SaveLibrarySettingsAsync(_library!);
+        }
+        if (_schedulesChanged)
+        {
+            _schedulesChanged = false;
+            await Api.SaveSchedulesAsync((await Api.GetSchedulesAsync()).Settings with { DownloadsAtATime = _schedules!.DownloadsAtATime });
+        }
+    }
+}
