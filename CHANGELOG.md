@@ -4,6 +4,11 @@ What changed in each release of Melodex. Versions follow [semantic versioning](h
 
 ## [Unreleased]
 
+### Fixed
+
+- On an iPhone or iPad, a song that wasn't queued or played lately took several seconds to start in the web app, as
+  the server made the whole of the copy it sends there before sending any of it. It's sent as it's made now (#257).
+
 ## [2.0.0] - 2026-11-25
 
 Melodex becomes a full music server: Subsonic players with stars, ratings and a shared play queue; listening history,
