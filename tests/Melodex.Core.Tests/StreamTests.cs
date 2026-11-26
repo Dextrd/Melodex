@@ -1,5 +1,8 @@
 using System.Diagnostics;
 using System.Text;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Melodex.Core.Listening;
@@ -146,5 +149,44 @@ public sealed class StreamTests
         {
             Directory.Delete(root, true);
         }
+    }
+
+    // Making a song AAC can take a while, so the first time it's asked for it's sent as it's made, and kept (#257).
+    [FfmpegFact]
+    public async Task An_mp4_copy_is_sent_as_its_made_the_first_time_and_from_the_file_after()
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"melodex-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(root);
+        try
+        {
+            var song = Path.Combine(root, "song.flac");
+            using (var ffmpeg = Process.Start(new ProcessStartInfo("ffmpeg", ["-v", "error", "-f", "lavfi", "-i", "sine=frequency=440:duration=60", "-c:a", "flac", song])
+                   { RedirectStandardError = true })!)
+                await ffmpeg.WaitForExitAsync();
+            var copies = new StreamCopies(Options.Create(new MelodexOptions { DataPath = Path.Combine(root, "data") }), NullLogger<StreamCopies>.Instance);
+
+            var first = await copies.ServeAsync(song, null, StreamCopies.Mp4, null, CancellationToken.None);
+            Assert.IsType<FileStreamHttpResult>(first);
+            var sent = await Send(first);
+
+            var copy = Assert.Single(Directory.GetFiles(Path.Combine(root, "data", "mp4")));
+            Assert.EndsWith(".aac.mp4", copy);
+            Assert.Equal(await File.ReadAllBytesAsync(copy), sent);
+            Assert.True(Encoding.ASCII.GetString(sent).Split("moof").Length > 3);
+            Assert.IsType<PhysicalFileHttpResult>(await copies.ServeAsync(song, null, StreamCopies.Mp4, null, CancellationToken.None));
+        }
+        finally
+        {
+            Directory.Delete(root, true);
+        }
+    }
+
+    private static async Task<byte[]> Send(IResult result)
+    {
+        var body = new MemoryStream();
+        var http = new DefaultHttpContext { RequestServices = new ServiceCollection().AddLogging().BuildServiceProvider() };
+        http.Response.Body = body;
+        await result.ExecuteAsync(http);
+        return body.ToArray();
     }
 }
