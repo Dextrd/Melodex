@@ -6,6 +6,13 @@ What changed in each release of Melodex. Versions follow [semantic versioning](h
 
 ## [2.0.1] - 2026-11-27
 
+### Security
+
+- Someone who may manage users could set a new password for anyone who wasn't the admin, including people who may do
+  more than they can, and then sign in as them. They could also set anyone's media server login, the admin's
+  included. Now they can only change or remove someone who may do nothing they can't, and only the admin changes the
+  admin's account.
+
 ### Fixed
 
 - On an iPhone or iPad, a song that wasn't queued or played lately took several seconds to start in the web app, as

@@ -37,6 +37,10 @@ right, saved together:
 
 Someone who just listens needs Browse and Listen. Buttons for what someone may not do don't show.
 
+Someone who may manage users can only give permissions they have themselves, and can only change or remove someone
+who may do nothing they can't: their name, password, permissions and media server logins. Only the admin changes the
+admin's account.
+
 ## API keys
 
 Apps use a key from **Settings → Server → API keys**. Anyone signed in can make keys there, as many as they like, but each can do only
