@@ -4,6 +4,10 @@ What changed in each release of Melodex. Versions follow [semantic versioning](h
 
 ## [Unreleased]
 
+### Fixed
+
+- On a phone, the current lyric is no longer cut off on the right as it grows (#260).
+
 ## [2.0.1] - 2026-11-27
 
 ### Security

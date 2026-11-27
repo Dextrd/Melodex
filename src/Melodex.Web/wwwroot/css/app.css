@@ -906,7 +906,7 @@ button.icon.play .spinner { margin: 0; vertical-align: middle; }
 }
 .np-queue .queue-list li.now { background: color-mix(in srgb, var(--text) 10%, transparent); }
 /* Lyrics sit flush beside the cover, with no box, fading out at the top and bottom. */
-.np-panel.np-lyrics { background: none; backdrop-filter: none; border-radius: 0; padding-left: 0; padding-right: 0;
+.np-panel.np-lyrics { background: none; backdrop-filter: none; border-radius: 0; padding-left: 0; padding-right: 4%;
     mask-image: linear-gradient(to bottom, transparent, #000 14%, #000 86%, transparent); }
 .np-lyrics { padding: 30vh 2rem; font-size: clamp(1.25rem, 2.2vw, 2rem); font-weight: 700; line-height: 1.35; scrollbar-width: none; }
 .np-lyrics::-webkit-scrollbar { display: none; }
