@@ -228,8 +228,8 @@ public static class AccessEndpoints
                 var caller = Caller.Of(http);
                 if (await db.Users.FindAsync([id], ct) is not { } user)
                     return Results.NotFound();
-                if (user.IsAdmin && !caller.IsAdmin || user.IsAdmin && caller.Kind != CallerKind.User)
-                    return Results.Problem("Only the admin can change the admin's account.", statusCode: StatusCodes.Status403Forbidden, title: "Not allowed");
+                if (OutOfReach(caller, user) is { } outOfReach)
+                    return outOfReach;
                 if (body.Permissions is { } permissions && !user.IsAdmin && Beyond(caller, permissions) is { } beyond)
                     return beyond;
                 var username = string.IsNullOrWhiteSpace(body.Username) ? user.Username : body.Username.Trim();
@@ -256,7 +256,8 @@ public static class AccessEndpoints
             })
             .WithName("UpdateUser")
             .WithSummary("Rename someone, set a new password for them (which signs them out everywhere), or change what they may do. Only the admin "
-                         + "can change the admin, whose permissions are fixed, and you can only give permissions you have yourself.")
+                         + "can change the admin, whose permissions are fixed; you can only change someone who may do nothing you can't, and only give "
+                         + "permissions you have yourself.")
             .Produces<UserInfo>().ProducesValidationProblem().Produces(StatusCodes.Status404NotFound);
 
         users.MapDelete("/{id:guid}", async (Guid id, HttpContext http, MelodexDbContext db, AccessService access, CancellationToken ct) =>
@@ -267,12 +268,15 @@ public static class AccessEndpoints
                     return Results.Problem("The admin can't be removed.", statusCode: StatusCodes.Status409Conflict, title: "Can't remove the admin");
                 if (user.Id == Caller.Of(http).UserId)
                     return Results.Problem("You can't remove yourself. Ask the admin.", statusCode: StatusCodes.Status409Conflict, title: "Can't remove yourself");
+                if (OutOfReach(Caller.Of(http), user) is { } outOfReach)
+                    return outOfReach;
                 db.Users.Remove(user);
                 await db.SaveChangesAsync(ct);
                 access.UsersChanged();
                 return Results.NoContent();
             })
-            .WithName("RemoveUser").WithSummary("Remove someone, signing them out and revoking their API keys. The admin can't be removed.")
+            .WithName("RemoveUser").WithSummary("Remove someone, signing them out and revoking their API keys. The admin can't be removed, and you can "
+                                                + "only remove someone who may do nothing you can't.")
             .Produces(StatusCodes.Status204NoContent).Produces(StatusCodes.Status404NotFound).ProducesProblem(StatusCodes.Status409Conflict);
     }
 
@@ -377,6 +381,28 @@ public static class AccessEndpoints
     }
 
     // Nobody can give more than they have.
+
+    /// <summary>
+    /// Why the caller can't change this person's account, or null if they can. Only the admin, signed in, changes the
+    /// admin's; anyone else's is changed only by someone who has every permission they have, so the users permission
+    /// can't be used to take over an account that may do more.
+    /// </summary>
+    internal static IResult? OutOfReach(Caller caller, User user)
+    {
+        if (user.IsAdmin)
+            return caller.IsAdmin && caller.Kind == CallerKind.User
+                ? null
+                : Results.Problem("Only the admin can change the admin's account.", statusCode: StatusCodes.Status403Forbidden, title: "Not allowed");
+        var missing = Scopes.Parse(user.Permissions).Where(p => Scopes.IsPermission(p) && !caller.May(p)).ToList();
+        return missing.Count == 0
+            ? null
+            : Results.Problem($"{user.Username} may do more than you: you don't have {string.Join(", ", missing)}. Ask the admin.",
+                statusCode: StatusCodes.Status403Forbidden, title: "Not allowed");
+    }
+
+    /// <summary>The same, for someone found by their ID: not found if there's no one.</summary>
+    internal static async Task<IResult?> OutOfReachAsync(HttpContext http, Guid id, MelodexDbContext db, CancellationToken ct) =>
+        await db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == id, ct) is { } user ? OutOfReach(Caller.Of(http), user) : Results.NotFound();
 
     private static IResult? Beyond(Caller caller, IEnumerable<string> permissions)
     {

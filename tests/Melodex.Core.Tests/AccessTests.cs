@@ -242,6 +242,55 @@ public sealed class AccessTests : IDisposable
         Assert.Equal(["admin", "manager"], (await admin.ListUsersAsync()).Select(u => u.Username).Order());
     }
 
+    // The users permission doesn't reach anyone who may do more: their password, name, permissions, removal and media
+    // server logins are left to someone with all they have, and the admin's to the admin.
+    [Fact]
+    public async Task Nobody_changes_someone_who_may_do_more_than_they_can()
+    {
+        var admin = new MelodexClient(_factory.CreateSignedInClient());
+        var adminId = (await admin.ListUsersAsync()).Single(u => u.IsAdmin).Id;
+        await admin.CreateUserAsync(new CreateUser("manager", "managing password", [Scopes.Read, Scopes.Users, Scopes.Keys]));
+        var keeper = await admin.CreateUserAsync(new CreateUser("keeper", "keeping password", [Scopes.Read, Scopes.Settings, Scopes.Remove]));
+        var guest = await admin.CreateUserAsync(new CreateUser("guest", "a guest password", [Scopes.Read]));
+        var http = await SignInAsync("manager", "managing password");
+        var manager = new MelodexClient(http);
+
+        foreach (var change in new Func<Task>[]
+                 {
+                     () => manager.UpdateUserAsync(keeper.Id, new UpdateUser(Password: "taken over now")),
+                     () => manager.UpdateUserAsync(keeper.Id, new UpdateUser(Username: "kept")),
+                     () => manager.UpdateUserAsync(keeper.Id, new UpdateUser(Permissions: [Scopes.Read])),
+                     () => manager.RemoveUserAsync(keeper.Id),
+                 })
+            Assert.Equal(HttpStatusCode.Forbidden, (await Assert.ThrowsAsync<MelodexApiException>(change)).Status);
+        foreach (var id in new[] { keeper.Id, adminId })
+        {
+            var login = new LinkMediaServer("someone", "their password");
+            Assert.Equal(HttpStatusCode.Forbidden, (await http.PutAsJsonAsync($"api/v1/users/{id}/media-server", login, MelodexJson.Options)).StatusCode);
+            Assert.Equal(HttpStatusCode.Forbidden, (await http.DeleteAsync($"api/v1/users/{id}/media-server")).StatusCode);
+            Assert.Equal(HttpStatusCode.Forbidden,
+                (await http.PutAsJsonAsync($"api/v1/users/{id}/media-servers/{Guid.NewGuid()}", login, MelodexJson.Options)).StatusCode);
+            Assert.Equal(HttpStatusCode.Forbidden, (await http.DeleteAsync($"api/v1/users/{id}/media-servers/{Guid.NewGuid()}")).StatusCode);
+        }
+        // Their password is still their own.
+        await SignInAsync("keeper", "keeping password");
+
+        // A key reaches only as far as its scopes: one with users alone can't change someone who may read.
+        var key = await manager.CreateApiKeyAsync(new CreateApiKey("Users only", [Scopes.Users]));
+        var app = _factory.CreateClient();
+        app.DefaultRequestHeaders.Add(AccessService.KeyHeader, key.Key);
+        Assert.Equal(HttpStatusCode.Forbidden,
+            (await app.PutAsJsonAsync($"api/v1/users/{guest.Id}", new UpdateUser(Password: "taken over now"), MelodexJson.Options)).StatusCode);
+
+        // Someone who may do no more than the manager is still theirs to change and remove.
+        await manager.UpdateUserAsync(guest.Id, new UpdateUser(Password: "a new guest password"));
+        await SignInAsync("guest", "a new guest password");
+        await manager.RemoveUserAsync(guest.Id);
+        // The admin still changes anyone.
+        await admin.UpdateUserAsync(keeper.Id, new UpdateUser(Permissions: [Scopes.Read]));
+        await manager.UpdateUserAsync(keeper.Id, new UpdateUser(Username: "kept"));
+    }
+
     [Fact]
     public async Task Keys_can_do_no_more_than_their_owner()
     {

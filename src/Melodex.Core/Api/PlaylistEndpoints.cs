@@ -186,21 +186,24 @@ public static class PlaylistEndpoints
             .WithSummary("Forget your login on one media server. Your playlists stay in both places, but no longer change together while it's in use.")
             .Produces(StatusCodes.Status204NoContent);
 
+        // Someone else's logins are changed only by whoever may change their account (AccessEndpoints.OutOfReach): the admin's
+        // only by the admin.
         api.MapGet("/users/{id:guid}/media-servers", (Guid id, MelodexDbContext db, ConnectorPlugins connectors, CancellationToken ct) => AccountsAsync(id, db, connectors, ct))
             .RequireScope(Scopes.Users).WithTags("Access")
             .WithName("ListUserMediaServerAccounts")
             .WithSummary("Someone's login on each media server that syncs playlists.")
             .Produces<List<MediaServerAccount>>().Produces(StatusCodes.Status404NotFound);
 
-        api.MapPut("/users/{id:guid}/media-servers/{serverId:guid}", (Guid id, Guid serverId, LinkMediaServer body, MelodexDbContext db, ConnectorPlugins connectors,
-                PlaylistSync sync, PlaylistSyncer syncer, CancellationToken ct) => LinkAccountAsync(id, serverId, body, db, connectors, sync, syncer, ct))
+        api.MapPut("/users/{id:guid}/media-servers/{serverId:guid}", async (Guid id, Guid serverId, LinkMediaServer body, HttpContext http, MelodexDbContext db,
+                ConnectorPlugins connectors, PlaylistSync sync, PlaylistSyncer syncer, CancellationToken ct) =>
+                await AccessEndpoints.OutOfReachAsync(http, id, db, ct) ?? await LinkAccountAsync(id, serverId, body, db, connectors, sync, syncer, ct))
             .RequireScope(Scopes.Users).WithTags("Access")
             .WithName("LinkUserMediaServerAccount")
             .WithSummary("Link someone's login on one media server for them, in use or not.")
             .Produces<MediaServerAccount>().ProducesValidationProblem().Produces(StatusCodes.Status404NotFound);
 
-        api.MapDelete("/users/{id:guid}/media-servers/{serverId:guid}", (Guid id, Guid serverId, MelodexDbContext db, CancellationToken ct) =>
-                UnlinkAccountAsync(id, serverId, db, ct))
+        api.MapDelete("/users/{id:guid}/media-servers/{serverId:guid}", async (Guid id, Guid serverId, HttpContext http, MelodexDbContext db, CancellationToken ct) =>
+                await AccessEndpoints.OutOfReachAsync(http, id, db, ct) ?? await UnlinkAccountAsync(id, serverId, db, ct))
             .RequireScope(Scopes.Users).WithTags("Access")
             .WithName("UnlinkUserMediaServerAccount")
             .WithSummary("Forget someone's login on one media server.")
@@ -219,14 +222,15 @@ public static class PlaylistEndpoints
             .WithSummary("Stop syncing your playlists. They stay in Melodex and on the media server, but no longer change together.")
             .Produces(StatusCodes.Status204NoContent);
 
-        api.MapPut("/users/{id:guid}/media-server", (Guid id, LinkMediaServer body, MelodexDbContext db, PlaylistSync sync, PlaylistSyncer syncer, CancellationToken ct) =>
-                LinkAsync(id, body, db, sync, syncer, ct))
+        api.MapPut("/users/{id:guid}/media-server", async (Guid id, LinkMediaServer body, HttpContext http, MelodexDbContext db, PlaylistSync sync,
+                PlaylistSyncer syncer, CancellationToken ct) => await AccessEndpoints.OutOfReachAsync(http, id, db, ct) ?? await LinkAsync(id, body, db, sync, syncer, ct))
             .RequireScope(Scopes.Users).WithTags("Access")
             .WithName("LinkUserMediaServer")
             .WithSummary("Link someone's login on the media server for them, so their playlists are synced.")
             .Produces<PlaylistSyncStatus>().ProducesValidationProblem().Produces(StatusCodes.Status404NotFound);
 
-        api.MapDelete("/users/{id:guid}/media-server", (Guid id, MelodexDbContext db, CancellationToken ct) => UnlinkAsync(id, db, ct))
+        api.MapDelete("/users/{id:guid}/media-server", async (Guid id, HttpContext http, MelodexDbContext db, CancellationToken ct) =>
+                await AccessEndpoints.OutOfReachAsync(http, id, db, ct) ?? await UnlinkAsync(id, db, ct))
             .RequireScope(Scopes.Users).WithTags("Access")
             .WithName("UnlinkUserMediaServer")
             .WithSummary("Stop syncing someone's playlists.")
