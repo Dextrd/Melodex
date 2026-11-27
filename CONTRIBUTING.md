@@ -27,6 +27,14 @@ Found a security problem? Please don't open an issue: see [SECURITY.md](SECURITY
 
 If you're picking up an existing issue, comment on it first, so two people don't do the same work.
 
+## Branches
+
+- **`dev`** is where work happens. Every pull request goes there, and it's what the next release will be.
+- **`main`** is the latest release, and changes only when there's a new one. The compose file, the guide's links
+  and the images' `latest` tag all follow it, so what's on `main` is what people are running.
+
+At a release, `main` is brought up to `dev` and tagged.
+
 ## Setting up
 
 You'll need the .NET 10 SDK, Python 3 with `mutagen`, ffmpeg and Docker. [Developing Melodex](docs/development.md)
@@ -44,7 +52,7 @@ imports rewrite or replace files, and a bug in a change to them can damage a lib
 
 ## Making a change
 
-- **Branch from `main`**, one issue per pull request. Keep it to what the issue needs: a tidy-up somewhere else is
+- **Branch from `dev`**, and open the pull request against `dev`, one issue per pull request. Keep it to what the issue needs: a tidy-up somewhere else is
   its own pull request.
 - **Match the code around it**: its naming, its comments and how it's laid out. The web app talks to the core only
   through the public API, at `/api/v1`; if it needs something new, add it to the API and to `Melodex.Client`.
@@ -67,7 +75,7 @@ imports rewrite or replace files, and a bug in a change to them can damage a lib
 ## Tests and CI
 
 Run the tests near your change while you work, for example `dotnet test --filter AboutPageTests`, and the whole suite
-before you open the pull request. CI runs on every pull request. It builds Melodex, checks the web app's scripts
+before you open the pull request. CI runs on every pull request, and on every push to `dev` and `main`. It builds Melodex, checks the web app's scripts
 parse, runs every test, checks the migrations, and builds and starts the Docker image. A pull request is merged only
 once CI passes.
 
