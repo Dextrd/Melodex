@@ -4,6 +4,8 @@ What changed in each release of Melodex. Versions follow [semantic versioning](h
 
 ## [Unreleased]
 
+## [2.0.1] - 2026-11-27
+
 ### Fixed
 
 - On an iPhone or iPad, a song that wasn't queued or played lately took several seconds to start in the web app, as
