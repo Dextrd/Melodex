@@ -279,6 +279,12 @@ input[type=search], input[type=text], input[type=number], select, textarea {
 }
 textarea { resize: vertical; line-height: 1.45; }
 input[type=search] { width: 100%; max-width: 420px; }
+/* iOS zooms the page in on a field whose text is under 16px, and the page's own size is smaller. iPhone and iPad
+   only: every browser there is WebKit and nothing else matches this. */
+@supports (-webkit-touch-callout: none) {
+    input[type=search], input[type=text], input[type=number], input[type=password], input[type=time], select,
+    textarea { font-size: 16px; }
+}
 label { display: inline-flex; align-items: center; gap: .4rem; }
 
 .muted { color: var(--muted); }
