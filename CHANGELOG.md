@@ -7,6 +7,7 @@ What changed in each release of Melodex. Versions follow [semantic versioning](h
 ### Fixed
 
 - On a phone, the current lyric is no longer cut off on the right as it grows (#260).
+- On WebKit browsers (iOS), pages no longer zoom into text boxes when typing (#271).
 
 ## [2.0.1] - 2026-11-27
 
